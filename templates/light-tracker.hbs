@@ -1,0 +1,37 @@
+{{!-- Light Tracker --}}
+<div class="vlt-tracker">
+  {{#each entries}}
+  <div class="vlt-entry">
+    <img class="vlt-portrait" src="{{img}}" alt="{{name}}" />
+    <span class="vlt-name">{{name}}</span>
+
+    <div class="vlt-lights">
+      {{#each lights}}
+      <div class="vlt-light-row">
+        <i class="fas fa-fire" style="color:#ff9900"></i>
+        <span>{{name}}</span>
+        <div class="vlt-time-bar">
+          <div class="vlt-time-fill {{#if (lt pct 20)}}low{{/if}}" style="width:{{pct}}%"></div>
+        </div>
+        <span>{{formattedTime}}</span>
+        <button class="vlt-douse" data-actor-id="{{../actorId}}" data-item-id="{{id}}" title="Douse">
+          <i class="fas fa-wind"></i>
+        </button>
+      </div>
+      {{/each}}
+
+      {{#unless lights.length}}
+        <span style="color:#6a6050;font-size:10px;font-style:italic">No active lights</span>
+      {{/unless}}
+    </div>
+
+    {{#if hasDarkvision}}
+    <span class="vlt-darkvision" title="Has darkvision"><i class="fas fa-eye"></i></span>
+    {{/if}}
+  </div>
+  {{/each}}
+
+  {{#unless entries.length}}
+    <p style="color:#6a6050;text-align:center;padding:8px">No player characters found.</p>
+  {{/unless}}
+</div>

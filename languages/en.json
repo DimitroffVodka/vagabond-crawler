@@ -1,0 +1,18 @@
+{
+  "VAGABOND_CRAWLER": {
+    "CrawlStart":        "Start Crawl",
+    "CrawlEnd":          "End Crawl",
+    "CrawlResume":       "Resume Crawl",
+    "CrawlPaused":       "Combat in progress",
+    "NextTurn":          "Next Turn",
+    "AddParty":          "Add Party",
+    "AddGM":             "Add GM",
+    "EncounterCheck":    "Enc. Check",
+    "InstantEncounter":  "Encounter!",
+    "TimePasses":        "Time Passes",
+    "StartCombat":       "Combat",
+    "RestBreather":      "Rest",
+    "LightTracker":      "Lights",
+    "DropTable":         "Drop Table"
+  }
+}

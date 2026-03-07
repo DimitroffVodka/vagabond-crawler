@@ -1,0 +1,139 @@
+<form class="vagabond-encounter-roller">
+
+  <div class="encounter-tabs">
+    <button type="button" class="tab-btn {{#if isBuildMode}}active{{/if}}" data-mode="build">
+      <i class="fas fa-hammer"></i> Build Table
+    </button>
+    <button type="button" class="tab-btn {{#unless isBuildMode}}active{{/unless}}" data-mode="existing">
+      <i class="fas fa-table"></i> Roll Tables
+    </button>
+  </div>
+
+  {{!-- BUILD TABLE TAB --}}
+  {{#if isBuildMode}}
+  <div class="encounter-build-section">
+    <div class="encounter-controls-row">
+      <div class="control-group">
+        <label>Die Type</label>
+        <select class="die-select">
+          {{#each dieTypes}}
+          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{value}}</option>
+          {{/each}}
+        </select>
+      </div>
+      <div class="control-group" style="flex:1">
+        <label>Table Name</label>
+        <input type="text" class="table-name-input" value="{{tableName}}" placeholder="e.g. Forest Encounters" />
+      </div>
+      <div class="control-group" style="align-self:flex-end">
+        <button type="button" class="save-table"><i class="fas fa-save"></i> Save as Roll Table</button>
+      </div>
+    </div>
+
+    <div class="encounter-slots-header">
+      <span class="slot-num">#</span>
+      <span class="slot-name">Monster (drag NPC from sidebar)</span>
+      <span class="slot-appearing"># Appearing</span>
+      <span></span>
+    </div>
+
+    <div class="encounter-slots">
+      {{#each slots}}
+      <div class="encounter-slot {{#unless name}}empty{{/unless}}" data-index="{{index}}">
+        <span class="slot-num">{{number}}</span>
+        <span class="slot-name">{{#if name}}{{name}}{{else}}<em>Drop NPC here</em>{{/if}}</span>
+        {{#if name}}
+          <input type="text" class="appearing-input" data-index="{{index}}" value="{{appearing}}" placeholder="1" style="width:60px" />
+          <button type="button" class="clear-slot" data-index="{{index}}"><i class="fas fa-times"></i></button>
+        {{else}}
+          <span class="slot-appearing"></span>
+          <span></span>
+        {{/if}}
+      </div>
+      {{/each}}
+    </div>
+
+    <div class="encounter-actions">
+      <button type="button" class="roll-encounter"><i class="fas fa-dice-d20"></i> Roll Encounter</button>
+    </div>
+  </div>
+  {{/if}}
+
+  {{!-- ROLL TABLES TAB --}}
+  {{#unless isBuildMode}}
+  <div class="encounter-existing-section">
+    {{#if registeredTable}}
+    <div class="registered-table-group">
+      <h4><i class="fas fa-star"></i> Active Table</h4>
+      <div class="table-select-row">
+        <span class="active-table-name">{{registeredTable}}</span>
+        <button type="button" class="roll-registered"><i class="fas fa-dice-d20"></i> Roll</button>
+      </div>
+    </div>
+    {{/if}}
+
+    {{#if hasWorldTables}}
+    <div class="world-tables-group">
+      <h4><i class="fas fa-table"></i> All Roll Tables</h4>
+      <p class="table-hint">Tables built here include monster UUIDs for token placement.</p>
+      <div class="table-select-row">
+        <select class="world-table-select">
+          {{#each worldTables}}
+          <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+          {{/each}}
+        </select>
+        <button type="button" class="roll-world-table"><i class="fas fa-dice-d20"></i> Roll</button>
+        <button type="button" class="set-as-active"><i class="fas fa-star"></i> Set Active</button>
+      </div>
+      {{#if selectedTablePreview}}
+      <div class="table-preview">
+        <div class="table-preview-header">
+          <span class="preview-formula">{{selectedTablePreview.formula}}</span>
+        </div>
+        <div class="table-preview-rows">
+          {{#each selectedTablePreview.rows}}
+          <div class="preview-row">
+            <span class="preview-range">{{range}}</span>
+            <span class="preview-name">{{name}}</span>
+            <span class="preview-appearing">×{{appearing}}</span>
+          </div>
+          {{/each}}
+        </div>
+      </div>
+      {{/if}}
+    </div>
+    {{else}}
+    <p class="no-tables-msg"><em>No roll tables found. Build one in the Build Table tab.</em></p>
+    {{/if}}
+  </div>
+  {{/unless}}
+
+  {{!-- RESULT PANEL --}}
+  {{#if lastResult}}
+  <div class="encounter-result-panel">
+    <h4><i class="fas fa-dragon"></i> Encounter Result</h4>
+    <div class="result-row">
+      <span class="result-label">Monster:</span>
+      <span class="result-value">{{lastResult.monsterName}} × {{lastResult.count}}</span>
+      <button type="button" class="reroll-count" title="Re-roll count"><i class="fas fa-dice"></i></button>
+    </div>
+    <div class="result-row">
+      <span class="result-label">Distance:</span>
+      <span class="result-value">{{lastResult.distance.label}} <small>({{lastResult.distance.roll}})</small></span>
+      <button type="button" class="reroll-distance" title="Re-roll distance"><i class="fas fa-dice"></i></button>
+    </div>
+    <div class="result-row">
+      <span class="result-label">Reaction:</span>
+      <span class="result-value">{{lastResult.reaction.label}} <small>({{lastResult.reaction.roll}})</small></span>
+      <button type="button" class="reroll-reaction" title="Re-roll reaction"><i class="fas fa-dice"></i></button>
+    </div>
+    <div class="result-actions">
+      <button type="button" class="post-to-chat"><i class="fas fa-comment"></i> Post to Chat</button>
+      {{#if lastResult.monsterUuid}}
+      <button type="button" class="place-tokens"><i class="fas fa-map-pin"></i> Place {{lastResult.count}} Token(s)</button>
+      {{/if}}
+    </div>
+  </div>
+  {{/if}}
+
+</form>

@@ -1,0 +1,50 @@
+{{!-- Encounter Table Builder --}}
+<div class="vcb-encounter-builder">
+
+  <div class="vcb-builder-row">
+    <label>Die Type:
+      <select class="vcb-die-select">
+        {{#each dieTypes}}
+          <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+        {{/each}}
+      </select>
+    </label>
+    <label>Table Name:
+      <input type="text" class="vcb-table-name" value="{{tableName}}" placeholder="My Dungeon Encounters" />
+    </label>
+  </div>
+
+  <div class="vcb-slots">
+    {{#each slots}}
+    <div class="vcb-slot" data-index="{{index}}">
+      <span class="vcb-slot-num">{{number}}</span>
+      {{#if name}}
+        <img src="" class="vcb-slot-thumb" />
+        <span class="vcb-slot-name">{{name}}</span>
+        <input type="text" class="vcb-appearing" value="{{appearing}}" placeholder="# Appearing" style="width:60px" />
+        <button class="vcb-clear-slot" data-index="{{index}}" title="Clear slot">×</button>
+      {{else}}
+        <span class="vcb-slot-empty" style="color:#6a6050;font-style:italic">Drop NPC actor here</span>
+      {{/if}}
+    </div>
+    {{/each}}
+  </div>
+
+  <div class="vcb-builder-actions">
+    <button class="vcb-save-table"><i class="fas fa-save"></i> Save as Roll Table</button>
+  </div>
+
+  {{#if worldTables.length}}
+  <hr />
+  <div class="vcb-use-existing">
+    <strong>Or use an existing table:</strong>
+    <select class="vcb-existing-select">
+      {{#each worldTables}}
+        <option value="{{id}}">{{name}}</option>
+      {{/each}}
+    </select>
+    <button class="vcb-use-table"><i class="fas fa-check"></i> Use This Table</button>
+  </div>
+  {{/if}}
+
+</div>
