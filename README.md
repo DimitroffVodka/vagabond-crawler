@@ -192,7 +192,6 @@ Or search for **Vagabond Crawler** in the Foundry module browser.
 
 ## Authors
 
-- **Patrick**
 - **DimitroffVodka**
 
 ---
