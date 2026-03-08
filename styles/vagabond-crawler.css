@@ -302,7 +302,7 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
+  width: max-content;
   max-width: 100%;
   z-index: 65;
   font-family: var(--vcb-font);
@@ -321,10 +321,11 @@
   display: flex;
   align-items: stretch;
   background: linear-gradient(180deg, #17191d 0%, #1b1b1b 100%);
-  width: 100%;
+  width: max-content;
   overflow: visible;
   box-shadow: 0 2px 8px rgba(0,0,0,0.6);
   border-bottom: 2px solid var(--vcb-accent-dim);
+  border-radius: 0 0 var(--vcb-radius) 0;
 }
 
 /* ── Hero / NPC groups ────────────────────────────────────────────────────── */
