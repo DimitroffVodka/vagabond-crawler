@@ -170,7 +170,7 @@ export const MovementTracker = {
 
   init() {
     CONFIG.Token.rulerClass = VCSTokenRuler;
-    console.log("vagabond-crawler | Registered VCSTokenRuler");
+    console.log(`${MODULE_ID} | Registered VCSTokenRuler`);
 
     // CONFIG.Token.rulerClass only affects newly created tokens.
     // Swap ruler instances on all tokens already on canvas.
@@ -286,7 +286,7 @@ export const MovementTracker = {
       try { token.ruler?.destroy(); } catch(e) {}
       token.ruler = new VCSTokenRuler(token);
       token.ruler.draw().catch(() => {});
-      console.log(`vagabond-crawler | Installed VCSTokenRuler on ${token.name}`);
+      console.log(`${MODULE_ID} | Installed VCSTokenRuler on ${token.name}`);
     }
   },
 

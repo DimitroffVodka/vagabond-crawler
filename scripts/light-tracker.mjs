@@ -139,7 +139,7 @@ export const LightTracker = {
     if (this._intervalId) return;
     this._tickAccum  = 0;
     this._intervalId = setInterval(() => this._tick(), 1000);
-    console.log(`vagabond-crawler | Real-time light tracking started.`);
+    console.log(`${MODULE_ID} | Real-time light tracking started.`);
   },
 
   stopRealTime() {
@@ -150,7 +150,7 @@ export const LightTracker = {
         game.time.advance(this._tickAccum);
         this._tickAccum = 0;
       }
-      console.log(`vagabond-crawler | Real-time light tracking stopped.`);
+      console.log(`${MODULE_ID} | Real-time light tracking stopped.`);
     }
   },
 
