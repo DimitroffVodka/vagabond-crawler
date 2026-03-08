@@ -10,7 +10,7 @@ A comprehensive dungeon crawl management module for the **Vagabond RPG** system 
 
 ## Features
 
-### 🗺️ Crawl Bar (GM Only)
+### Crawl Bar (GM Only)
 A persistent bottom bar that drives the entire crawl loop. Visible only to the GM.
 
 - **Start / End Crawl** — Activates the crawl state and populates the tracker
@@ -28,7 +28,7 @@ A persistent bottom bar that drives the entire crawl loop. Visible only to the G
 
 ---
 
-### 🎴 Crawl Strip (All Players)
+### Crawl Strip (All Players)
 A top-of-screen HUD bar showing all combatants at a glance. Visible to all players during an active crawl.
 
 - **Portrait cards** for every hero and NPC with HP bar, status pills, and name
@@ -59,7 +59,7 @@ During combat, hovering a card reveals a tab strip with quick-access action menu
 
 ---
 
-### ✨ Spell Cast Dialog
+### Spell Cast Dialog
 Launched from the NPC Action Menu spell tab. A compact popup for configuring and casting spells without opening the full character sheet.
 
 - Select delivery type (Touch, Remote, Cone, Line, Sphere, Aura, etc.)
@@ -72,7 +72,7 @@ Launched from the NPC Action Menu spell tab. A compact popup for configuring and
 
 ---
 
-### 👣 Movement Tracker
+### Movement Tracker
 Enforces Vagabond's movement rules on tracked tokens.
 
 **Crawl mode:**
@@ -91,7 +91,7 @@ Movement remaining is displayed on each hero's card in the strip.
 
 ---
 
-### 💡 Light Tracker
+### Light Tracker
 Tracks light source burn time for torches, lanterns, and candles carried by party members.
 
 - Automatically detects torches, hooded lanterns, bullseye lanterns, and candles in actor inventories
@@ -106,7 +106,7 @@ Supported light sources: Torch, Lantern (Hooded), Lantern (Bullseye), Candle
 
 ---
 
-### ⚔️ Morale Checker
+### Morale Checker
 Automatically triggers morale checks at the correct moments during combat.
 
 - **First death** — Triggers when the first NPC is defeated
@@ -116,7 +116,7 @@ Automatically triggers morale checks at the correct moments during combat.
 
 ---
 
-### ⏱️ Crawl Clock
+### Crawl Clock
 A progress clock that tracks dungeon exploration tension.
 
 - Configurable sizes: Tiny (4), Small (6), Medium (8), Large (10), Huge (12)
@@ -128,7 +128,7 @@ A progress clock that tracks dungeon exploration tension.
 
 ---
 
-### 🍖 Rest & Breather
+### Rest & Breather
 A combined dialog for managing recovery between encounters.
 
 - Shows all player characters with current HP, Luck, Mana, Fatigue, Might, and Ration count
@@ -140,7 +140,7 @@ A combined dialog for managing recovery between encounters.
 
 ---
 
-### 🎲 Encounter Tools
+### Encounter Tools
 **Encounter Check** — A quick d6 roll against a configurable threshold (1-in-6 through 5-in-6). On a hit, auto-opens the encounter roller and rolls the active table. Right-click the button to change the threshold. Configurable as GM-only whisper or visible to all players.
 
 **Encounter Roller** — A full encounter building and rolling tool:
