@@ -1,16 +1,18 @@
 /**
  * Vagabond Crawler — Encounter Tools
  *
- * Encounter Check: d6 roll, on 1 post to GM chat.
+ * Encounter Check: d6 roll, configurable threshold (1-in-6 through 5-in-6).
+ * On hit, auto-opens the encounter roller and rolls the active table.
  * Encounter Roller: full Application window matching vagabond-extras UX:
  *   - Build Table tab: drag NPCs onto slots, save as RollTable
- *   - Roll Tables tab: pick any world RollTable and roll it
+ *   - Roll Tables tab: pick any world RollTable (grouped by folder) and roll it
  *   - Result panel: monster × count, distance, reaction with reroll buttons
  *   - Post to Chat / Place Tokens actions
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
 import { confirmDialog } from "./dialog-helpers.mjs";
+import { ICONS } from "./icons.mjs";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -42,24 +44,27 @@ export const EncounterTools = {
   _app: null,
 
   async rollEncounterCheck() {
-    const roll   = await new Roll("1d6").evaluate();
-    const hit    = roll.total === 1;
-    const gmOnly = game.settings.get(MODULE_ID, "encounterRollGMOnly");
+    const roll      = await new Roll("1d6").evaluate();
+    const threshold = game.settings.get(MODULE_ID, "encounterThreshold");
+    const hit       = roll.total <= threshold;
+    const gmOnly    = game.settings.get(MODULE_ID, "encounterRollGMOnly");
 
     await ChatMessage.create({
       content: `<div class="vagabond-crawler-chat ${hit ? "encounter-hit" : "encounter-miss"}">
-        <h3><i class="fas ${hit ? "fa-dragon" : "fa-dice-d6"}"></i>
+        <h3>${hit ? ICONS.encounterChat : '<i class="fas fa-dice-d6"></i>'}
           ${hit ? "Encounter!" : "No Encounter"}
         </h3>
-        <p>Rolled <strong>${roll.total}</strong> on d6 —
+        <p>Rolled <strong>${roll.total}</strong> on d6 (encounter on ${threshold} or less) —
           ${hit ? "something stirs in the dark." : "the dungeon is quiet… for now."}
         </p>
-        ${hit ? `<p><em>Use the Encounter! button to roll the table.</em></p>` : ""}
       </div>`,
       speaker: { alias: "Crawler" },
       rolls:   [roll],
       whisper: gmOnly ? game.users.filter(u => u.isGM).map(u => u.id) : [],
     });
+
+    // Auto-open encounter roller and roll the active table on hit
+    if (hit) this.rollInstantEncounter();
   },
 
   rollInstantEncounter() {
@@ -122,8 +127,8 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
         appearing: s?.appearing ?? "",
         uuid:      s?.uuid      ?? "",
       })),
-      worldTables:    game.tables.map(t => ({ id: t.id, name: t.name, selected: t.id === this._selectedTableId })),
-      hasWorldTables: game.tables.size > 0,
+      worldTableGroups: this._getGroupedTables(),
+      hasWorldTables:   game.tables.size > 0,
       selectedTablePreview: this._getTablePreview(this._selectedTableId),
       lastResult:     this._lastResult,
       registeredTable: this._getRegisteredTableName(),
@@ -196,6 +201,7 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const sel = $(".world-table-select");
       if (sel) { this._selectedTableId = sel.value; this._setAsActive(sel.value); }
     });
+    btn(".manage-folders",   () => this._openFolderExclusions());
     btn(".reroll-count",    async () => {
       if (this._lastResult?.countFormula) {
         const r = await new Roll(this._lastResult.countFormula).evaluate();
@@ -382,7 +388,7 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!r) return;
     await ChatMessage.create({
       content: `<div class="vagabond-crawler-chat encounter-result">
-        <h3><i class="fas fa-dragon"></i> Random Encounter</h3>
+        <h3>${ICONS.encounterChat} Random Encounter</h3>
         <div class="encounter-details">
           <p><strong>Monster:</strong> ${r.monsterName} × ${r.count}</p>
           <p><strong>Distance:</strong> ${r.distance.label} <small>(${r.distance.roll})</small></p>
@@ -435,6 +441,75 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const uuid = game.settings.get(MODULE_ID, "encounterTableUuid");
     if (!uuid) return null;
     return game.tables.get(uuid.split(".").pop())?.name ?? null;
+  }
+
+  _getGroupedTables() {
+    let excludedIds;
+    try { excludedIds = new Set(JSON.parse(game.settings.get(MODULE_ID, "excludedTableFolders"))); }
+    catch { excludedIds = new Set(); }
+
+    const groups = new Map();
+    const unfolderedTables = [];
+
+    for (const table of game.tables) {
+      const folder = table.folder;
+      if (folder && excludedIds.has(folder.id)) continue;
+
+      const entry = { id: table.id, name: table.name, selected: table.id === this._selectedTableId };
+      if (folder) {
+        if (!groups.has(folder.id)) groups.set(folder.id, { label: folder.name, tables: [] });
+        groups.get(folder.id).tables.push(entry);
+      } else {
+        unfolderedTables.push(entry);
+      }
+    }
+
+    for (const g of groups.values()) g.tables.sort((a, b) => a.name.localeCompare(b.name));
+    unfolderedTables.sort((a, b) => a.name.localeCompare(b.name));
+
+    const result = [];
+    if (unfolderedTables.length) result.push({ label: null, tables: unfolderedTables });
+    const sorted = [...groups.values()].sort((a, b) => a.label.localeCompare(b.label));
+    result.push(...sorted);
+    return result;
+  }
+
+  async _openFolderExclusions() {
+    const tableFolders = game.folders.filter(f => f.type === "RollTable");
+    if (!tableFolders.length) { ui.notifications.info("No table folders found."); return; }
+
+    let excludedIds;
+    try { excludedIds = new Set(JSON.parse(game.settings.get(MODULE_ID, "excludedTableFolders"))); }
+    catch { excludedIds = new Set(); }
+
+    const checkboxes = tableFolders
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(f => `<label style="display:flex;align-items:center;gap:6px;padding:3px 0;">
+        <input type="checkbox" name="folder-${f.id}" value="${f.id}" ${excludedIds.has(f.id) ? "checked" : ""} />
+        <span>${f.name}</span>
+      </label>`).join("");
+
+    const result = await foundry.applications.api.DialogV2.prompt({
+      window: { title: "Exclude Folders" },
+      content: `<div style="font-family:var(--vcb-font);font-size:13px;padding:4px;">
+        <p style="color:#7a7060;margin-bottom:8px;">Check folders to <strong>hide</strong> from the encounter table dropdown:</p>
+        ${checkboxes}
+      </div>`,
+      ok: {
+        label: "Save",
+        icon: "fas fa-save",
+        callback: (event, button) => {
+          const checked = [...button.form.querySelectorAll('input[type="checkbox"]:checked')];
+          return checked.map(cb => cb.value);
+        },
+      },
+      rejectClose: false,
+    });
+
+    if (result) {
+      await game.settings.set(MODULE_ID, "excludedTableFolders", JSON.stringify(result));
+      this.render();
+    }
   }
 
   _getTablePreview(tableId) {

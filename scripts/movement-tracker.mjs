@@ -2,38 +2,61 @@
  * Vagabond Crawler — Movement Tracker
  *
  * Crawl mode: hard-blocks movement beyond crawl speed, deducts on move.
- * Combat mode: deducts movement, colors ruler green/yellow/red but does NOT block.
+ * Combat mode: budget = base speed, ruler turns red when over (Rush).
+ *              Hard cap at 2× base speed (move + Rush action).
+ *              moveRemaining can go negative to indicate Rush usage.
  *
- * Key insight from console data:
- *   - waypoint.cost = cost of THAT segment (per-step, not cumulative)
- *   - passedWaypoints = segments already committed this drag
- *   - pendingWaypoints = speculative path ahead (cursor position)
- *   - movementId changes every segment — each is a new transaction
- *   - Total cost = sum of all passed costs + sum of pending costs
+ * TokenRulerWaypoint (what _getSegmentStyle receives) is NOT the same
+ * object as the TokenMeasuredMovementWaypoint passed to refresh().
+ * Foundry creates new DeepReadonly<TokenRulerWaypoint> objects internally
+ * with `previous` (linked list), `stage` ("passed"|"pending"|"planned"),
+ * and `cost` carried over from the original waypoint.
+ *
+ * We compute cumulative cost by walking the `previous` chain, counting
+ * only "pending" waypoints (passed costs are already deducted from the
+ * actor's moveRemaining flag).
  */
 
 import { MODULE_ID }  from "./vagabond-crawler.mjs";
 import { CrawlState } from "./crawl-state.mjs";
 import { CrawlStrip } from "./crawl-strip.mjs";
+import { ICONS }      from "./icons.mjs";
 
-// ── VCS TokenRuler subclass ───────────────────────────────────────────────────
+// ── Shared speed helpers ────────────────────────────────────────────────────
+
+/**
+ * Visual movement budget for an actor.
+ * Combat: base speed (normal move action).
+ * Crawl:  exploration (crawl) speed.
+ * This is what moveRemaining resets to each turn and what the strip displays.
+ */
+function _getBaseSpeed(actor) {
+  const s = actor?.system?.speed;
+  if (CrawlState.paused) return s?.base ?? 0;   // combat: base move
+  return s?.crawl ?? 0;                           // crawl: exploration
+}
+
+/**
+ * Hard movement cap — the absolute maximum a token can move per turn.
+ * Combat: 2× base speed (move + Rush action).
+ * Crawl:  same as base speed (no Rush in crawl).
+ */
+function _getHardCap(actor) {
+  const s = actor?.system?.speed;
+  if (CrawlState.paused) return ((s?.base ?? 0) * 2);  // combat: move + Rush
+  return s?.crawl ?? 0;                                  // crawl: no Rush
+}
+
+// ── VCS TokenRuler subclass ─────────────────────────────────────────────────
 
 class VCSTokenRuler extends foundry.canvas.placeables.tokens.TokenRuler {
-
-  /** Total ft of full path, updated every refresh(). */
-  _vcsTotalFt = 0;
-
-  /** Map from waypoint object → cumulative ft at that waypoint. */
-  _vcsCumulativeMap = new Map();
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
   get _moveRemaining() {
     const actor = this.token?.actor;
     if (!actor) return Infinity;
-    const s = actor.system.speed;
-    const baseSpeed = CrawlState.paused ? (s?.base ?? 30) : (s?.crawl ?? 90);
-    return actor.getFlag(MODULE_ID, "moveRemaining") ?? baseSpeed;
+    return actor.getFlag(MODULE_ID, "moveRemaining") ?? _getBaseSpeed(actor);
   }
 
   get _isTracked() {
@@ -43,19 +66,25 @@ class VCSTokenRuler extends foundry.canvas.placeables.tokens.TokenRuler {
     return !!CrawlState.members.find(m => m.actorId === actor.id);
   }
 
-  _sumCosts(waypoints) {
-    return (waypoints ?? []).reduce((sum, wp) => sum + (wp?.cost ?? 0), 0);
-  }
-
+  /**
+   * Walk the waypoint's `previous` linked list and sum costs of pending
+   * waypoints only.  Passed waypoints have already been deducted from the
+   * actor's moveRemaining flag, so including them would double-count.
+   */
   _cumulativeAt(waypoint) {
-    return this._vcsCumulativeMap.get(waypoint) ?? 0;
+    let total = 0;
+    let wp = waypoint;
+    while (wp) {
+      if (wp.stage === "passed") break;   // stop at committed waypoints
+      total += (wp.cost ?? 0);
+      wp = wp.previous ?? null;
+    }
+    return total;
   }
 
   _colorForFt(ft) {
     const r = this._moveRemaining;
-    if (ft <= r)     return 0x00cc00;
-    if (ft <= r * 2) return 0xddaa00;
-    return 0xcc2200;
+    return ft <= r ? 0x00cc00 : 0xcc2200;  // green: within budget, red: over
   }
 
   _clearHighlight() {
@@ -68,58 +97,14 @@ class VCSTokenRuler extends foundry.canvas.placeables.tokens.TokenRuler {
     super.clear();
   }
 
-  // ── refresh: build cumulative map, clamp pending to budget ───────────────
+  // ── refresh ────────────────────────────────────────────────────────────
 
-  refresh({ passedWaypoints, pendingWaypoints, plannedMovement }) {
-    const passed  = passedWaypoints ?? [];
-    const pending = pendingWaypoints ?? [];
-
-    // Build cumulative cost map: each waypoint → running total ft to reach it
-    this._vcsCumulativeMap.clear();
-    let running = 0;
-    for (const wp of passed) {
-      running += (wp?.cost ?? 0);
-      this._vcsCumulativeMap.set(wp, running);
-    }
-    const spentFt = running;
-
-    // Continue into pending
-    let pendingRunning = spentFt;
-    for (const wp of pending) {
-      pendingRunning += (wp?.cost ?? 0);
-      this._vcsCumulativeMap.set(wp, pendingRunning);
-    }
-    this._vcsTotalFt = pendingRunning;
-
-    // In crawl enforcement mode: clamp pending to remaining budget
-    if (this._isTracked && !CrawlState.paused
-        && game.settings.get(MODULE_ID, "enforceCrawlMovement")) {
-
-      const remaining = this._moveRemaining;
-      const budget    = remaining - spentFt;
-
-      if (budget <= 0) {
-        this._clearHighlight();
-        return super.refresh({ passedWaypoints, pendingWaypoints: [], plannedMovement });
-      }
-
-      let accumulated = 0;
-      let cutIdx = -1;
-      for (let i = 0; i < pending.length; i++) {
-        accumulated += (pending[i]?.cost ?? 0);
-        if (accumulated <= budget) cutIdx = i;
-        else break;
-      }
-
-      const clampedPending = cutIdx >= 0 ? pending.slice(0, cutIdx + 1) : [];
-      if (clampedPending.length < pending.length) this._clearHighlight();
-      return super.refresh({ passedWaypoints, pendingWaypoints: clampedPending, plannedMovement });
-    }
-
-    super.refresh({ passedWaypoints, pendingWaypoints, plannedMovement });
+  /** No custom bookkeeping needed — style methods walk the linked list. */
+  refresh(args) {
+    super.refresh(args);
   }
 
-  // ── Style overrides ──────────────────────────────────────────────────────
+  // ── Style overrides ────────────────────────────────────────────────────
 
   _getSegmentStyle(waypoint) {
     const base = super._getSegmentStyle(waypoint);
@@ -148,17 +133,24 @@ class VCSTokenRuler extends foundry.canvas.placeables.tokens.TokenRuler {
   _getWaypointLabelContext(waypoint, state) {
     const base = super._getWaypointLabelContext(waypoint, state);
     if (!this._isTracked || !base) return base;
-    const after = Math.max(0, this._moveRemaining - this._cumulativeAt(waypoint));
-    base.label  = base.label ? `${base.label} (${after}ft left)` : `${after}ft left`;
+    const after = this._moveRemaining - this._cumulativeAt(waypoint);
+    const tag   = after < 0 ? `Rush: ${after}ft` : `${after}ft left`;
+    base.label  = base.label ? `${base.label} (${tag})` : tag;
     return base;
   }
 }
 
-// ── MovementTracker ───────────────────────────────────────────────────────────
+// ── MovementTracker ─────────────────────────────────────────────────────────
 
 export const MovementTracker = {
 
   _turnStartPos: {},  // tokenId → {x, y} snapshotted at turn/round start
+
+  /** Snapshot a token's current position as the rollback target. */
+  snapshotPosition(tokenId) {
+    const token = canvas.tokens?.get(tokenId);
+    if (token) this._turnStartPos[tokenId] = { x: token.document.x, y: token.document.y };
+  },
 
   registerSettings() {
     game.settings.register(MODULE_ID, "enforceCrawlMovement", {
@@ -176,14 +168,6 @@ export const MovementTracker = {
     // Swap ruler instances on all tokens already on canvas.
     this._installRulers();
     Hooks.on("canvasReady", () => this._installRulers());
-
-    canvas.tokens?.placeables?.forEach(t => {
-      // turn-start positions are populated by resetAll(), not here
-    });
-
-    Hooks.on("createToken", _doc => {
-      // turn-start positions populated by resetAll()
-    });
 
     Hooks.on("preUpdateToken", (doc, changes, opts, userId) => {
       if (opts?.[MODULE_ID]?.rollback) return; // skip accounting for rollback moves
@@ -216,10 +200,11 @@ export const MovementTracker = {
             const distanceFt = this._pendingDeduct?.[doc.id] ?? 0;
             delete this._pendingDeduct?.[doc.id];
             if (distanceFt > 0) {
-              const s             = actor.system.speed;
               const moveRemaining = actor.getFlag(MODULE_ID, "moveRemaining")
-                ?? (CrawlState.paused ? (s?.base ?? 0) : (s?.crawl ?? 0));
-              const newRemaining  = Math.max(0, Math.round((moveRemaining - distanceFt) / 5) * 5);
+                ?? _getBaseSpeed(actor);
+              // Combat: allow negative (Rush territory).  Crawl: floor at 0.
+              const raw = Math.round((moveRemaining - distanceFt) / 5) * 5;
+              const newRemaining = CrawlState.paused ? raw : Math.max(0, raw);
               actor.setFlag(MODULE_ID, "moveRemaining", newRemaining)
                 .then(() => CrawlStrip.updateMember(actor.id));
             }
@@ -228,9 +213,10 @@ export const MovementTracker = {
 
         // Delay ruler clear to after #continueMovement finishes all segments
         const tokenId = doc.id;
-        clearTimeout(this._clearTimers?.[tokenId]);
         this._clearTimers ??= {};
+        clearTimeout(this._clearTimers[tokenId]);
         this._clearTimers[tokenId] = setTimeout(() => {
+          delete this._clearTimers[tokenId];
           const token = canvas.tokens?.get(tokenId);
           token?.ruler?.clear();
           const highlight = canvas.interface.grid.highlight.children
@@ -242,7 +228,9 @@ export const MovementTracker = {
 
     Hooks.on("renderTokenHUD", (hud, html, data) => {
       if (!game.user.isGM) return;
-      if (!CrawlState.active || !CrawlState.isHeroesPhase) return;
+      if (!CrawlState.active) return;
+      // Show rollback in crawl Heroes phase OR during combat
+      if (!CrawlState.isHeroesPhase && !CrawlState.paused) return;
       const token = hud.object;
       const member = CrawlState.members.find(m => m.tokenId === token.id);
       if (!member || member.type !== "player") return;
@@ -250,9 +238,9 @@ export const MovementTracker = {
       const btn = document.createElement("div");
       btn.classList.add("control-icon");
       btn.title = "Rollback Movement";
-      btn.innerHTML = `<i class="fas fa-rotate-left"></i>`;
+      btn.innerHTML = ICONS.rollbackMove;
       btn.addEventListener("click", () => {
-        hud.clear();
+        hud.close();
         this.rollback(token.id);
       });
       html.querySelector(".col.left")?.appendChild(btn);
@@ -272,7 +260,8 @@ export const MovementTracker = {
 
     Hooks.on("updateCombat", async (combat, changes) => {
       if (!CrawlState.active || !game.user.isGM) return;
-      if (changes.round === undefined) return;
+      // Reset on round change OR turn change (each combatant gets fresh budget)
+      if (changes.round === undefined && changes.turn === undefined) return;
       await this.resetAll();
     });
   },
@@ -306,34 +295,43 @@ export const MovementTracker = {
     const gridSize = scene?.grid?.size     ?? 100;
     const gridDist = scene?.grid?.distance ?? 5;
 
-    const s             = actor.system.speed;
     const inCombat      = CrawlState.paused;
-    const baseSpeed     = inCombat ? (s?.base ?? 0) : (s?.crawl ?? 0);
-    const moveRemaining = actor.getFlag(MODULE_ID, "moveRemaining") ?? baseSpeed;
+    const moveRemaining = actor.getFlag(MODULE_ID, "moveRemaining") ?? _getBaseSpeed(actor);
 
-    // ── Crawl: safety-net block (ruler clamping should prevent reaching here) ──
-    if (!inCombat && game.settings.get(MODULE_ID, "enforceCrawlMovement")) {
-      const dx = ((changes.x ?? doc.x) - doc.x) / gridSize;
-      const dy = ((changes.y ?? doc.y) - doc.y) / gridSize;
-      const segFt = Math.round((Math.max(Math.abs(dx), Math.abs(dy)) * gridDist) / 5) * 5;
+    // Crawl: enforce if setting enabled.  Combat: always enforce.
+    const enforce = inCombat || game.settings.get(MODULE_ID, "enforceCrawlMovement");
+    if (!enforce) return;
 
-      if (segFt > moveRemaining) {
-        if (userId === game.userId) {
-          ui.notifications.warn(`${actor.name}: only ${moveRemaining}ft remaining.`);
-          // Schedule repeated clear attempts — #continueMovement may redraw after our first clear
-          const tokenId = doc.id;
-          let attempts = 0;
-          const clearLoop = setInterval(() => {
-            const token = canvas.tokens?.get(tokenId);
-            token?.ruler?.clear();
-            const h = canvas.interface?.grid?.highlight?.children
-              ?.find(c => c.name === `TokenRuler.${tokenId}`);
-            if (h) h.visible = false;
-            if (++attempts >= 10) clearInterval(clearLoop);
-          }, 50);
-        }
-        return false;
+    const dx = ((changes.x ?? doc.x) - doc.x) / gridSize;
+    const dy = ((changes.y ?? doc.y) - doc.y) / gridSize;
+    const segFt = Math.round((Math.max(Math.abs(dx), Math.abs(dy)) * gridDist) / 5) * 5;
+
+    // Combat: allow up to 2× base (Rush).  moveRemaining starts at base speed
+    // and can go negative (down to -base), so the hard limit is:
+    //   moveRemaining + baseSpeed  (= remaining Rush budget)
+    // Crawl: hard stop at moveRemaining (no Rush).
+    const baseSpeed = _getBaseSpeed(actor);
+    const limit     = inCombat ? moveRemaining + baseSpeed : moveRemaining;
+
+    if (segFt > limit) {
+      if (userId === game.userId) {
+        const msg = inCombat && moveRemaining <= 0
+          ? `${actor.name}: Rush exhausted — no movement remaining.`
+          : `${actor.name}: only ${Math.max(0, moveRemaining)}ft remaining${inCombat ? ` (${limit}ft with Rush)` : ""}.`;
+        ui.notifications.warn(msg);
+        // Schedule repeated clear attempts — #continueMovement may redraw after our first clear
+        const tokenId = doc.id;
+        let attempts = 0;
+        const clearLoop = setInterval(() => {
+          const token = canvas.tokens?.get(tokenId);
+          token?.ruler?.clear();
+          const h = canvas.interface?.grid?.highlight?.children
+            ?.find(c => c.name === `TokenRuler.${tokenId}`);
+          if (h) h.visible = false;
+          if (++attempts >= 10) clearInterval(clearLoop);
+        }, 50);
       }
+      return false;
     }
   },
 
@@ -349,14 +347,14 @@ export const MovementTracker = {
 
     const actor = doc.actor;
 
-    // Move token back to turn-start position
-    await doc.update({ x: start.x, y: start.y }, { [MODULE_ID]: { rollback: true } });
+    // Teleport token back to turn-start position (bypass wall collision)
+    await doc.update({ x: start.x, y: start.y }, {
+      teleport: true, animate: false, [MODULE_ID]: { rollback: true },
+    });
 
-    // Refund full turn movement
+    // Refund full turn movement (base speed — Rush is a choice, not a given)
     if (actor?.type === "character") {
-      const s        = actor.system.speed;
-      const maxSpeed = CrawlState.paused ? (s?.base ?? 0) : (s?.crawl ?? 0);
-      const fullSpeed = Math.round(maxSpeed / 5) * 5;
+      const fullSpeed = Math.round(_getBaseSpeed(actor) / 5) * 5;
       await actor.setFlag(MODULE_ID, "moveRemaining", fullSpeed);
       CrawlStrip.updateMember(actor.id);
       ui.notifications.info(`${actor.name} rolled back to turn start — movement restored.`);
@@ -366,8 +364,7 @@ export const MovementTracker = {
   // ── Turn management ───────────────────────────────────────────────────────
 
   async resetActor(actor) {
-    const s = actor.system.speed;
-    const speed = CrawlState.paused ? (s?.base ?? 0) : (s?.crawl ?? 0);
+    const speed = _getBaseSpeed(actor);
     await actor.setFlag(MODULE_ID, "moveRemaining", Math.round(speed / 5) * 5);
   },
 

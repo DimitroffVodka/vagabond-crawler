@@ -78,12 +78,23 @@
       <p class="table-hint">Tables built here include monster UUIDs for token placement.</p>
       <div class="table-select-row">
         <select class="world-table-select">
-          {{#each worldTables}}
-          <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+          {{#each worldTableGroups}}
+            {{#if label}}
+            <optgroup label="{{label}}">
+              {{#each tables}}
+              <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+              {{/each}}
+            </optgroup>
+            {{else}}
+              {{#each tables}}
+              <option value="{{id}}" {{#if selected}}selected{{/if}}>{{name}}</option>
+              {{/each}}
+            {{/if}}
           {{/each}}
         </select>
         <button type="button" class="roll-world-table"><i class="fas fa-dice-d20"></i> Roll</button>
         <button type="button" class="set-as-active"><i class="fas fa-star"></i> Set Active</button>
+        <button type="button" class="manage-folders" title="Exclude folders from this list"><i class="fas fa-folder-minus"></i></button>
       </div>
       {{#if selectedTablePreview}}
       <div class="table-preview">
@@ -111,7 +122,7 @@
   {{!-- RESULT PANEL --}}
   {{#if lastResult}}
   <div class="encounter-result-panel">
-    <h4><i class="fas fa-dragon"></i> Encounter Result</h4>
+    <h4><img class="vcb-icon-dragon" src="modules/vagabond-crawler/icons/light-sabers.svg" alt="" /> Encounter Result</h4>
     <div class="result-row">
       <span class="result-label">Monster:</span>
       <span class="result-value">{{lastResult.monsterName}} × {{lastResult.count}}</span>

@@ -1,0 +1,2178 @@
+{
+  "name": "Vagabond Loot (p.186)",
+  "formula": "1d2148",
+  "results": [
+    {
+      "type": "text",
+      "weight": 180,
+      "range": [
+        1,
+        180
+      ],
+      "name": "Coins (d100) silver",
+      "img": "icons/commodities/currency/coins-plain-stack-silver.webp",
+      "description": "<p>[[/r d100]] silver</p>",
+      "_id": "ded6319dce4a40ad",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772854731558,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      },
+      "documentUuid": null
+    },
+    {
+      "type": "text",
+      "weight": 120,
+      "range": [
+        181,
+        300
+      ],
+      "name": "Coins (d10) gold",
+      "img": "icons/commodities/currency/coin-inset-crown-gold.webp",
+      "description": "[[/r d10]] gold",
+      "_id": "ca6312f7136e4b6d",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 60,
+      "range": [
+        301,
+        360
+      ],
+      "name": "Light Armor",
+      "img": "icons/equipment/chest/breastplate-quilted-brown.webp",
+      "documentUuid": "Compendium.vagabond.armor.Item.K6gCgMFAMIPLJO0L",
+      "description": "",
+      "_id": "1c867c8fa9784d8f",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 60,
+      "range": [
+        361,
+        420
+      ],
+      "name": "Medium Armor",
+      "img": "icons/equipment/chest/breastplate-scale-grey.webp",
+      "documentUuid": "Compendium.vagabond.armor.Item.T5aaqoo4V8KZIVCZ",
+      "description": "",
+      "_id": "7778d77c5df64d86",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 60,
+      "range": [
+        421,
+        480
+      ],
+      "name": "Arcane Trinket",
+      "img": "icons/commodities/treasure/trinket-totem-bone-green.webp",
+      "documentUuid": null,
+      "description": "<p>d20 Arcane</p><p>1 Wand</p><p>2 Pointy hat</p><p>3 Polyhedral dice</p><p>4 Summoning salts</p><p>5 Puzzle box</p><p>6 Glass orb</p><p>7 Mysterious lodestone</p><p>8 Clockwork hourglass</p><p>9 Charred statuettes</p><p>10 Runic cube</p><p>11 Ancient dark lotus</p><p>12 Set of keys</p><p>13 Savant's headband</p><p>14 Disk of information</p><p>15 Map of starsigns</p><p>16 Kaleidoscope</p><p>17 Abacus</p><p>18 Smoking pipe</p><p>19 Jar of primordial slurry</p><p>20 Fan of owl feathers</p>",
+      "_id": "a82fd454ba8a408b",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856775310,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 60,
+      "range": [
+        481,
+        540
+      ],
+      "name": "Divine Trinket",
+      "img": "icons/commodities/treasure/trinket-totem-bone-green.webp",
+      "documentUuid": null,
+      "description": "<p>Divine Trinket</p><ol><li><p>Holy symbol</p></li><li><p>Prayer beads</p></li><li><p>Consecrated staff</p></li><li><p>Bag of spice</p></li><li><p>Omphalos</p></li><li><p>Ancient elven ring</p></li><li><p>Gilded chalice</p></li><li><p>Glowing crystal</p></li><li><p>Sacred paper figure</p></li><li><p>Dragon's tear</p></li><li><p>Sacred feather</p></li><li><p>Altar vessel of flame</p></li><li><p>Stone from a holy site</p></li><li><p>Vegetable in holy water</p></li><li><p>Bloodstained spearhead</p></li><li><p>Blood-soaked fabric</p></li><li><p>Petrified unicorn's eye</p></li><li><p>Handheld sundial</p></li><li><p>Tooth of a peacekeeper</p></li><li><p>Saint's heart</p></li></ol>",
+      "_id": "548fbe7064db4000",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856900394,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 60,
+      "range": [
+        541,
+        600
+      ],
+      "name": "Heavy Armor",
+      "img": "icons/equipment/chest/breastplate-cuirass-steel-grey.webp",
+      "documentUuid": "Compendium.vagabond.armor.Item.yvHynLJxGSilvLwM",
+      "description": "",
+      "_id": "9a79bd4380f74a78",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 60,
+      "range": [
+        601,
+        660
+      ],
+      "name": "Grappling hook",
+      "img": "icons/sundries/survival/climbing-anchor-steel-grey.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.8ZXlmCn52DvUTgGV",
+      "description": "",
+      "_id": "1fa3e36519c0494c",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772854945597,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 60,
+      "range": [
+        661,
+        720
+      ],
+      "name": "Occult Trinket",
+      "img": "icons/commodities/treasure/trinket-totem-bone-green.webp",
+      "documentUuid": null,
+      "description": "<p>Occult Trinket</p><ol><li><p>Indecipherable rune</p></li><li><p>Meteor chunk</p></li><li><p>Foul snail's shell</p></li><li><p>Haunting mask</p></li><li><p>Eyed triangle amulet</p></li><li><p>Tool of alien origin</p></li><li><p>Silverized rodent corpse</p></li><li><p>Aberrant brain in a jar</p></li><li><p>Cracked femur</p></li><li><p>Vial of demon's blood</p></li><li><p>Lantern, sheds teal light</p></li><li><p>Staring doll</p></li><li><p>Small humanoid effigy</p></li><li><p>Yellow wallpaper</p></li><li><p>Dead cockatrice egg</p></li><li><p>Shining trapezohedron</p></li><li><p>Black mirror</p></li><li><p>Crown of snakes</p></li><li><p>Uncanny stone mask</p></li><li><p>Bizarre keystone</p></li></ol>",
+      "_id": "d517479541ff4002",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856915501,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 60,
+      "range": [
+        721,
+        780
+      ],
+      "name": "Primal Trinket",
+      "img": "icons/commodities/treasure/trinket-totem-bone-green.webp",
+      "documentUuid": null,
+      "description": "<p>Primal Trinket</p><ol><li><p>Totem</p></li><li><p>Bag of animal bones</p></li><li><p>Primordial crystal</p></li><li><p>Cairn stones</p></li><li><p>Bone/wooden mask</p></li><li><p>Mistletoe sprig</p></li><li><p>Antlers</p></li><li><p>Insect in amber</p></li><li><p>Tiny cryptid's corpse</p></li><li><p>Abacus of treant's wood</p></li><li><p>Roc's feather</p></li><li><p>Colorchanging hair lock</p></li><li><p>Echoing flute</p></li><li><p>Nuts from a sacred tree</p></li><li><p>Fist-sized claw</p></li><li><p>Necklace of runestones</p></li><li><p>Petrified banana and figs</p></li><li><p>Staff of twisted branches</p></li><li><p>Flask of mermaid's water</p></li><li><p>Brownie's shoe</p></li></ol>",
+      "_id": "6544ee6edc184180",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856931297,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "text",
+      "weight": 60,
+      "range": [
+        781,
+        840
+      ],
+      "name": "Coins (2d10) gold",
+      "img": "icons/commodities/currency/coin-inset-crown-gold.webp",
+      "description": "[[/r 2d10]] gold",
+      "_id": "e609be0a9f7b4dc3",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "text",
+      "weight": 60,
+      "range": [
+        841,
+        900
+      ],
+      "name": "Relic: +1 Enchantment Scroll",
+      "img": "icons/sundries/scrolls/scroll-bound-white-tan.webp",
+      "description": "",
+      "_id": "24a87ac411a34237",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855026705,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      },
+      "documentUuid": null
+    },
+    {
+      "type": "document",
+      "weight": 60,
+      "range": [
+        901,
+        960
+      ],
+      "name": "Torches (d4)",
+      "img": "icons/sundries/lights/torch-brown.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.sbHg7jCRQY8lIzY7",
+      "description": "[[/r d4]] torches",
+      "_id": "75418836e25b417b",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "text",
+      "weight": 60,
+      "range": [
+        961,
+        1020
+      ],
+      "name": "Coins (5d10) gold",
+      "img": "icons/commodities/currency/coin-inset-crown-gold.webp",
+      "description": "[[/r 5d10]] gold",
+      "_id": "acd8d0c5334e46a7",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 50,
+      "range": [
+        1021,
+        1070
+      ],
+      "name": "Clothes, casual",
+      "img": "icons/equipment/chest/shirt-simple-white.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.Jfh9uo30NbPwGPAR",
+      "description": "",
+      "_id": "425a4de628694af0",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855038915,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 45,
+      "range": [
+        1071,
+        1115
+      ],
+      "name": "Shortbow",
+      "img": "icons/weapons/bows/longbow-recurve-leather-red.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.wFqNBkEUehnQcGOJ",
+      "description": "",
+      "_id": "1e03f0a9a3ce43da",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 45,
+      "range": [
+        1116,
+        1160
+      ],
+      "name": "Standard shield",
+      "img": "icons/equipment/shield/round-wooden-boss-steel-yellow-blue.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.kRZpyvFZXQyDgpZn",
+      "description": "",
+      "_id": "1b350a63f3064374",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855043748,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 45,
+      "range": [
+        1161,
+        1205
+      ],
+      "name": "Ring, basic",
+      "img": "icons/equipment/finger/ring-band-gold.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.DOLVhvqssUOk83bz",
+      "description": "",
+      "_id": "1dbcb93f99754a9e",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855047922,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 42,
+      "range": [
+        1206,
+        1247
+      ],
+      "name": "Blank book & writing ink",
+      "img": "icons/sundries/books/book-worn-brown-grey.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.Y4YS4zKbAXglcKcd",
+      "description": "",
+      "_id": "f09f363189fe437a",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 42,
+      "range": [
+        1248,
+        1289
+      ],
+      "name": "Beer - Gallon",
+      "img": "icons/consumables/drinks/alcohol-jar-spirits-gray.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.wobxIhKxYeLdGP1F",
+      "description": "",
+      "_id": "d52df8723fbf4f85",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855052684,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 42,
+      "range": [
+        1290,
+        1331
+      ],
+      "name": "Rations (1 day)",
+      "img": "icons/consumables/food/cooked-grilled-ham-hock-glazed-brown.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.BhUNyj2nflyVUPIo",
+      "description": "<p>[[/r d6]] rations</p>",
+      "_id": "bce24d07cb884b68",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855056567,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 30,
+      "range": [
+        1332,
+        1361
+      ],
+      "name": "Caestus",
+      "img": "icons/equipment/hand/glove-simple-leather-brown-blue.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.d0zJpdUlmX8ChBxz",
+      "description": "",
+      "_id": "95dc6102005f4680",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 30,
+      "range": [
+        1362,
+        1391
+      ],
+      "name": "Hand crossbow",
+      "img": "icons/weapons/crossbows/crossbow-simple-brown.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.ZPaSkHYlIBVwUQdO",
+      "description": "",
+      "_id": "395310c663dc48b0",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 30,
+      "range": [
+        1392,
+        1421
+      ],
+      "name": "Light crossbow",
+      "img": "icons/weapons/crossbows/crossbow-simple-brown.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.ZPaSkHYlIBVwUQdO",
+      "description": "",
+      "_id": "707d26f868bc4e01",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 30,
+      "range": [
+        1422,
+        1451
+      ],
+      "name": "Handgun",
+      "img": "icons/weapons/guns/gun-pistol-flintlock.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.ShVLwDMGm2m0D4eS",
+      "description": "",
+      "_id": "4bf34eb204cd4c6e",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855061519,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 30,
+      "range": [
+        1452,
+        1481
+      ],
+      "name": "Bottle, glass",
+      "img": "icons/consumables/potions/bottle-round-empty-glass.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.GoYDfP0HISDfZpkK",
+      "description": "",
+      "_id": "de50c03953d64959",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855067544,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 30,
+      "range": [
+        1482,
+        1511
+      ],
+      "name": "Spyglass",
+      "img": "icons/tools/navigation/spyglass-telescope-blue.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.2OpraGvajtzozyxT",
+      "description": "",
+      "_id": "3fdb731a29f14be0",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855071485,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 30,
+      "range": [
+        1512,
+        1541
+      ],
+      "name": "Compass",
+      "img": "icons/tools/navigation/compass-brass-blue-red.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.K5EHpROMIABuKZDR",
+      "description": "",
+      "_id": "1294214e60814d11",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855075268,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 30,
+      "range": [
+        1542,
+        1571
+      ],
+      "name": "Circlet, brass",
+      "img": "icons/equipment/head/crown-gold-red.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.ZxTWC5A7Bsgh9crv",
+      "description": "",
+      "_id": "261e603fc7ca4269",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855078821,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 20,
+      "range": [
+        1572,
+        1591
+      ],
+      "name": "Handaxe",
+      "img": "icons/weapons/axes/axe-battle-worn-black.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.cBUd8HGKrJNmXviU",
+      "description": "",
+      "_id": "733c4bdc7c354cfe",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 20,
+      "range": [
+        1592,
+        1611
+      ],
+      "name": "Battleaxe",
+      "img": "icons/weapons/axes/axe-battle-worn.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.76co3Mfck1ARSH5Z",
+      "description": "",
+      "_id": "bef443d37da84033",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 20,
+      "range": [
+        1612,
+        1631
+      ],
+      "name": "Shotgun",
+      "img": "icons/weapons/guns/gun-blunderbuss-worn-brown.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.NcdLNkEqRB8bjV3G",
+      "description": "",
+      "_id": "4b1bbbe08ddd4d39",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 20,
+      "range": [
+        1632,
+        1651
+      ],
+      "name": "Circlet, silver",
+      "img": "icons/commodities/treasure/trinket-wing-white.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.xmUaIaMA8RaABFni",
+      "description": "",
+      "_id": "2eaae913f47a48a4",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855083672,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 18,
+      "range": [
+        1652,
+        1669
+      ],
+      "name": "Club",
+      "img": "icons/weapons/clubs/club-banded-steel.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.vOF4iFi5ieztUI7N",
+      "description": "",
+      "_id": "52eafdada84a473e",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855087255,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 18,
+      "range": [
+        1670,
+        1687
+      ],
+      "name": "Javelin",
+      "img": "icons/weapons/polearms/javelin-simple.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.FFStq9FhUwmJBeLr",
+      "description": "",
+      "_id": "ada418b247d347d9",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855091497,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 18,
+      "range": [
+        1688,
+        1705
+      ],
+      "name": "Spear",
+      "img": "icons/weapons/polearms/spear-hooked-double-engraved.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.zP25XADuyEP3KSez",
+      "description": "",
+      "_id": "9aa62c4967f54e90",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855095822,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 18,
+      "range": [
+        1706,
+        1723
+      ],
+      "name": "Dagger",
+      "img": "icons/weapons/daggers/dagger-curved-black.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.HwX2SFNKg7DPXSma",
+      "description": "",
+      "_id": "f6e4c590b33647bd",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 15,
+      "range": [
+        1724,
+        1738
+      ],
+      "name": "Longbow",
+      "img": "icons/weapons/bows/bow-ornamental-gold-blue.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.ReQB9WHhhob5MZ96",
+      "description": "",
+      "_id": "8a782302784c4661",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 15,
+      "range": [
+        1739,
+        1753
+      ],
+      "name": "Gauntlet",
+      "img": "icons/equipment/hand/gauntlet-armored-leather-teal-orange.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.GInXyhXCQ5T5H61o",
+      "description": "",
+      "_id": "acea4c93e3ef4ec6",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 15,
+      "range": [
+        1754,
+        1768
+      ],
+      "name": "Katar",
+      "img": "icons/weapons/fist/fist-katar-triple-gold-black.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.HrpXxa1GxiZmI4Fw",
+      "description": "",
+      "_id": "551acd47019042e3",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 15,
+      "range": [
+        1769,
+        1783
+      ],
+      "name": "Poison, Basic",
+      "img": "icons/consumables/potions/potion-jar-corked-labeled-poison-skull-green.webp",
+      "documentUuid": "Compendium.vagabond.alchemical-items.Item.rLuwMWhTLNcOHS6X",
+      "description": "",
+      "_id": "7feaa5faaede4f8b",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856128549,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 15,
+      "range": [
+        1784,
+        1798
+      ],
+      "name": "Potion, Healing I",
+      "img": "icons/consumables/potions/bottle-round-label-cork-blue.webp",
+      "documentUuid": "Compendium.vagabond.alchemical-items.Item.aweSOez9lB0bd5KM",
+      "description": "",
+      "_id": "8921cfcae3ba4a26",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856141489,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 15,
+      "range": [
+        1799,
+        1813
+      ],
+      "name": "Buckler",
+      "img": "icons/equipment/shield/buckler-wooden-boss-steel.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.0NA6IoKBoDOjQeEy",
+      "description": "",
+      "_id": "c7b2e154098c4813",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 15,
+      "range": [
+        1814,
+        1828
+      ],
+      "name": "Ring, crest/signet",
+      "img": "icons/equipment/finger/ring-signet-silver.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.Ni4UCzaYTcKg69An",
+      "description": "",
+      "_id": "fdecffdc4ff24364",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855108236,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 12,
+      "range": [
+        1829,
+        1840
+      ],
+      "name": "Staff",
+      "img": "icons/weapons/staves/staff-simple.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.ufjKBfCKT1kTA5Kq",
+      "description": "",
+      "_id": "9264469fd6e9469d",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 12,
+      "range": [
+        1841,
+        1852
+      ],
+      "name": "Poleblade",
+      "img": "icons/weapons/polearms/glaive-hooked-steel.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.mU85pKLCB76Tn12q",
+      "description": "",
+      "_id": "560ce0a511a749ba",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855112484,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 12,
+      "range": [
+        1853,
+        1864
+      ],
+      "name": "Shortsword",
+      "img": "icons/weapons/swords/sword-guard-worn-purple.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.OxqGnjXxt9vRGVeZ",
+      "description": "",
+      "_id": "4d14dd0a7cd24a6f",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855116932,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 12,
+      "range": [
+        1865,
+        1876
+      ],
+      "name": "Longsword",
+      "img": "icons/weapons/swords/sword-guard-blue.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.Nxohe9qqbv8Pc2rf",
+      "description": "",
+      "_id": "455b4e659f0548b4",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855120893,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 12,
+      "range": [
+        1877,
+        1888
+      ],
+      "name": "Book, sheet music",
+      "img": "icons/skills/trades/music-notes-sound-blue.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.htE439dDIjptFzMK",
+      "description": "",
+      "_id": "f5bf37f9c9f64d9b",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855124567,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 12,
+      "range": [
+        1889,
+        1900
+      ],
+      "name": "Wine - Common, bottle of",
+      "img": "icons/consumables/drinks/wine-bottle-glass-white.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.tmUCdiHzUbgXt7Md",
+      "description": "",
+      "_id": "33d3d76627d04d0d",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855128683,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 12,
+      "range": [
+        1901,
+        1912
+      ],
+      "name": "Salt (1 lb. bag)",
+      "img": "icons/consumables/food/salt-seasoning-spice-pink.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.9D7EWZTHpE3cmCR9",
+      "description": "",
+      "_id": "7fbe9ef827ed43f8",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855132595,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 10,
+      "range": [
+        1913,
+        1922
+      ],
+      "name": "Pike",
+      "img": "icons/weapons/polearms/pike-flared-brown.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.8p8cEVnM40Mq1akk",
+      "description": "",
+      "_id": "fcf6723cab614a0b",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855136123,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 10,
+      "range": [
+        1923,
+        1932
+      ],
+      "name": "Greataxe",
+      "img": "icons/weapons/axes/axe-double-engraved-runes.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.7kJxTiu6idu4vrAL",
+      "description": "",
+      "_id": "cc5b76423b9d431c",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 10,
+      "range": [
+        1933,
+        1942
+      ],
+      "name": "Rifle",
+      "img": "icons/weapons/guns/gun-purple.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.OduxMhFxzjd6tqa1",
+      "description": "",
+      "_id": "20493273896645bd",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855140160,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 10,
+      "range": [
+        1943,
+        1952
+      ],
+      "name": "Clothes, formal",
+      "img": "icons/equipment/chest/coat-collared-red-gold.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.4gnbwQkNiheTaThw",
+      "description": "",
+      "_id": "5626e3c7ccae417e",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855149812,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 10,
+      "range": [
+        1953,
+        1962
+      ],
+      "name": "Circlet, gold",
+      "img": "icons/equipment/head/crown-gold-blue.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.7Mgjgi8kfPibLJE4",
+      "description": "",
+      "_id": "00be9060bfb44c32",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855170177,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        1963,
+        1968
+      ],
+      "name": "Flail",
+      "img": "icons/weapons/maces/flail-spiked-grey.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.8aStQlbcUpqosSSs",
+      "description": "",
+      "_id": "6908051523284dd8",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772855177300,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        1969,
+        1974
+      ],
+      "name": "Greatclub",
+      "img": "icons/weapons/clubs/club-simple-barbed-grey.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.D1phqb4eb8U9lzGC",
+      "description": "",
+      "_id": "269805c415b74c2f",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856371812,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        1975,
+        1980
+      ],
+      "name": "Light hammer",
+      "img": "icons/weapons/hammers/hammer-war-rounding.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.06MiqNq5OgMBPrDO",
+      "description": "",
+      "_id": "de8cf1b384d345b1",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856380041,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        1981,
+        1986
+      ],
+      "name": "Mace",
+      "img": "icons/weapons/maces/mace-flanged-steel.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.nBsfFUjhmQejOHxK",
+      "description": "",
+      "_id": "790eb21b955b454a",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        1987,
+        1992
+      ],
+      "name": "Warhammer",
+      "img": "icons/weapons/hammers/hammer-double-engraved.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.QoM4vz7fklFjWpTo",
+      "description": "",
+      "_id": "a76e4e401a7e4c9f",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856383878,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        1993,
+        1998
+      ],
+      "name": "Morningstar",
+      "img": "icons/weapons/maces/mace-round-spiked-black.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.EV0r8Rk2N9vFsDTH",
+      "description": "",
+      "_id": "04f68ad2c8ac4641",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        1999,
+        2004
+      ],
+      "name": "Warhammer",
+      "img": "icons/weapons/hammers/hammer-double-engraved.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.QoM4vz7fklFjWpTo",
+      "description": "",
+      "_id": "2acc04e33af649b3",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856388880,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2005,
+        2010
+      ],
+      "name": "Greatsword",
+      "img": "icons/weapons/swords/greatsword-crossguard-silver.webp",
+      "documentUuid": "Compendium.vagabond.weapons.Item.s7T80rfKt90tymAD",
+      "description": "",
+      "_id": "91374e92eaac400b",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856393030,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2011,
+        2016
+      ],
+      "name": "Accordion",
+      "img": "icons/tools/instruments/harp-lap-brown.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.euJkGubQRnPmsnQW",
+      "description": "",
+      "_id": "74305cf1495e4bdb",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856399941,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2017,
+        2022
+      ],
+      "name": "Bagpipes",
+      "img": "icons/tools/instruments/horn-flared-wood.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.KDpkxMiznDQOgLOP",
+      "description": "",
+      "_id": "f5a200daeff14021",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856403163,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2023,
+        2028
+      ],
+      "name": "Drum",
+      "img": "icons/tools/instruments/drum-snare-red.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.7B1WX6ep2BllY41E",
+      "description": "",
+      "_id": "997b3d2f70bc4567",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856407729,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2029,
+        2034
+      ],
+      "name": "Flute",
+      "img": "icons/tools/instruments/flute-simple-wood.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.9YESMiD3qLqxiUob",
+      "description": "",
+      "_id": "86e5af797c154189",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856411454,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2035,
+        2040
+      ],
+      "name": "Harp",
+      "img": "icons/tools/instruments/harp-gold-glowing.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.TZJ1thF2Ng6ERkBH",
+      "description": "",
+      "_id": "9d6b222959c442ea",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856418444,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2041,
+        2046
+      ],
+      "name": "Lute",
+      "img": "icons/tools/instruments/lute-gold-brown.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.HN3Gem6z0pA0r5Fu",
+      "description": "",
+      "_id": "326fdfaa51074724",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856422428,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2047,
+        2052
+      ],
+      "name": "Lyre",
+      "img": "icons/tools/instruments/harp-yellow-teal.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.oBuHnCyGqptwceTO",
+      "description": "",
+      "_id": "11f122712574470b",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856425201,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2053,
+        2058
+      ],
+      "name": "Sacbut",
+      "img": "icons/tools/instruments/horn-red-grey.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.cChdGoUVQ0Vv3Hnr",
+      "description": "",
+      "_id": "6ee8a1f246f74802",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856428951,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2059,
+        2064
+      ],
+      "name": "Shawm",
+      "img": "icons/tools/instruments/pipe-flue-tan.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.PXobVZPz1JTG4IFj",
+      "description": "",
+      "_id": "dae30602ac834740",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856431926,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2065,
+        2070
+      ],
+      "name": "Trumpet",
+      "img": "icons/tools/instruments/horn-white-gray.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.H9JFUzPPMx90AeTq",
+      "description": "",
+      "_id": "7772c2381862480f",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856435594,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2071,
+        2076
+      ],
+      "name": "Spellbook",
+      "img": "icons/sundries/books/book-embossed-jewel-silver-green.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.kgwTlHgJpktjBM9R",
+      "description": "",
+      "_id": "3da7b1fc04cd4d15",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856438660,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2077,
+        2082
+      ],
+      "name": "Wine - Fine, bottle of",
+      "img": "icons/consumables/drinks/wine-bottle-glass-white.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.NfWDQX6FE9fywMR9",
+      "description": "",
+      "_id": "30190377293841e3",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856441390,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2083,
+        2088
+      ],
+      "name": "Spices (per 1 lb.) - Exotic",
+      "img": "icons/consumables/plants/dried-herb-bundle-brown.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.hZUlpFXHFzMeOCvJ",
+      "description": "",
+      "_id": "52e9c02ceb7e444d",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856444608,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2089,
+        2094
+      ],
+      "name": "Playing card deck",
+      "img": "icons/sundries/gaming/playing-cards-grey.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.MdeWlhDLEBOzJhrJ",
+      "description": "",
+      "_id": "e6b400e157474654",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2095,
+        2100
+      ],
+      "name": "Tarot card deck",
+      "img": "icons/sundries/gaming/playing-cards-grey.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.NDZf21pgM1iD8OW6",
+      "description": "",
+      "_id": "2c040aa560c948c5",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "lastModifiedBy": null
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2101,
+        2106
+      ],
+      "name": "Dice set",
+      "img": "icons/sundries/gaming/dice-pair-white-green.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.Ej08lRyfg7In52zu",
+      "description": "",
+      "_id": "9c55ec209fbb4e86",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856449020,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2107,
+        2112
+      ],
+      "name": "Doll",
+      "img": "icons/commodities/treasure/doll-voodoo.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.2wBEk4haP7EaPDZE",
+      "description": "",
+      "_id": "bf270da5829a4172",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856452838,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2113,
+        2118
+      ],
+      "name": "Marbles, bag of",
+      "img": "icons/commodities/gems/pearls-white.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.Rpq6MKfJg7Uu28J7",
+      "description": "",
+      "_id": "cd7750ccae5c4a24",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856456489,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2119,
+        2124
+      ],
+      "name": "Juggling balls, set of 3",
+      "img": "icons/commodities/materials/glass-orb-blue-gold.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.pQhcs1ZX8L9sqwNd",
+      "description": "",
+      "_id": "56fb2416761443c9",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856462333,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2125,
+        2130
+      ],
+      "name": "Kicksack",
+      "img": "icons/containers/bags/sack-cloth-brown.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.4oJL8r2x7pGB5Bg7",
+      "description": "",
+      "_id": "2a902c6e0d5e4793",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856466218,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2131,
+        2136
+      ],
+      "name": "Noisemaker",
+      "img": "icons/tools/instruments/rattle-gourd-glowing-teal.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.9S7BEaRN1xt1CETj",
+      "description": "",
+      "_id": "8dc0d2bc4eb646d3",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856470355,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2137,
+        2142
+      ],
+      "name": "Toy, basic",
+      "img": "icons/commodities/treasure/figurine-bear.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.saxNNKF2ZKV0b8gj",
+      "description": "",
+      "_id": "b28df185d47240c3",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856473348,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    },
+    {
+      "type": "document",
+      "weight": 6,
+      "range": [
+        2143,
+        2148
+      ],
+      "name": "Firecracker",
+      "img": "icons/weapons/thrown/dynamite-red.webp",
+      "documentUuid": "Compendium.vagabond.gear.Item.b9zgIaHkaRxOtwvu",
+      "description": "<p>[[/r d6]] firecrackers</p>",
+      "_id": "cf343886cadd49ec",
+      "drawn": false,
+      "flags": {},
+      "_stats": {
+        "compendiumSource": null,
+        "duplicateSource": null,
+        "exportSource": null,
+        "coreVersion": "13.351",
+        "systemId": "vagabond",
+        "systemVersion": "4.2.1",
+        "modifiedTime": 1772856477213,
+        "lastModifiedBy": "G3pp5yzqgeNvogfL"
+      }
+    }
+  ],
+  "replacement": true,
+  "displayRoll": true,
+  "flags": {},
+  "img": "icons/svg/d20-grey.svg",
+  "description": "<p>Loot table from Vagabond Core Rulebook p.186. Probabilities faithfully preserved from the original d66 structure with all sub-tables flattened.</p>",
+  "folder": null,
+  "_stats": {
+    "compendiumSource": null,
+    "duplicateSource": null,
+    "exportSource": {
+      "worldId": "fresh-test",
+      "uuid": "RollTable.GgOr6kxJTXkOgI6L",
+      "coreVersion": "13.351",
+      "systemId": "vagabond",
+      "systemVersion": "4.2.1"
+    },
+    "coreVersion": "13.351",
+    "systemId": "vagabond",
+    "systemVersion": "4.2.0",
+    "createdTime": 1772832217070,
+    "modifiedTime": 1772856471406,
+    "lastModifiedBy": "G3pp5yzqgeNvogfL"
+  },
+  "ownership": {
+    "default": 0
+  }
+}

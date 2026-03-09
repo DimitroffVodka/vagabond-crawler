@@ -10,6 +10,7 @@ import { EncounterTools }   from "./encounter-tools.mjs";
 import { MoraleChecker }    from "./morale-checker.mjs";
 import { RestBreather }     from "./rest-breather.mjs";
 import { LightTracker }     from "./light-tracker.mjs";
+import { CrawlClock }       from "./crawl-clock.mjs";
 
 export const MODULE_ID = "vagabond-crawler";
 
@@ -31,7 +32,13 @@ Hooks.once("init", () => {
   // Crawl state persistence
   game.settings.register(MODULE_ID, "crawlState", {
     scope: "world", config: false, type: Object,
-    default: { active: false, members: [], phase: "heroes", paused: false, turnCount: 0, elapsedMins: 0 }
+    default: { active: false, members: [], phase: "heroes", paused: false, turnCount: 0, elapsedMins: 0, clockId: null, clockFilled: 0 }
+  });
+
+  // Crawl clock configuration (persists across deletion / combat / new crawls)
+  game.settings.register(MODULE_ID, "clockConfig", {
+    scope: "world", config: false, type: Object,
+    default: { size: "S", defaultPosition: "bottom-left" }
   });
 
   // Encounter roll result visibility
@@ -39,6 +46,16 @@ Hooks.once("init", () => {
     name: "Encounter Roll: GM Only",
     hint: "If enabled, encounter check results are whispered to the GM only.",
     scope: "world", config: true, type: Boolean, default: true
+  });
+
+  // Encounter threshold (1-in-6 through 5-in-6) — UI via right-click popover
+  game.settings.register(MODULE_ID, "encounterThreshold", {
+    scope: "world", config: false, type: Number, default: 1
+  });
+
+  // Excluded RollTable folders (JSON array of folder IDs)
+  game.settings.register(MODULE_ID, "excludedTableFolders", {
+    scope: "world", config: false, type: String, default: "[]"
   });
 
   // Hide NPC names in the strip
@@ -54,6 +71,13 @@ Hooks.once("init", () => {
     name: "Auto-Hide Defeated Tokens",
     hint: "Defeated tokens are hidden from the strip instead of showing a skull.",
     scope: "world", config: true, type: Boolean, default: false,
+    onChange: () => { game.vagabondCrawler?.strip?.render(); },
+  });
+
+  game.settings.register(MODULE_ID, "npcActionMenu", {
+    name: "NPC Action Menu",
+    hint: "Show a hover dropdown on NPC cards during combat with their Actions and Abilities. Players can only use actions on actors they own.",
+    scope: "world", config: true, type: Boolean, default: true,
     onChange: () => { game.vagabondCrawler?.strip?.render(); },
   });
 
@@ -89,6 +113,7 @@ Hooks.once("ready", async () => {
     morale:    MoraleChecker,
     rest:      RestBreather,
     light:     LightTracker,
+    clock:     CrawlClock,
     debugCombat: () => {
       const combat = game.combat;
       if (!combat) return "No active combat";

@@ -17,6 +17,8 @@
  *   turnCount   {number}   — full crawl turns completed (increments when gm→heroes)
  *   elapsedMins {number}   — total minutes elapsed
  *   paused      {boolean}  — true during active Foundry combat
+ *   clockId     {string|null} — JournalEntry ID of the crawl progress clock
+ *   clockFilled {number}     — saved filled count (persists across combat hide/show)
  */
 
 import { MODULE_ID }  from "./vagabond-crawler.mjs";
@@ -35,6 +37,8 @@ export const CrawlState = {
   get turnCount()   { return this._state?.turnCount    ?? 1; },
   get elapsedMins() { return this._state?.elapsedMins  ?? 0; },
   get paused()      { return this._state?.paused       ?? false; },
+  get clockId()     { return this._state?.clockId      ?? null; },
+  get clockFilled() { return this._state?.clockFilled  ?? 0; },
 
   get isHeroesPhase() { return this.phase === "heroes"; },
   get isGMPhase()     { return this.phase === "gm"; },
@@ -52,10 +56,14 @@ export const CrawlState = {
 
   _broadcast() {
     if (!game.user.isGM) return;
-    game.socket.emit(`module.${MODULE_ID}`, {
-      action: "syncState",
-      state: foundry.utils.deepClone(this._state),
-    });
+    try {
+      game.socket.emit(`module.${MODULE_ID}`, {
+        action: "syncState",
+        state: foundry.utils.deepClone(this._state),
+      });
+    } catch (e) {
+      console.error(`${MODULE_ID} | Socket broadcast failed:`, e);
+    }
   },
 
   _applyBodyClass() {
@@ -68,6 +76,8 @@ export const CrawlState = {
 
   async restore() {
     this._state = game.settings.get(MODULE_ID, "crawlState");
+    // Clamp elapsedMins in case of corrupted saved state
+    if (this._state.elapsedMins < 0) this._state.elapsedMins = 0;
     this._applyBodyClass();
     if (this._state.active) {
       CrawlStrip.render();
@@ -88,10 +98,12 @@ export const CrawlState = {
     this._state = {
       active:      true,
       phase:       "heroes",
-      members:     [],
+      members:     [{ id: "gm", name: "Game Master", img: "icons/svg/cowled.svg", type: "gm" }],
       turnCount:   1,
       elapsedMins: 0,
       paused:      false,
+      clockId:     null,
+      clockFilled: 0,
     };
     await this._save();
     ui.notifications.info("Crawl mode started — Heroes phase.");
@@ -100,7 +112,7 @@ export const CrawlState = {
   async end() {
     this._state = {
       active: false, phase: "heroes", members: [],
-      turnCount: 0, elapsedMins: 0, paused: false,
+      turnCount: 0, elapsedMins: 0, paused: false, clockId: null, clockFilled: 0,
     };
     await this._save();
     ui.notifications.info("Crawl ended.");
@@ -161,7 +173,21 @@ export const CrawlState = {
 
   async addTime(minutes) {
     if (!this.active) return;
-    this._state.elapsedMins += minutes;
+    this._state.elapsedMins = Math.max(0, (this._state.elapsedMins ?? 0) + minutes);
+    await this._save();
+  },
+
+  // ── Clock ───────────────────────────────────────────────────────────────────
+
+  async setClockId(id) {
+    if (!this._state) return;
+    this._state.clockId = id;
+    await this._save();
+  },
+
+  async setClockFilled(n) {
+    if (!this._state) return;
+    this._state.clockFilled = n ?? 0;
     await this._save();
   },
 

@@ -16,8 +16,9 @@ export const RestBreather = {
 
     const rows = characters.map(a => {
       const s = a.system;
-      const ration = a.items.find(i => /^ration/i.test(i.name.trim()));
-      const rations = ration ? (ration.system.quantity ?? 1) : 0;
+      const rations = a.items
+        .filter(i => i.type === "equipment" && i.system.isSupply)
+        .reduce((sum, i) => sum + (i.system.quantity ?? 0), 0);
       return `<tr>
         <td><strong>${a.name}</strong></td>
         <td>${s.health.value}/${s.health.max}</td>
@@ -117,7 +118,7 @@ export const RestBreather = {
       const hp    = s.health;
       const desc  = [];
 
-      const ration = actor.items.find(i => /^ration/i.test(i.name.trim()));
+      const ration = actor.items.find(i => i.type === "equipment" && i.system.isSupply && (i.system.quantity ?? 0) > 0);
       if (!ration) { results.push({ name: actor.name, desc: "No rations — skipped" }); continue; }
 
       const qty = ration.system.quantity ?? 1;
