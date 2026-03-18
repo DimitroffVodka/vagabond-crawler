@@ -12,7 +12,8 @@ import { RestBreather }    from "./rest-breather.mjs";
 import { MovementTracker } from "./movement-tracker.mjs";
 import { confirmDialog }   from "./dialog-helpers.mjs";
 import { CrawlClock }      from "./crawl-clock.mjs";
-import { LightTracker }    from "./light-tracker.mjs";
+// LightTracker now lives in the system — access via globalThis
+const _getLightTracker = () => globalThis.vagabond?.lightTracker;
 import { ICONS }           from "./icons.mjs";
 
 const BAR_ID = "vagabond-crawler-bar";
@@ -226,7 +227,7 @@ export const CrawlBar = {
           // A new crawl turn = 1 Scene: advance clock, burn lights, track time
           if (CrawlClock.available) await CrawlClock.advance("scene");
           const mins = game.settings.get(MODULE_ID, "timePassesMinutes");
-          await LightTracker.advanceTime(mins * 60);
+          await _getLightTracker()?.advanceTime(mins * 60);
           await CrawlState.addTime(mins);
         }
         this.render();
@@ -259,7 +260,7 @@ export const CrawlBar = {
         break;
 
       case "lightTracker":
-        LightTracker.openTracker();
+        _getLightTracker()?.openTracker();
         break;
 
       case "startCombat":

@@ -13,8 +13,24 @@
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
-import { getAlchemistData, getCraftCost, formatCost, craftItem } from "./alchemy-helpers.mjs";
-import { setCastCheckFlag } from "./npc-abilities.mjs";
+
+// ── Alchemy: prefer system API, fall back to local ──
+const _systemAlchemy = () => globalThis.vagabond?.alchemy;
+let _localAlchemy = null;
+async function _getAlchemy() {
+  if (_systemAlchemy()) return _systemAlchemy();
+  if (!_localAlchemy) {
+    try { _localAlchemy = await import("./alchemy-helpers.mjs"); } catch { /* not available */ }
+  }
+  return _localAlchemy;
+}
+
+// ── setCastCheckFlag: prefer system, fall back to local ──
+function setCastCheckFlag(val) {
+  if (globalThis.vagabond?.setCastCheckFlag) {
+    globalThis.vagabond.setCastCheckFlag(val);
+  }
+}
 
 // ─── Spell State ──────────────────────────────────────────────────────────────
 
@@ -446,9 +462,11 @@ function _buildMenuData(actor, isNPC) {
       label: item.name, dmg: _spellDmgLabel(item), type: "spell", itemId: item.id,
     }));
 
-    // Alchemist craft tab — known formulae for quick 5s crafting
+    // Alchemist craft tab — conditional on system or crawler providing alchemy
     let craftItems = [];
-    if (game.settings.get(MODULE_ID, "alchemistCookbook")) {
+    const alchemyAPI = _systemAlchemy();
+    const getAlchemistData = alchemyAPI?.getAlchemistData ?? _localAlchemy?.getAlchemistData;
+    if (getAlchemistData) {
       const alcData = getAlchemistData(actor);
       if (alcData?.tools && alcData.formulae.length > 0) {
         craftItems = alcData.formulae.map(name => ({
@@ -662,7 +680,15 @@ async function _fireAction(actor, type, indexStr, itemId) {
 
     } else if (type === "craft") {
       const craftName = itemId; // craftName passed via itemId parameter path
-      await craftItem(actor, craftName, true);
+      const alchemy = _systemAlchemy() ?? _localAlchemy;
+      if (alchemy?.craftItem) {
+        await alchemy.craftItem(actor, craftName, true);
+      } else {
+        // Lazy-load as last resort
+        const mod = await _getAlchemy();
+        if (mod?.craftItem) await mod.craftItem(actor, craftName, true);
+        else ui.notifications.warn("Alchemy system not available.");
+      }
     }
   } catch (err) {
     console.error(`Vagabond Crawler | Action fire error (${type}):`, err);
