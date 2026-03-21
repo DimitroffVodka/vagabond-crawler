@@ -13,6 +13,16 @@ import { MovementTracker } from "./movement-tracker.mjs";
 import { confirmDialog }   from "./dialog-helpers.mjs";
 import { CrawlClock }      from "./crawl-clock.mjs";
 // LightTracker now lives in the system — access via globalThis
+
+/**
+ * Pick the best static image for a token's crawl strip portrait.
+ * Prefers the token texture, but falls back to the actor portrait
+ * if the texture is a video (.webm) or missing.
+ */
+function _memberImg(tokenSrc, actor) {
+  if (tokenSrc && !tokenSrc.endsWith('.webm')) return tokenSrc;
+  return actor?.img || tokenSrc || 'icons/svg/mystery-man.svg';
+}
 const _getLightTracker = () => globalThis.vagabond?.lightTracker;
 import { ICONS }           from "./icons.mjs";
 
@@ -78,6 +88,12 @@ export const CrawlBar = {
             ? `<button class="vcb-btn vcb-danger-btn" data-action="endEncounter">${ICONS.close} End Encounter</button>`
             : `<button class="vcb-btn vcb-combat-btn" data-action="beginEncounter">${ICONS.combat} Begin Encounter</button>`
           }
+          <button class="vcb-btn" data-action="addSelectedTokens" title="Add selected tokens to combat">
+            ${ICONS.addTokens} Add Tokens
+          </button>
+          <button class="vcb-btn vcb-danger-btn" data-action="deleteEncounter" title="Delete encounter without resuming crawl">
+            <i class="fa-solid fa-trash"></i> Delete Encounter
+          </button>
           <button class="vcb-btn vcb-danger-btn" data-action="endCrawl">${ICONS.close} End Crawl</button>
         </div>`;
       this._bindEvents();
@@ -104,9 +120,18 @@ export const CrawlBar = {
         <button class="vcb-btn" data-action="addSelectedTokens" title="Add selected tokens to tracker">
           ${ICONS.addTokens} Add Tokens
         </button>
+        <button class="vcb-btn vcb-combat-btn" data-action="startCombat">
+          ${ICONS.combat} Combat
+        </button>
+
+        <div class="vcb-divider"></div>
+
+        <button class="vcb-btn" data-action="encounterCheck"
+                title="Left-click: roll d6 encounter check (${game.settings.get(MODULE_ID, "encounterThreshold")}-in-6)&#10;Right-click: options (threshold, instant, table builder)">
+          ${ICONS.encCheck} Encounter
+        </button>
 
         ${CrawlClock.available ? `
-        <div class="vcb-divider"></div>
         <div class="vcb-clock-widget" data-action="advanceClock"
              title="Crawl Clock: ${CrawlClock.filled}/${CrawlClock.segments}&#10;Left-click: advance 1 scene&#10;Right-click: options">
           ${CrawlClock.svgPath ? `<img class="vcb-clock-svg" src="${CrawlClock.svgPath}" alt="Crawl Clock" />` : ICONS.clock}
@@ -116,31 +141,6 @@ export const CrawlBar = {
 
         <div class="vcb-divider"></div>
 
-        <button class="vcb-btn" data-action="encounterCheck"
-                title="Roll d6 for encounter (${game.settings.get(MODULE_ID, "encounterThreshold")}-in-6)&#10;Right-click: change threshold">
-          ${ICONS.encCheck} Enc. Check
-        </button>
-        <button class="vcb-btn" data-action="openTableBuilder" title="Open encounter roller / build table">
-          ${ICONS.encounter} Encounter!
-        </button>
-        <div class="vcb-table-drop ${tableName ? "has-table" : ""}"
-             title="${tableName ? "Active: " + tableName : "Drop a RollTable here"}">
-          ${ICONS.tableScroll}
-          <span>${tableName ?? "Drop Table"}</span>
-          ${tableName ? `<button class="vcb-clear-table" data-action="clearTable" aria-label="Clear encounter table">×</button>` : ""}
-        </div>
-
-        <div class="vcb-divider"></div>
-
-        <button class="vcb-btn" data-action="lightTracker">
-          ${ICONS.lights} Lights
-        </button>
-
-        <div class="vcb-divider"></div>
-
-        <button class="vcb-btn vcb-combat-btn" data-action="startCombat">
-          ${ICONS.combat} Combat
-        </button>
         <button class="vcb-btn" data-action="restBreather">
           ${ICONS.rest} Rest
         </button>
@@ -173,13 +173,13 @@ export const CrawlBar = {
       });
     }
 
-    // Right-click threshold popover on encounter check button
+    // Right-click on Encounter button → options menu
     const encCheckBtn = this._el.querySelector('[data-action="encounterCheck"]');
     if (encCheckBtn) {
       encCheckBtn.addEventListener("contextmenu", ev => {
         ev.preventDefault();
         ev.stopPropagation();
-        this._showThresholdPopover(encCheckBtn);
+        this._showEncounterMenu(ev, encCheckBtn);
       });
     }
   },
@@ -207,6 +207,15 @@ export const CrawlBar = {
         if (game.combat) {
           await game.combat.endCombat();
         }
+        break;
+
+      case "deleteEncounter":
+        // Delete the combat entirely without the normal end-combat flow
+        if (game.combat) {
+          await game.combat.delete();
+          ui.notifications.info("Encounter deleted.");
+        }
+        this.render();
         break;
 
       case "endCrawl": {
@@ -386,6 +395,85 @@ export const CrawlBar = {
     }
   },
 
+  // ── Encounter right-click menu ───────────────────────────────────────────
+
+  _showEncounterMenu(ev, anchor) {
+    this._dismissEncounterMenu();
+
+    const current = game.settings.get(MODULE_ID, "encounterThreshold");
+    const menu = document.createElement("div");
+    menu.className = "vcb-threshold-popover vcb-encounter-menu";
+
+    // Build threshold row
+    let thresholdBtns = '';
+    for (let i = 1; i <= 5; i++) {
+      thresholdBtns += `<button class="vcb-threshold-opt ${i === current ? "active" : ""}" data-val="${i}">${i}-in-6</button>`;
+    }
+
+    menu.innerHTML = `
+      <div class="vcb-threshold-title">Encounter Threshold</div>
+      <div class="vcb-threshold-options">${thresholdBtns}</div>
+      <hr style="border-color: rgba(197,164,114,0.3); margin: 6px 0;">
+      <button class="vcb-btn vcb-encounter-menu-btn" data-menu-action="instant">
+        <i class="fas fa-bolt"></i> Instant Encounter
+      </button>
+      <button class="vcb-btn vcb-encounter-menu-btn" data-menu-action="tableBuilder">
+        <i class="fas fa-table"></i> Open Table Builder
+      </button>
+    `;
+
+    // Position above anchor
+    const rect = anchor.getBoundingClientRect();
+    menu.style.left   = `${rect.left}px`;
+    menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+    document.body.appendChild(menu);
+
+    // Adjust if overflow
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.right > window.innerWidth) menu.style.left = `${window.innerWidth - menuRect.width - 8}px`;
+
+    // Threshold buttons
+    menu.querySelectorAll(".vcb-threshold-opt").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await game.settings.set(MODULE_ID, "encounterThreshold", parseInt(btn.dataset.val));
+        this._dismissEncounterMenu();
+        this.render();
+        ui.notifications.info(`Encounter threshold: ${btn.dataset.val}-in-6`);
+      });
+    });
+
+    // Menu action buttons
+    menu.querySelectorAll("[data-menu-action]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const action = btn.dataset.menuAction;
+        this._dismissEncounterMenu();
+        if (action === "instant") {
+          EncounterTools.rollInstantEncounter();
+        } else if (action === "tableBuilder") {
+          EncounterTools.openTableBuilder();
+        }
+      });
+    });
+
+    // Dismiss on outside click
+    this._encounterMenuDismiss = (e) => {
+      if (!menu.contains(e.target)) this._dismissEncounterMenu();
+    };
+    setTimeout(() => document.addEventListener("pointerdown", this._encounterMenuDismiss), 0);
+    this._encounterMenu = menu;
+  },
+
+  _dismissEncounterMenu() {
+    if (this._encounterMenu) {
+      this._encounterMenu.remove();
+      this._encounterMenu = null;
+    }
+    if (this._encounterMenuDismiss) {
+      document.removeEventListener("pointerdown", this._encounterMenuDismiss);
+      this._encounterMenuDismiss = null;
+    }
+  },
+
   // ── Token management ─────────────────────────────────────────────────────
 
   async _addSelectedTokens() {
@@ -398,7 +486,7 @@ export const CrawlBar = {
       await CrawlState.addMember({
         id:      `token-${token.id}`,
         name:    token.name,
-        img:     token.document.texture?.src ?? token.actor.img,
+        img:     _memberImg(token.document.texture?.src, token.actor),
         type,
         actorId: token.actor.id,
         tokenId: token.id,
@@ -462,7 +550,7 @@ export const CrawlBar = {
       await CrawlState.addMember({
         id:      memberId,
         name:    token.name,
-        img:     token.texture?.src ?? token.actor.img,
+        img:     _memberImg(token.texture?.src, token.actor),
         type,
         actorId: token.actor.id,
         tokenId: token.id,
@@ -526,7 +614,7 @@ Hooks.on("createCombatant", async (combatant) => {
   await CrawlState.addMember({
     id:      memberId,
     name:    token.name,
-    img:     token.texture?.src ?? token.actor.img,
+    img:     _memberImg(token.texture?.src, token.actor),
     type,
     actorId: token.actor.id,
     tokenId: token.id,

@@ -67,13 +67,22 @@ export const EncounterTools = {
     if (hit) this.rollInstantEncounter();
   },
 
-  rollInstantEncounter() {
+  async rollInstantEncounter() {
     this.openTableBuilder();
-    // If a table is already registered, pre-roll it
-    const uuid = game.settings.get(MODULE_ID, "encounterTableUuid");
-    if (uuid && this._app) {
-      setTimeout(() => this._app?._rollFromRegisteredTable(), 200);
-    }
+    // Wait for the app to render, switch to Roll Tables tab, and click Roll
+    setTimeout(() => {
+      if (!this._app) return;
+      const el = this._app.element;
+      if (!el) return;
+      // Switch to Roll Tables tab
+      const existingTabBtn = el.querySelector('[data-mode="existing"]');
+      if (existingTabBtn) existingTabBtn.click();
+      // Click the Roll button after tab switches
+      setTimeout(() => {
+        const rollBtn = el.querySelector('.roll-world-table');
+        if (rollBtn) rollBtn.click();
+      }, 100);
+    }, 300);
   },
 
   openTableBuilder() {
