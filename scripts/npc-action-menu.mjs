@@ -476,10 +476,26 @@ function _buildMenuData(actor, isNPC) {
       }
     }
 
+    // Class feature items — relics/gear that act as usable abilities (Step Up, Virtuoso, etc.)
+    const classFeatureKeywords = ['step up', 'virtuoso'];
+    const abilities = (actor.items?.filter(i => {
+      if (i.type === 'weapon' || i.type === 'spell' || i.type === 'armor') return false;
+      const nameLower = i.name.toLowerCase();
+      return classFeatureKeywords.some(kw => nameLower.includes(kw));
+    }) ?? []).map(item => ({
+      label: item.name, dmg: '', type: 'ability', itemId: item.id,
+    }));
+
     const result = { tabA: "Weapons", tabB: "Spells", itemsA: weapons, itemsB: spells };
     if (craftItems.length > 0) {
       result.tabC = "Craft";
       result.itemsC = craftItems;
+    }
+    // Add Abilities tab if there are class feature items (use next available tab slot)
+    if (abilities.length > 0) {
+      const nextTab = result.tabC ? 'D' : 'C';
+      result[`tab${nextTab}`] = "Abilities";
+      result[`items${nextTab}`] = abilities;
     }
     return result;
   }
@@ -498,12 +514,14 @@ export function buildTabStripHTML(actor, isNPC) {
   const hasA = itemsA.length > 0;
   const hasB = itemsB.length > 0;
   const hasC = (menu.itemsC ?? []).length > 0;
-  if (!hasA && !hasB && !hasC) return "";
+  const hasD = (menu.itemsD ?? []).length > 0;
+  if (!hasA && !hasB && !hasC && !hasD) return "";
   return `
     <div class="vcs-action-tabs" data-actor-id="${actor.id}">
       ${hasA ? `<button class="vcs-atab vcs-atab-active" data-tab="a">${tabA}</button>` : ""}
       ${hasB ? `<button class="vcs-atab ${!hasA ? "vcs-atab-active" : ""}" data-tab="b">${tabB}</button>` : ""}
       ${hasC ? `<button class="vcs-atab ${!hasA && !hasB ? "vcs-atab-active" : ""}" data-tab="c">${menu.tabC}</button>` : ""}
+      ${hasD ? `<button class="vcs-atab" data-tab="d">${menu.tabD}</button>` : ""}
     </div>`;
 }
 
@@ -540,8 +558,10 @@ function _showPanel(stripEl, cardWrap, actor, isNPC, activeTab) {
   const menu = _buildMenuData(actor, isNPC);
   const { tabA, tabB, itemsA, itemsB } = menu;
   const itemsC = menu.itemsC ?? [];
+  const itemsD = menu.itemsD ?? [];
   const hasC = itemsC.length > 0;
-  const startTab = activeTab ?? (itemsA.length ? "a" : itemsB.length ? "b" : "c");
+  const hasD = itemsD.length > 0;
+  const startTab = activeTab ?? (itemsA.length ? "a" : itemsB.length ? "b" : hasC ? "c" : "d");
 
   const renderItems = (items) => items.length
     ? items.map(it => {
@@ -565,10 +585,12 @@ function _showPanel(stripEl, cardWrap, actor, isNPC, activeTab) {
       ${itemsA.length ? `<button class="vcs-ptab ${startTab === "a" ? "vcs-ptab-active" : ""}" data-tab="a">${tabA}</button>` : ""}
       ${itemsB.length ? `<button class="vcs-ptab ${startTab === "b" ? "vcs-ptab-active" : ""}" data-tab="b">${tabB}</button>` : ""}
       ${hasC ? `<button class="vcs-ptab ${startTab === "c" ? "vcs-ptab-active" : ""}" data-tab="c">${menu.tabC}</button>` : ""}
+      ${hasD ? `<button class="vcs-ptab ${startTab === "d" ? "vcs-ptab-active" : ""}" data-tab="d">${menu.tabD}</button>` : ""}
     </div>
     ${itemsA.length ? `<div class="vcs-panel-body" data-panel="a" style="${startTab !== "a" ? "display:none" : ""}">${renderItems(itemsA)}</div>` : ""}
     ${itemsB.length ? `<div class="vcs-panel-body" data-panel="b" style="${startTab !== "b" ? "display:none" : ""}">${renderItems(itemsB)}</div>` : ""}
-    ${hasC ? `<div class="vcs-panel-body" data-panel="c" style="${startTab !== "c" ? "display:none" : ""}">${renderItems(itemsC)}</div>` : ""}`;
+    ${hasC ? `<div class="vcs-panel-body" data-panel="c" style="${startTab !== "c" ? "display:none" : ""}">${renderItems(itemsC)}</div>` : ""}
+    ${hasD ? `<div class="vcs-panel-body" data-panel="d" style="${startTab !== "d" ? "display:none" : ""}">${renderItems(itemsD)}</div>` : ""}`;
 
   // Position: align with cardWrap, below the tab strip
   stripEl.appendChild(panel);
@@ -643,36 +665,39 @@ async function _fireAction(actor, type, indexStr, itemId) {
       const action = actor.system?.actions?.[index]; if (!action) return;
       await VagabondChatCard.npcAction(actor, action, index, targets);
 
-    } else if (type === "ability") {
+    } else if (type === "ability" && !itemId) {
+      // NPC ability (index-based)
       const ability = actor.system?.abilities?.[index]; if (!ability) return;
       await VagabondChatCard.npcAction(actor, ability, index);
 
+    } else if (type === "ability" && itemId) {
+      // PC class feature item (Step Up, Virtuoso, etc.)
+      const item = actor.items.get(itemId); if (!item) return;
+      const nameLower = item.name.toLowerCase();
+      if (nameLower.includes('step up') && actor.system.hasStepUp) {
+        const { performStepUp } = await import('/systems/vagabond/module/helpers/dancer-helper.mjs');
+        await performStepUp(actor);
+      } else if (nameLower.includes('virtuoso') && actor.system.hasVirtuoso) {
+        const { performVirtuoso } = await import('/systems/vagabond/module/helpers/bard-helper.mjs');
+        const targetsAtRollTime = Array.from(game.user.targets).map(t => ({
+          tokenId: t.id, sceneId: t.scene.id,
+          actorId: t.actor?.id, actorName: t.name, actorImg: t.document.texture.src,
+        }));
+        await performVirtuoso(actor, targetsAtRollTime);
+      } else {
+        // Generic: use item via system's useItem
+        const { VagabondActorSheet } = globalThis.vagabond?.applications ?? {};
+        if (VagabondActorSheet?._onUseItem) {
+          await VagabondActorSheet._onUseItem.call(null, new Event('click'), { dataset: { itemId } });
+        }
+      }
+
     } else if (type === "weapon") {
       const item = actor.items.get(itemId); if (!item) return;
-      const { VagabondChatCard } = globalThis.vagabond.utils;
-      const favorHinder = actor.system?.favorHinder || "none";
-      const attackResult = await item.rollAttack(actor, favorHinder);
-      if (!attackResult) return;
-      // FX
-      try {
-        const { VagabondItemSequencer } = await import("/systems/vagabond/module/helpers/item-sequencer.mjs");
-        const casterToken = actor.token?.object ?? actor.getActiveTokens(true)[0] ?? null;
-        VagabondItemSequencer.play(item, casterToken, Array.from(game.user.targets), attackResult.isHit);
-      } catch { /* non-fatal */ }
-      // Damage roll if hit
-      let damageRoll = null;
-      const isHit = attackResult.isHit ?? false;
-      if (isHit || attackResult.isCritical) {
-        damageRoll = await item.rollDamage(actor, attackResult.isCritical, attackResult.weaponSkill?.stat ?? null);
-      }
-      await VagabondChatCard.weaponAttack(actor, item, attackResult, damageRoll, targets);
 
-      // NOTE: All alchemical post-attack effects (countdown dice, statuses,
-      // splash damage, oil bonus) are handled by registerAlchemicalAttackHook()
-      // and registerOilBonusDamageHook() in alchemy-helpers.mjs.
-      // They fire via createChatMessage hook for BOTH crawl strip and character sheet attacks.
-
-      await item.handleConsumption?.();
+      // Delegate to the shared attack pipeline — same code path as character sheet
+      const { performWeaponAttack } = globalThis.vagabond.utils;
+      await performWeaponAttack(actor, item, { targets });
 
     } else if (type === "spell") {
       const item = actor.items.get(itemId); if (!item) return;
