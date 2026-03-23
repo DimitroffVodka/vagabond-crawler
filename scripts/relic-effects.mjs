@@ -1,10 +1,10 @@
 /**
  * Vagabond Crawler — Relic Effects
  *
- * Runtime hooks that make relic powers functional:
+ * Runtime hooks that make relic powers functional by monkey-patching
+ * the system's damage pipeline:
  * - Bane: Extra damage dice vs matching creature types
  * - Strike: Extra elemental damage dice
- * - Protection: Favor on saves vs creature types
  * - Fabled Vicious: Extra crit damage
  * - Lifesteal/Manasteal: Heal on kill
  */
@@ -17,7 +17,6 @@ import { MODULE_ID } from "./vagabond-crawler.mjs";
 
 /**
  * Collect all relic power flags from an actor's equipped items.
- * Returns an array of { power, flags, item } objects.
  */
 function _getEquippedRelicFlags(actor) {
   if (!actor) return [];
@@ -29,48 +28,30 @@ function _getEquippedRelicFlags(actor) {
     const forgeData = item.getFlag(MODULE_ID, "relicForge");
     if (!forgeData?.forged) continue;
 
-    // Collect flags from Active Effects on this item
     for (const effect of item.effects) {
-      const relicPower = effect.flags?.[MODULE_ID]?.relicPower;
-      if (!relicPower) continue;
-
-      // Read power-specific flags from the module namespace
-      const powerFlags = effect.flags?.[MODULE_ID] || {};
-      results.push({ power: relicPower, flags: powerFlags, item, effect });
+      const moduleFlags = effect.flags?.[MODULE_ID];
+      if (!moduleFlags?.relicPower) continue;
+      results.push({ power: moduleFlags.relicPower, flags: moduleFlags, item, effect });
     }
   }
   return results;
 }
 
 /**
- * Get the weapon item from a chat message's damage button context.
+ * Collect relic flags from a specific weapon item.
  */
-function _getItemFromMessage(message) {
-  const content = message.content || "";
-  // Look for data-actor-id and data-item-id in the chat card
-  const actorMatch = content.match(/data-actor-id="([^"]+)"/);
-  const itemMatch = content.match(/data-item-id="([^"]+)"/);
-  if (!actorMatch || !itemMatch) return null;
+function _getWeaponRelicFlags(item) {
+  if (!item) return [];
+  const forgeData = item.getFlag(MODULE_ID, "relicForge");
+  if (!forgeData?.forged) return [];
 
-  const actor = game.actors.get(actorMatch[1]);
-  if (!actor) return null;
-  return actor.items.get(itemMatch[1]) || null;
-}
-
-/**
- * Get the actor who owns a chat message.
- */
-function _getActorFromMessage(message) {
-  const speaker = message.speaker;
-  if (speaker?.actor) return game.actors.get(speaker.actor);
-  return null;
-}
-
-/**
- * Get the targeted actor(s).
- */
-function _getTargetActors() {
-  return Array.from(game.user.targets).map(t => t.actor).filter(Boolean);
+  const results = [];
+  for (const effect of item.effects) {
+    const moduleFlags = effect.flags?.[MODULE_ID];
+    if (!moduleFlags?.relicPower) continue;
+    results.push({ power: moduleFlags.relicPower, flags: moduleFlags, item, effect });
+  }
+  return results;
 }
 
 /* -------------------------------------------- */
@@ -80,10 +61,8 @@ function _getTargetActors() {
 export const RelicEffects = {
 
   init() {
-    // Hook into chat messages to detect damage rolls and add relic bonuses
-    Hooks.on("renderChatMessage", (message, html, data) => {
-      this._onRenderDamageMessage(message, html);
-    });
+    // Monkey-patch the damage helper once the system is ready
+    this._patchDamageHelper();
 
     // Hook into actor updates to detect kills for lifesteal
     Hooks.on("updateActor", (actor, changes, options, userId) => {
@@ -94,128 +73,91 @@ export const RelicEffects = {
   },
 
   /* -------------------------------------------- */
-  /*  Damage Message: Add Bane/Strike/Crit Bonus  */
+  /*  Monkey-patch: VagabondDamageHelper           */
   /* -------------------------------------------- */
 
-  async _onRenderDamageMessage(message, html) {
-    if (!game.user.isGM) return;
-
-    // Only process damage messages (they have damage rolls)
-    if (!message.rolls?.length) return;
-
-    // Check if we already processed this message
-    const el = html instanceof jQuery ? html[0] : html;
-    if (el.querySelector(".relic-bonus-applied")) return;
-
-    // Get the actor and item from the message
-    const actor = _getActorFromMessage(message);
-    if (!actor) return;
-
-    const relicFlags = _getEquippedRelicFlags(actor);
-    if (relicFlags.length === 0) return;
-
-    // Get targets
-    const targets = _getTargetActors();
-
-    // Collect bonus dice to add
-    const bonusParts = [];
-
-    // Check for Bane powers
-    for (const { flags, item } of relicFlags) {
-      const baneTarget = flags.baneTarget;
-      const baneDice = flags.baneDice;
-      if (!baneTarget || !baneDice) continue;
-
-      for (const target of targets) {
-        const beingType = target.system?.beingType || "";
-        const targetName = target.name || "";
-        const resolvedBane = baneTarget.replace("{input}", "");
-
-        // Check if target matches the bane type (being type or name match)
-        if (beingType.toLowerCase().includes(resolvedBane.toLowerCase()) ||
-            targetName.toLowerCase().includes(resolvedBane.toLowerCase())) {
-          bonusParts.push({
-            formula: baneDice,
-            label: `Bane (${resolvedBane})`,
-            type: "bane",
-          });
-          break; // Only add once per bane power
-        }
-      }
-    }
-
-    // Check for Strike powers (extra elemental damage)
-    for (const { power, flags, item } of relicFlags) {
-      const strikeDice = flags.strikeDice;
-      const strikeType = flags.strikeType;
-      if (!strikeDice || !strikeType) continue;
-
-      bonusParts.push({
-        formula: strikeDice,
-        label: `${strikeType} Strike`,
-        type: "strike",
-      });
-    }
-
-    // Check for crit-specific bonuses
-    const isCrit = message.content?.includes("Critical") || message.content?.includes("crit");
-    if (isCrit) {
-      for (const { flags } of relicFlags) {
-        // Thundering: +1d8 on crit
-        if (flags.relicPower === "strike-thundering" || flags.strikeType === "Thunder") {
-          // Thundering is already in strike — skip duplicate
-        }
-        // Fabled Vicious: +2x HD on crit
-        if (flags.relicPower === "fabled-vicious") {
-          const hd = actor.system?.hitDie || "d6";
-          bonusParts.push({
-            formula: `2${hd}`,
-            label: "Vicious (Crit)",
-            type: "vicious",
-          });
-        }
-      }
-    }
-
-    // If no bonus to add, done
-    if (bonusParts.length === 0) return;
-
-    // Roll and post the bonus damage as a follow-up
-    const totalFormula = bonusParts.map(b => b.formula).join(" + ");
-    const labels = bonusParts.map(b => b.label).join(", ");
-
+  async _patchDamageHelper() {
+    // Import from the system's module path
+    let DamageHelper;
     try {
-      const roll = new Roll(totalFormula);
-      await roll.evaluate();
-
-      await ChatMessage.create({
-        speaker: message.speaker,
-        content: `<div class="vagabond-chat-card-v2" data-card-type="generic">
-          <div class="card-body">
-            <header class="card-header">
-              <div class="header-icon">
-                <i class="fas fa-gem" style="font-size:1.5em; color:#f4c542;"></i>
-              </div>
-              <div class="header-info">
-                <h3 class="header-title">Relic Bonus Damage</h3>
-                <div class="metadata-tags-row">
-                  <div class="meta-tag"><span>${labels}</span></div>
-                </div>
-              </div>
-            </header>
-            <section class="content-body">
-              <div class="card-description" style="text-align:center; padding:6px 0;">
-                <p style="font-size:1.3em; font-weight:bold; color:#f4c542;">+${roll.total} damage</p>
-                <p style="color:#888; font-size:0.85em;">${totalFormula} = ${roll.total}</p>
-              </div>
-            </section>
-          </div>
-        </div>`,
-        rolls: [roll],
-      });
+      const mod = await import("/systems/vagabond/module/helpers/damage-helper.mjs");
+      DamageHelper = mod.VagabondDamageHelper;
     } catch (e) {
-      console.error(`${MODULE_ID} | Relic bonus damage roll failed:`, e);
+      console.warn(`${MODULE_ID} | Could not import VagabondDamageHelper:`, e);
+      return;
     }
+
+    if (!DamageHelper) {
+      console.warn(`${MODULE_ID} | VagabondDamageHelper not found in module export.`);
+      return;
+    }
+
+    const origRollDamage = DamageHelper.rollDamageFromButton.bind(DamageHelper);
+
+    DamageHelper.rollDamageFromButton = async function(button, messageId) {
+      // Before the original runs, check for relic bonuses and inject into the button's formula
+      const actorId = button.dataset.actorId;
+      const itemId = button.dataset.itemId;
+      const actor = game.actors.get(actorId);
+      const item = actor?.items.get(itemId);
+
+      if (actor && item) {
+        const relicFlags = _getWeaponRelicFlags(item);
+        if (relicFlags.length > 0) {
+          const targets = Array.from(game.user.targets).map(t => t.actor).filter(Boolean);
+          const context = JSON.parse((button.dataset.context || "{}").replace(/&quot;/g, '"'));
+          const bonusParts = [];
+
+          // Bane: check target creature type
+          for (const { flags } of relicFlags) {
+            const baneTarget = flags.baneTarget;
+            const baneDice = flags.baneDice;
+            if (!baneTarget || !baneDice) continue;
+
+            for (const target of targets) {
+              const beingType = target.system?.beingType || "";
+              if (beingType.toLowerCase().includes(baneTarget.toLowerCase())) {
+                bonusParts.push({ formula: baneDice, label: `Bane (${baneTarget})` });
+                break;
+              }
+            }
+          }
+
+          // Strike: add elemental damage
+          for (const { flags } of relicFlags) {
+            if (flags.strikeDice && flags.strikeType) {
+              bonusParts.push({ formula: flags.strikeDice, label: `${flags.strikeType} Strike` });
+            }
+          }
+
+          // Fabled Vicious: extra crit damage
+          if (context.isCritical) {
+            for (const { flags } of relicFlags) {
+              if (flags.relicPower === "fabled-vicious") {
+                const hd = actor.system?.hitDie || "d6";
+                bonusParts.push({ formula: `2${hd}`, label: "Vicious (Crit)" });
+              }
+            }
+          }
+
+          // Inject bonus into the damage formula
+          if (bonusParts.length > 0) {
+            const bonusFormula = bonusParts.map(b => b.formula).join(" + ");
+            const origFormula = button.dataset.damageFormula;
+            button.dataset.damageFormula = `${origFormula} + ${bonusFormula}`;
+
+            // Post a notification about the bonus
+            const labels = bonusParts.map(b => b.label).join(", ");
+            console.log(`${MODULE_ID} | Relic bonus injected: ${labels} (${bonusFormula})`);
+          }
+        }
+      }
+
+      // Call the original
+      return origRollDamage(button, messageId);
+    };
+
+    console.log(`${MODULE_ID} | Patched VagabondDamageHelper.rollDamageFromButton for relic effects.`);
   },
 
   /* -------------------------------------------- */
@@ -229,59 +171,59 @@ export const RelicEffects = {
     // Check if HP dropped to 0 or below
     const newHP = changes?.system?.health?.value;
     if (newHP === undefined || newHP > 0) return;
-    const oldHP = actor.system.health.value;
-    if (oldHP <= 0) return; // Already dead
 
-    // Find who killed this NPC — check the last attacker from combat
+    // Find who killed this NPC — check the current combatant
     const combat = game.combat;
     if (!combat) return;
-
-    // Get the current combatant (likely the killer)
     const currentCombatant = combat.combatant;
-    if (!currentCombatant?.actor) return;
+    if (!currentCombatant?.actor || currentCombatant.actor.type !== "character") return;
 
     const killer = currentCombatant.actor;
-    if (killer.type !== "character") return;
-
     const relicFlags = _getEquippedRelicFlags(killer);
 
     for (const { flags } of relicFlags) {
       // Lifesteal: heal 1d6 on kill
       if (flags.relicPower === "utility-lifesteal") {
-        const healAmount = Math.floor(Math.random() * 6) + 1; // Manual d6 (avoid Roll.evaluate issues)
-        const currentHP = killer.system.health.value;
-        const maxHP = killer.system.health.max;
-        const newHP = Math.min(currentHP + healAmount, maxHP);
-        await killer.update({ "system.health.value": newHP });
+        try {
+          const roll = new Roll("1d6");
+          await roll.evaluate();
+          const healAmount = roll.total;
+          const currentHP = killer.system.health.value;
+          const maxHP = killer.system.health.max;
+          const newHP = Math.min(currentHP + healAmount, maxHP);
+          await killer.update({ "system.health.value": newHP });
 
-        await ChatMessage.create({
-          speaker: ChatMessage.getSpeaker({ actor: killer }),
-          content: `<div class="vagabond-chat-card-v2" data-card-type="generic">
-            <div class="card-body">
-              <header class="card-header">
-                <div class="header-icon">
-                  <i class="fas fa-heart-pulse" style="font-size:1.5em; color:#e74c3c;"></i>
-                </div>
-                <div class="header-info">
-                  <h3 class="header-title">Lifesteal</h3>
-                  <div class="metadata-tags-row">
-                    <div class="meta-tag"><span>${killer.name}</span></div>
+          await ChatMessage.create({
+            speaker: ChatMessage.getSpeaker({ actor: killer }),
+            content: `<div class="vagabond-chat-card-v2" data-card-type="generic">
+              <div class="card-body">
+                <header class="card-header">
+                  <div class="header-icon">
+                    <i class="fas fa-heart-pulse" style="font-size:1.5em; color:#e74c3c;"></i>
                   </div>
-                </div>
-              </header>
-              <section class="content-body">
-                <div class="card-description" style="text-align:center; padding:4px 0;">
-                  <p>Healed <strong>${healAmount} HP</strong> from slaying ${actor.name}.</p>
-                </div>
-              </section>
-            </div>
-          </div>`,
-        });
+                  <div class="header-info">
+                    <h3 class="header-title">Lifesteal</h3>
+                    <div class="metadata-tags-row">
+                      <div class="meta-tag"><span>${killer.name}</span></div>
+                    </div>
+                  </div>
+                </header>
+                <section class="content-body">
+                  <div class="card-description" style="text-align:center; padding:4px 0;">
+                    <p>Healed <strong>${healAmount} HP</strong> from slaying ${actor.name}.</p>
+                  </div>
+                </section>
+              </div>
+            </div>`,
+            rolls: [roll],
+          });
+        } catch (e) {
+          console.error(`${MODULE_ID} | Lifesteal roll failed:`, e);
+        }
       }
 
       // Manasteal: recover 1 spell slot on kill
       if (flags.relicPower === "utility-manasteal") {
-        // Try to recover lowest empty spell slot
         const spellSlots = killer.system.spellSlots;
         if (spellSlots) {
           let recovered = false;
