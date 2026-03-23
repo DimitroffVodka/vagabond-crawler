@@ -7,121 +7,7 @@
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
-
-/* -------------------------------------------- */
-/*  Power Categories                            */
-/* -------------------------------------------- */
-
-const RELIC_POWER_CATEGORIES = {
-  weapon:    { label: "Weapon",       icon: "fas fa-sword" },
-  bane:      { label: "Bane",         icon: "fas fa-crosshairs" },
-  protect:   { label: "Protection",   icon: "fas fa-shield-halved" },
-  resist:    { label: "Resistance",   icon: "fas fa-shield-virus" },
-  fortify:   { label: "Fortification",icon: "fas fa-chess-rook" },
-  enchant:   { label: "Enchanted",    icon: "fas fa-hat-wizard" },
-  misc:      { label: "Miscellaneous",icon: "fas fa-star" },
-};
-
-/* -------------------------------------------- */
-/*  Relic Powers Database                       */
-/* -------------------------------------------- */
-
-const RELIC_POWERS = [
-  // ── Weapon Enhancement ─────────────────────────
-  { id: "keen", name: "Keen", category: "weapon", icon: "fas fa-bullseye", cost: 200,
-    nameFormat: { position: "prefix", text: "Keen" },
-    effects: [{ key: "system.properties", mode: 2, value: "keen" }],
-    description: "Crit range expanded by 1." },
-
-  { id: "vicious", name: "Vicious", category: "weapon", icon: "fas fa-burst", cost: 150,
-    nameFormat: { position: "prefix", text: "Vicious" },
-    effects: [{ key: "system.damageBonus", mode: 2, value: "2" }],
-    description: "+2 bonus to damage rolls." },
-
-  { id: "thundering", name: "Thundering", category: "weapon", icon: "fas fa-bolt", cost: 300,
-    nameFormat: { position: "prefix", text: "Thundering" },
-    effects: [{ key: "flags.vagabond-crawler.relicPower.thundering", mode: 5, value: "true" }],
-    description: "On crit, deal extra 1d8 thunder damage." },
-
-  { id: "flaming", name: "Flaming", category: "weapon", icon: "fas fa-fire", cost: 250,
-    nameFormat: { position: "prefix", text: "Flaming" },
-    effects: [{ key: "flags.vagabond-crawler.relicPower.flaming", mode: 5, value: "true" }],
-    description: "Extra 1d6 fire damage on hit." },
-
-  { id: "frost", name: "Frost", category: "weapon", icon: "fas fa-snowflake", cost: 250,
-    nameFormat: { position: "prefix", text: "Frost" },
-    effects: [{ key: "flags.vagabond-crawler.relicPower.frost", mode: 5, value: "true" }],
-    description: "Extra 1d6 cold damage on hit." },
-
-  // ── Bane ───────────────────────────────────────
-  { id: "bane", name: "Bane", category: "bane", icon: "fas fa-skull-crossbones", cost: 200,
-    nameFormat: { position: "suffix", text: "of {input} Bane" },
-    effects: [{ key: "flags.vagabond-crawler.relicPower.bane", mode: 5, value: "{input}" }],
-    requiresInput: true, inputType: "select",
-    inputOptions: ["Undead","Beast","Dragon","Fey","Fiend","Giant","Humanoid","Monstrosity","Ooze","Plant","Construct","Elemental","Aberration","Celestial"],
-    inputLabel: "Creature Type",
-    description: "Extra damage dice vs chosen creature type." },
-
-  // ── Protection ─────────────────────────────────
-  { id: "protection", name: "Protection", category: "protect", icon: "fas fa-shield", cost: 200,
-    nameFormat: { position: "suffix", text: "of Protection from {input}" },
-    effects: [{ key: "flags.vagabond-crawler.relicPower.protection", mode: 5, value: "{input}" }],
-    requiresInput: true, inputType: "select",
-    inputOptions: ["Undead","Beast","Dragon","Fey","Fiend","Giant","Humanoid","Monstrosity"],
-    inputLabel: "Protected From",
-    description: "Favor on saves vs chosen creature type." },
-
-  // ── Resistance ─────────────────────────────────
-  { id: "resistance", name: "Resistance", category: "resist", icon: "fas fa-shield-virus", cost: 300,
-    nameFormat: { position: "suffix", text: "of {input} Resistance" },
-    effects: [{ key: "system.resistances", mode: 2, value: "{input}" }],
-    requiresInput: true, inputType: "select",
-    inputOptions: ["Fire","Cold","Lightning","Thunder","Poison","Necrotic","Radiant","Psychic","Acid"],
-    inputLabel: "Damage Type",
-    description: "Half damage from chosen damage type." },
-
-  // ── Fortification ──────────────────────────────
-  { id: "fortified", name: "Fortified", category: "fortify", icon: "fas fa-chess-rook", cost: 300,
-    nameFormat: { position: "prefix", text: "Fortified" },
-    effects: [{ key: "system.armorBonus", mode: 2, value: "1" }],
-    description: "+1 Armor bonus when equipped." },
-
-  { id: "warding", name: "Warding", category: "fortify", icon: "fas fa-hand-sparkles", cost: 250,
-    nameFormat: { position: "prefix", text: "Warding" },
-    effects: [{ key: "system.universalCheckBonus", mode: 2, value: "1" }],
-    description: "+1 to all saves when equipped." },
-
-  // ── Enchanted ──────────────────────────────────
-  { id: "lucky", name: "Lucky", category: "enchant", icon: "fas fa-clover", cost: 400,
-    nameFormat: { position: "prefix", text: "Lucky" },
-    effects: [{ key: "system.bonusLuck", mode: 2, value: "1" }],
-    description: "+1 Luck when equipped." },
-
-  { id: "swift", name: "Swift", category: "enchant", icon: "fas fa-wind", cost: 200,
-    nameFormat: { position: "prefix", text: "Swift" },
-    effects: [{ key: "system.speed.bonus", mode: 2, value: "10" }],
-    description: "+10 Speed when equipped." },
-
-  // ── Miscellaneous ──────────────────────────────
-  { id: "lifesteal", name: "Lifesteal", category: "misc", icon: "fas fa-heart-pulse", cost: 500,
-    nameFormat: { position: "prefix", text: "Vampiric" },
-    effects: [{ key: "flags.vagabond-crawler.relicPower.lifesteal", mode: 5, value: "true" }],
-    description: "On kill, heal 1d6 HP." },
-
-  { id: "returning", name: "Returning", category: "misc", icon: "fas fa-rotate-left", cost: 100,
-    nameFormat: { position: "prefix", text: "Returning" },
-    effects: [{ key: "flags.vagabond-crawler.relicPower.returning", mode: 5, value: "true" }],
-    description: "Thrown weapon returns to your hand." },
-
-  { id: "glamoured", name: "Glamoured", category: "misc", icon: "fas fa-masks-theater", cost: 100,
-    nameFormat: { position: "prefix", text: "Glamoured" },
-    effects: [{ key: "flags.vagabond-crawler.relicPower.glamoured", mode: 5, value: "true" }],
-    description: "Can change appearance at will." },
-];
-
-function getRelicPower(id) {
-  return RELIC_POWERS.find(p => p.id === id) || null;
-}
+import { RELIC_POWERS, RELIC_POWER_CATEGORIES, METAL_DISPLAY_NAMES, getRelicPower, getPowersByCategory } from "./relic-powers.mjs";
 
 /* -------------------------------------------- */
 /*  Relic Forge Singleton                       */
@@ -139,7 +25,7 @@ export const RelicForge = {
   },
 
   init() {
-    console.log(`${MODULE_ID} | Relic Forge initialized.`);
+    console.log(`${MODULE_ID} | Relic Forge initialized (${RELIC_POWERS.length} powers).`);
   },
 
   open(item = null) {
@@ -177,11 +63,40 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this._selectedPowers = new Map(); // id → { ...powerDef, _userInput?: string }
     this._customPowers = [];
     this._categoryFilter = "all";
+    this._compendiumCache = null;
   }
 
   /* ---- Data for template ---- */
 
   async _prepareContext() {
+    // Load compendium names for dropdown powers (cached after first load)
+    if (!this._compendiumCache) {
+      this._compendiumCache = {};
+      this._compendiumCache.bestiary = [];
+      for (const packId of ["vagabond.bestiary", "vagabond.humanlike"]) {
+        const pack = game.packs.get(packId);
+        if (pack) {
+          const index = await pack.getIndex();
+          for (const entry of index) {
+            if (!this._compendiumCache.bestiary.includes(entry.name)) {
+              this._compendiumCache.bestiary.push(entry.name);
+            }
+          }
+        }
+      }
+      this._compendiumCache.bestiary.sort();
+
+      this._compendiumCache.spells = [];
+      const spellPack = game.packs.get("vagabond.spells");
+      if (spellPack) {
+        const index = await spellPack.getIndex();
+        for (const entry of index) {
+          this._compendiumCache.spells.push(entry.name);
+        }
+        this._compendiumCache.spells.sort();
+      }
+    }
+
     return this.getData();
   }
 
@@ -195,47 +110,53 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     ];
 
     // Filtered powers
-    const filtered = this._categoryFilter === "all"
-      ? RELIC_POWERS
-      : RELIC_POWERS.filter(p => p.category === this._categoryFilter);
-
+    const filtered = getPowersByCategory(this._categoryFilter);
     const powers = filtered.map(p => ({
       ...p,
       selected: this._selectedPowers.has(p.id),
-      costDisplay: p.cost > 0 ? `${p.cost.toLocaleString()}g` : "Free",
+      costDisplay: p.cost > 0 ? `${p.cost.toLocaleString()}g` : (p.cost === 0 ? "Free" : "Special"),
     }));
 
-    // Selected powers (right panel)
-    const selectedPowers = Array.from(this._selectedPowers.values()).map(p => ({
-      ...p,
-      costDisplay: p.cost > 0 ? `${p.cost.toLocaleString()}g` : "Free",
-      userInput: p._userInput || "",
-      isSelect: p.inputType === "select",
-    }));
+    // Selected powers (right panel) — resolve input options
+    const selectedPowers = Array.from(this._selectedPowers.values()).map(p => {
+      const resolved = {
+        ...p,
+        costDisplay: p.cost > 0 ? `${p.cost.toLocaleString()}g` : (p.cost === 0 ? "Free" : "Special"),
+        userInput: p._userInput || "",
+        isSelect: p.inputType === "select" || p.inputType === "compendium",
+      };
+
+      // Resolve input options
+      if (p.inputType === "compendium" && p.inputSource) {
+        resolved.inputOptions = this._compendiumCache?.[p.inputSource] || [];
+      } else if (p.inputType === "select" && p.inputOptions) {
+        resolved.inputOptions = p.inputOptions;
+      }
+
+      return resolved;
+    });
 
     const customPowers = this._customPowers.map((cp, i) => ({ ...cp, index: i }));
 
     // Base item
     let baseItem = null;
     let baseCostDisplay = "-";
+    let baseMetalDisplay = "Common";
     if (this._item) {
+      const metal = this._itemData.system?.metal || "none";
       baseItem = {
         img: this._itemData.img || "icons/svg/item-bag.svg",
         name: this._itemData.name,
         type: this._itemData.system?.equipmentType || "gear",
-        metal: this._itemData.system?.metal || "none",
+        metal: (metal !== "none" && metal !== "common") ? (METAL_DISPLAY_NAMES[metal] || metal) : "Common",
       };
-      const cost = this._itemData.system?.cost ?? {};
-      const parts = [];
-      if (cost.gold) parts.push(`${cost.gold}g`);
-      if (cost.silver) parts.push(`${cost.silver}s`);
-      if (cost.copper) parts.push(`${cost.copper}c`);
-      baseCostDisplay = parts.length > 0 ? parts.join(" ") : "-";
+      baseCostDisplay = this._itemData.system?.costDisplay || "-";
     }
 
     return {
       baseItem,
       baseCostDisplay,
+      baseMetalDisplay,
       categories,
       powers,
       selectedPowers,
@@ -250,8 +171,10 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   _computeName() {
     const baseName = this._itemData?.name || "[Item]";
+    const metal = this._itemData?.system?.metal || "none";
     const prefixes = [];
     const suffixes = [];
+    let wrapTemplate = null;
 
     const allPowers = [...this._selectedPowers.values(), ...this._customPowers];
     for (const power of allPowers) {
@@ -260,18 +183,33 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
         if (power.nameLabel) prefixes.push(power.nameLabel);
         continue;
       }
-      let text = fmt.text || "";
+
+      let text = fmt.text || fmt.template || "";
       if (power.requiresInput && power._userInput) {
         text = text.replace("{input}", power._userInput);
       } else if (power.requiresInput) {
         text = text.replace("{input}", "???");
       }
+
       if (fmt.position === "prefix") prefixes.push(text);
       else if (fmt.position === "suffix") suffixes.push(text);
+      else if (fmt.position === "wrap") wrapTemplate = text;
     }
 
-    let name = [...prefixes, baseName].join(" ");
-    if (suffixes.length) name = name + " " + suffixes.join(" ");
+    let name;
+    if (wrapTemplate) {
+      name = wrapTemplate.replace("{item}", baseName);
+      if (prefixes.length) name = prefixes.join(" ") + " " + name;
+      if (suffixes.length) name = name + " " + suffixes.join(" ");
+    } else {
+      name = [...prefixes, baseName].join(" ");
+      if (suffixes.length) name = name + " " + suffixes.join(" ");
+    }
+
+    if (metal && metal !== "none" && metal !== "common") {
+      name += ` (${METAL_DISPLAY_NAMES[metal] || metal})`;
+    }
+
     return name;
   }
 
@@ -279,7 +217,8 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const baseCostGold = this._itemData?.system?.baseCost?.gold || this._itemData?.system?.cost?.gold || 0;
     const allPowers = [...this._selectedPowers.values(), ...this._customPowers];
     const powerCost = allPowers.reduce((sum, p) => sum + (p.cost || 0), 0);
-    const totalGold = baseCostGold + powerCost;
+    const metalMultiplier = this._itemData?.system?.metalMultiplier || 1;
+    const totalGold = (baseCostGold * metalMultiplier) + powerCost;
     return totalGold > 0 ? `${totalGold.toLocaleString()}g` : "-";
   }
 
@@ -361,7 +300,6 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const power = this._selectedPowers.get(id);
       if (power) {
         power._userInput = ev.currentTarget.value.trim();
-        // Update preview name live
         const nameEl = el.querySelector(".name-text");
         if (nameEl) nameEl.textContent = this._computeName();
         const costEl = el.querySelector(".cost-text");
@@ -401,7 +339,7 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
         description: `${key} ${mode === 2 ? "+" : "→"} ${value}`,
         icon: "fas fa-wand-magic-sparkles",
         cost: 0,
-        effects: [{ key, mode, value }],
+        changes: [{ key, mode, value }],
         flags: { relicPower: `custom-${name.toLowerCase().replace(/\s+/g, "-")}` },
       });
 
@@ -441,19 +379,32 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const input = power._userInput || "";
       if (power.id) userInputs[power.id] = input;
 
-      const changes = (power.effects || []).map(e => ({
+      const changes = (power.changes || []).map(e => ({
         key: e.key.replace("{input}", input),
         mode: e.mode,
         value: String(e.value).replace("{input}", input),
       }));
-      effectDocs.push({
-        name: `Relic: ${power.name}${input ? ` (${input})` : ""}`,
-        icon: item.img || "icons/svg/item-bag.svg",
-        changes,
-        disabled: false,
-        transfer: true,
-        flags: { [MODULE_ID]: { relicPower: power.id || power.name, managed: true } },
-      });
+
+      // Merge addProperties into weapon properties
+      if (power.addProperties) {
+        for (const prop of power.addProperties) {
+          changes.push({ key: "system.properties", mode: 2, value: prop });
+        }
+      }
+
+      if (changes.length > 0) {
+        effectDocs.push({
+          name: `Relic: ${power.name}${input ? ` (${input})` : ""}`,
+          icon: item.img || "icons/svg/item-bag.svg",
+          changes,
+          disabled: false,
+          transfer: true,
+          flags: {
+            [MODULE_ID]: { relicPower: power.id || power.name, managed: true },
+            ...(power.flags || {}),
+          },
+        });
+      }
     }
 
     const relicName = this._computeName();
@@ -490,7 +441,7 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
           <section class="content-body">
             <div class="card-description" style="text-align:center; padding:4px 0;">
               <p><strong>Powers:</strong> ${powerList}</p>
-              <p style="color:#888;">Total power cost: ${powerCost}g</p>
+              <p style="color:#888;">Total power cost: ${powerCost.toLocaleString()}g</p>
             </div>
           </section>
         </div>
