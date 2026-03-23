@@ -133,7 +133,7 @@ export const RelicEffects = {
           // Fabled Vicious: extra crit damage
           if (context.isCritical) {
             for (const { flags } of relicFlags) {
-              if (flags.relicPower === "fabled-vicious") {
+              if (flags.relicPower === "vicious") {
                 const hd = actor.system?.hitDie || "d6";
                 bonusParts.push({ formula: `2${hd}`, label: "Vicious (Crit)" });
               }
@@ -182,16 +182,17 @@ export const RelicEffects = {
     const relicFlags = _getEquippedRelicFlags(killer);
 
     for (const { flags } of relicFlags) {
-      // Lifesteal: heal 1d6 on kill
-      if (flags.relicPower === "utility-lifesteal") {
+      // Lifesteal: heal on kill (uses onKillHealDice flag)
+      const healDice = flags.onKillHealDice;
+      if (healDice) {
         try {
-          const roll = new Roll("1d6");
+          const roll = new Roll(healDice);
           await roll.evaluate();
           const healAmount = roll.total;
           const currentHP = killer.system.health.value;
           const maxHP = killer.system.health.max;
-          const newHP = Math.min(currentHP + healAmount, maxHP);
-          await killer.update({ "system.health.value": newHP });
+          const newHPVal = Math.min(currentHP + healAmount, maxHP);
+          await killer.update({ "system.health.value": newHPVal });
 
           await ChatMessage.create({
             speaker: ChatMessage.getSpeaker({ actor: killer }),
@@ -210,7 +211,7 @@ export const RelicEffects = {
                 </header>
                 <section class="content-body">
                   <div class="card-description" style="text-align:center; padding:4px 0;">
-                    <p>Healed <strong>${healAmount} HP</strong> from slaying ${actor.name}.</p>
+                    <p>Healed <strong>${healAmount} HP</strong> (${healDice}) from slaying ${actor.name}.</p>
                   </div>
                 </section>
               </div>
@@ -222,18 +223,19 @@ export const RelicEffects = {
         }
       }
 
-      // Manasteal: recover 1 spell slot on kill
-      if (flags.relicPower === "utility-manasteal") {
-        const spellSlots = killer.system.spellSlots;
-        if (spellSlots) {
-          let recovered = false;
-          for (let i = 0; i < spellSlots.length && !recovered; i++) {
-            if (spellSlots[i]?.used) {
-              await killer.update({ [`system.spellSlots.${i}.used`]: false });
-              recovered = true;
-            }
-          }
-          if (recovered) {
+      // Manasteal: restore mana on kill (uses onKillManaDice flag)
+      const manaDice = flags.onKillManaDice;
+      if (manaDice) {
+        try {
+          const roll = new Roll(manaDice);
+          await roll.evaluate();
+          const manaAmount = roll.total;
+          const currentMana = killer.system.mana?.value ?? 0;
+          const maxMana = killer.system.mana?.max ?? 0;
+          if (maxMana > 0) {
+            const newManaVal = Math.min(currentMana + manaAmount, maxMana);
+            await killer.update({ "system.mana.value": newManaVal });
+
             await ChatMessage.create({
               speaker: ChatMessage.getSpeaker({ actor: killer }),
               content: `<div class="vagabond-chat-card-v2" data-card-type="generic">
@@ -251,13 +253,16 @@ export const RelicEffects = {
                   </header>
                   <section class="content-body">
                     <div class="card-description" style="text-align:center; padding:4px 0;">
-                      <p>Recovered a spell slot from slaying ${actor.name}.</p>
+                      <p>Restored <strong>${manaAmount} Mana</strong> (${manaDice}) from slaying ${actor.name}.</p>
                     </div>
                   </section>
                 </div>
               </div>`,
+              rolls: [roll],
             });
           }
+        } catch (e) {
+          console.error(`${MODULE_ID} | Manasteal roll failed:`, e);
         }
       }
     }
