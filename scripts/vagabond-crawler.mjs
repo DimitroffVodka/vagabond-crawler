@@ -14,6 +14,9 @@ import { CrawlClock }       from "./crawl-clock.mjs";
 import { FlankingChecker }  from "./flanking-checker.mjs";
 import { registerChatTooltips } from "./chat-tooltips.mjs";
 import { registerMagicWardHook } from "./npc-abilities.mjs";
+import { ItemDrops }        from "./item-drops.mjs";
+import { LootDrops }        from "./loot-drops.mjs";
+import { RelicForge }       from "./relic-forge.mjs";
 
 export const MODULE_ID = "vagabond-crawler";
 
@@ -94,6 +97,9 @@ Hooks.once("init", () => {
   // Register all sub-module settings
   MovementTracker.registerSettings();
   LightTracker.registerSettings();
+  ItemDrops.registerSettings();
+  LootDrops.registerSettings();
+  RelicForge.registerSettings();
 
   // Real-time light burn
   game.settings.register(MODULE_ID, "realtimeTracking", {
@@ -125,6 +131,9 @@ Hooks.once("ready", async () => {
     light:     LightTracker,
     clock:     CrawlClock,
     flanking:  FlankingChecker,
+    itemDrops: ItemDrops,
+    lootDrops: LootDrops,
+    relicForge: RelicForge,
     debugCombat: () => {
       const combat = game.combat;
       if (!combat) return "No active combat";
@@ -172,6 +181,11 @@ Hooks.once("ready", async () => {
   // Chat damage dice tooltips
   registerChatTooltips();
 
+  // Item drops, loot drops, relic forge
+  ItemDrops.init();
+  LootDrops.init();
+  RelicForge.init();
+
   // Start light tracker + real-time engine if enabled
   LightTracker.init();
   if (game.user.isGM && game.settings.get(MODULE_ID, "realtimeTracking")) {
@@ -190,5 +204,6 @@ Hooks.once("ready", () => {
     if (data.action === "syncLights") {
       await LightTracker.applySync(data.lights);
     }
+    // Item Drops and Loot Drops register their own socket handlers in init()
   });
 });

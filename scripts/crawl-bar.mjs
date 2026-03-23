@@ -14,6 +14,7 @@ import { confirmDialog }   from "./dialog-helpers.mjs";
 import { CrawlClock }      from "./crawl-clock.mjs";
 import { LightTracker }    from "./light-tracker.mjs";
 import { ICONS }           from "./icons.mjs";
+import { RelicForge }      from "./relic-forge.mjs";
 
 const BAR_ID = "vagabond-crawler-bar";
 
@@ -143,6 +144,9 @@ export const CrawlBar = {
         <button class="vcb-btn" data-action="restBreather">
           ${ICONS.rest} Rest
         </button>
+        <button class="vcb-btn" data-action="relicForge" title="Open the Relic Forge">
+          <i class="fas fa-hammer"></i> Forge
+        </button>
         <button class="vcb-btn vcb-danger-btn" data-action="endCrawl">
           ${ICONS.close} End
         </button>
@@ -264,6 +268,10 @@ export const CrawlBar = {
 
       case "startCombat":
         await this._startCombat();
+        break;
+
+      case "relicForge":
+        RelicForge.open();
         break;
 
       case "restBreather":
