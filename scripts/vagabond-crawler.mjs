@@ -12,8 +12,6 @@ import { RestBreather }     from "./rest-breather.mjs";
 import { LightTracker }     from "./light-tracker.mjs";
 import { CrawlClock }       from "./crawl-clock.mjs";
 import { FlankingChecker }  from "./flanking-checker.mjs";
-import { AlchemyCookbook }  from "./alchemy-cookbook.mjs";
-import { registerMaterialsHook, registerCountdownDamageHook, registerEffectExpirationHook, registerCountdownLinkedAEHook, registerOilBonusDamageHook, registerAlchemicalAttackHook, registerEurekaHook, registerConsumableUseHook, populateAlchemicalFolder, useConsumable, getConsumableEffect } from "./alchemy-helpers.mjs";
 import { registerChatTooltips } from "./chat-tooltips.mjs";
 import { registerMagicWardHook } from "./npc-abilities.mjs";
 
@@ -93,14 +91,6 @@ Hooks.once("init", () => {
     scope: "world", config: true, type: Boolean, default: true,
   });
 
-  // Alchemist Cookbook
-  game.settings.register(MODULE_ID, "alchemistCookbook", {
-    name: "Alchemist Cookbook",
-    hint: "Enable crafting UI for Alchemists — adds Craft tab to combat strip and right-click cookbook on Alchemy Tools.",
-    scope: "world", config: true, type: Boolean, default: true,
-    onChange: () => { game.vagabondCrawler?.strip?.render(); },
-  });
-
   // Register all sub-module settings
   MovementTracker.registerSettings();
   LightTracker.registerSettings();
@@ -120,53 +110,6 @@ Hooks.once("init", () => {
   console.log(`${MODULE_ID} | Initialized.`);
 });
 
-// ── Consumable Use Context Menu ──────────────────────────────────────────────
-
-function registerConsumableContextMenu() {
-  // Hook into renderApplicationV2 to add a flask "Use" button for alchemical items
-  // that have consumable effects. Foundry v13 ApplicationV2 sheets fire this hook.
-  Hooks.on("renderApplicationV2", (app, html) => {
-    if (!app.actor) return;
-    const el = html instanceof HTMLElement ? html : html?.[0] ?? app.element;
-    if (!el) return;
-    const actor = app.actor;
-
-    // Find all equipment items in the inventory panel
-    const itemRows = el.querySelectorAll("[data-item-id]");
-    for (const row of itemRows) {
-      const itemId = row.dataset.itemId;
-      const actorItem = actor.items.get(itemId);
-      if (!actorItem || actorItem.type !== "equipment") continue;
-      const effect = getConsumableEffect(actorItem.name);
-      if (!effect) continue;
-
-      // Add a "Use" button if not already present
-      if (row.querySelector(".vc-use-consumable")) continue;
-      const useBtn = document.createElement("a");
-      useBtn.className = "vc-use-consumable";
-      useBtn.title = `Use ${actorItem.name}`;
-      useBtn.innerHTML = '<i class="fas fa-flask"></i>';
-      useBtn.style.cssText = "cursor:pointer; margin-left:4px; color:#4a8; font-size:12px;";
-      useBtn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        await useConsumable(actor, actorItem);
-        app.render();
-      });
-
-      // Insert the button near the item name or controls
-      const controls = row.querySelector(".item-controls") ?? row.querySelector(".eq-controls");
-      if (controls) {
-        controls.prepend(useBtn);
-      } else {
-        row.appendChild(useBtn);
-      }
-    }
-  });
-
-  console.log(`${MODULE_ID} | Consumable use hooks registered.`);
-}
-
 // ── Ready ─────────────────────────────────────────────────────────────────────
 
 Hooks.once("ready", async () => {
@@ -182,7 +125,6 @@ Hooks.once("ready", async () => {
     light:     LightTracker,
     clock:     CrawlClock,
     flanking:  FlankingChecker,
-    alchemy:   AlchemyCookbook,
     debugCombat: () => {
       const combat = game.combat;
       if (!combat) return "No active combat";
@@ -224,19 +166,6 @@ Hooks.once("ready", async () => {
   // Start flanking checker
   FlankingChecker.init();
 
-  // Start alchemy cookbook + auto-convert materials
-  AlchemyCookbook.init();
-  if (game.settings.get(MODULE_ID, "alchemistCookbook")) {
-    registerMaterialsHook();
-    registerCountdownDamageHook();
-    registerEffectExpirationHook();
-    registerCountdownLinkedAEHook();
-    registerOilBonusDamageHook();
-    registerAlchemicalAttackHook();
-    registerEurekaHook();
-    registerConsumableUseHook();
-  }
-
   // NPC passive ability hooks (Magic Ward, etc.)
   registerMagicWardHook();
 
@@ -247,17 +176,6 @@ Hooks.once("ready", async () => {
   LightTracker.init();
   if (game.user.isGM && game.settings.get(MODULE_ID, "realtimeTracking")) {
     LightTracker.startRealTime();
-  }
-
-  // Register consumable use context menu on character sheets
-  registerConsumableContextMenu();
-
-  // Expose public API on the module for macros / console
-  const mod = game.modules.get(MODULE_ID);
-  if (mod) {
-    mod.api = mod.api ?? {};
-    mod.api.populateAlchemicalFolder = populateAlchemicalFolder;
-    mod.api.useConsumable = useConsumable;
   }
 
   console.log(`${MODULE_ID} | Ready.`);

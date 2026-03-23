@@ -13,7 +13,6 @@
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
-import { getAlchemistData, getCraftCost, formatCost, craftItem } from "./alchemy-helpers.mjs";
 import { setCastCheckFlag } from "./npc-abilities.mjs";
 
 // ─── Spell State ──────────────────────────────────────────────────────────────
@@ -447,9 +446,11 @@ function _buildMenuData(actor, isNPC) {
     }));
 
     // Alchemist craft tab — known formulae for quick 5s crafting
+    // Uses vagabond-character-enhancer API (gracefully degrades if not installed)
     let craftItems = [];
-    if (game.settings.get(MODULE_ID, "alchemistCookbook")) {
-      const alcData = getAlchemistData(actor);
+    const alchemyAPI = game.vagabondCharacterEnhancer?.alchemy;
+    if (alchemyAPI?.getAlchemistData) {
+      const alcData = alchemyAPI.getAlchemistData(actor);
       if (alcData?.tools && alcData.formulae.length > 0) {
         craftItems = alcData.formulae.map(name => ({
           label: name, dmg: `<span class="vcs-menu-dmg">5s</span>`,
@@ -662,7 +663,7 @@ async function _fireAction(actor, type, indexStr, itemId) {
 
     } else if (type === "craft") {
       const craftName = itemId; // craftName passed via itemId parameter path
-      await craftItem(actor, craftName, true);
+      await game.vagabondCharacterEnhancer?.alchemy?.craftItem?.(actor, craftName, true);
     }
   } catch (err) {
     console.error(`Vagabond Crawler | Action fire error (${type}):`, err);
