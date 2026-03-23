@@ -248,12 +248,15 @@ export const RelicForge = {
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
-class RelicForgeApp extends ApplicationV2 {
+class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
-    id: "vagabond-crawler-relic-forge",
-    window: { title: "Relic Forge", resizable: true },
+    id:       "vagabond-crawler-relic-forge",
+    window:   { title: "Relic Forge", resizable: true },
     position: { width: 700, height: "auto" },
-    classes: ["vagabond-crawler-relic-forge"],
+  };
+
+  static PARTS = {
+    form: { template: "modules/vagabond-crawler/templates/relic-forge.hbs" },
   };
 
   constructor(...args) {
@@ -264,169 +267,106 @@ class RelicForgeApp extends ApplicationV2 {
     this._categoryFilter = null;
   }
 
-  async _renderHTML() {
-    const html = document.createElement("div");
-    html.classList.add("relic-forge-container");
-    html.style.cssText = "padding:12px; display:flex; flex-direction:column; gap:12px;";
+  /* ---- Data for template ---- */
 
-    // Drop zone / Item preview
-    html.innerHTML = this._buildDropZoneHTML() + this._buildPowerSelectorHTML() + this._buildSummaryHTML();
-    return html;
+  async _prepareContext() {
+    return this.getData();
   }
 
-  _replaceHTML(result, content, options) {
-    const target = this.element;
-    if (!target) return;
-    target.innerHTML = "";
-    target.appendChild(result);
-    this._bindEvents(target);
-  }
-
-  _buildDropZoneHTML() {
-    if (!this._item) {
-      return `
-        <div class="forge-drop-zone" style="border:2px dashed #999; border-radius:8px; padding:30px; text-align:center; cursor:pointer;">
-          <i class="fas fa-hammer" style="font-size:2em; color:#999;"></i>
-          <p style="color:#888; margin-top:8px;">Drop an equipment item here to begin forging.</p>
-        </div>
-      `;
-    }
-
-    const item = this._itemData;
-    const metal = item.system?.metal || "none";
-    return `
-      <div class="forge-item-preview" style="display:flex; align-items:center; gap:12px; border:1px solid #666; border-radius:6px; padding:10px; background:rgba(0,0,0,0.05);">
-        <img src="${item.img || 'icons/svg/item-bag.svg'}" width="48" height="48" style="border:1px solid #999; border-radius:4px;">
-        <div style="flex:1;">
-          <strong style="font-size:1.1em;">${item.name}</strong><br>
-          <span style="color:#888;">Metal: ${metal} | Type: ${item.system?.equipmentType || "gear"}</span>
-        </div>
-        <button class="forge-clear-item" style="background:none; border:none; cursor:pointer; font-size:1.2em; color:#c00;" title="Remove item">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-    `;
-  }
-
-  _buildPowerSelectorHTML() {
-    if (!this._item) return "";
-
+  getData() {
     // Group powers by category
-    const categories = {};
+    const categoryMap = {};
     for (const [name, power] of Object.entries(RELIC_POWERS)) {
-      if (!categories[power.category]) categories[power.category] = [];
-      categories[power.category].push({ name, ...power });
+      if (!categoryMap[power.category]) categoryMap[power.category] = [];
+      categoryMap[power.category].push(name);
     }
 
-    // Build category tabs
-    const catNames = Object.keys(categories);
-    const tabs = catNames.map(cat => {
-      const active = this._categoryFilter === cat ? "font-weight:bold; border-bottom:2px solid #7b5ea7;" : "";
-      return `<button class="forge-cat-tab" data-category="${cat}" style="background:none; border:none; padding:4px 8px; cursor:pointer; ${active}">${cat}</button>`;
-    }).join("");
-    const allActive = !this._categoryFilter ? "font-weight:bold; border-bottom:2px solid #7b5ea7;" : "";
+    const categories = Object.keys(categoryMap).map(name => ({
+      name,
+      active: this._categoryFilter === name,
+    }));
 
-    // Build power list (filtered by category)
-    const visiblePowers = this._categoryFilter
-      ? (categories[this._categoryFilter] || [])
-      : Object.entries(RELIC_POWERS).map(([name, p]) => ({ name, ...p }));
+    // Visible powers (filtered by category)
+    const visibleEntries = this._categoryFilter
+      ? (categoryMap[this._categoryFilter] || [])
+      : Object.keys(RELIC_POWERS);
 
-    const powerRows = visiblePowers.map(power => {
-      const selected = this._selectedPowers.has(power.name);
-      const bgColor = selected ? "rgba(123,94,167,0.1)" : "transparent";
-      const userInput = this._selectedPowers.get(power.name)?.userInput || "";
+    const powers = visibleEntries.map(name => {
+      const power = RELIC_POWERS[name];
+      const selected = this._selectedPowers.has(name);
+      const userInput = this._selectedPowers.get(name)?.userInput || "";
+      return {
+        name,
+        cost: power.cost,
+        description: power.description,
+        selected,
+        showInput: power.requiresInput && selected,
+        isSelect: power.inputType === "select",
+        inputLabel: power.inputLabel || "Value",
+        inputOptions: power.inputOptions || [],
+        userInput,
+      };
+    });
 
-      let inputHTML = "";
-      if (power.requiresInput && selected) {
-        if (power.inputType === "select" && power.inputOptions) {
-          const options = power.inputOptions.map(opt =>
-            `<option value="${opt}" ${userInput === opt ? "selected" : ""}>${opt}</option>`
-          ).join("");
-          inputHTML = `<select class="forge-power-input" data-power="${power.name}" style="margin-left:8px; padding:2px;">
-            <option value="">-- ${power.inputLabel || "Select"} --</option>
-            ${options}
-          </select>`;
-        } else {
-          inputHTML = `<input class="forge-power-input" data-power="${power.name}" type="text" value="${userInput}" placeholder="${power.inputLabel || "Enter value"}" style="margin-left:8px; width:120px; padding:2px;">`;
-        }
+    // Compute summary
+    let hasPowers = false, relicName = "", baseCostDisplay = "", powerCost = 0, totalDisplay = "";
+    if (this._item && this._selectedPowers.size > 0) {
+      hasPowers = true;
+      const costObj = this._itemData.system?.cost ?? { gold: 0, silver: 0, copper: 0 };
+      const baseGold = costObj.gold ?? 0;
+      const baseSilver = costObj.silver ?? 0;
+      const nameParts = { prefix: [], base: this._itemData.name, suffix: [] };
+
+      for (const [name, data] of this._selectedPowers) {
+        const power = RELIC_POWERS[name];
+        if (!power) continue;
+        powerCost += power.cost;
+        const input = data.userInput || "";
+        const formatted = power.nameFormat.text.replace("{input}", input);
+        if (power.nameFormat.position === "prefix") nameParts.prefix.push(formatted);
+        else if (power.nameFormat.position === "suffix") nameParts.suffix.push(formatted);
       }
 
-      return `
-        <div class="forge-power-row" style="display:flex; align-items:center; gap:8px; padding:4px 8px; background:${bgColor}; border-radius:4px;">
-          <input type="checkbox" class="forge-power-check" data-power="${power.name}" ${selected ? "checked" : ""}>
-          <div style="flex:1;">
-            <strong>${power.name}</strong>
-            <span style="color:#888; font-size:0.85em;"> (${power.cost}g)</span>
-            ${inputHTML}
-            <div style="color:#666; font-size:0.8em;">${power.description}</div>
-          </div>
-        </div>
-      `;
-    }).join("");
-
-    return `
-      <div class="forge-powers" style="border:1px solid #ddd; border-radius:6px; overflow:hidden;">
-        <div style="display:flex; flex-wrap:wrap; gap:2px; padding:6px; border-bottom:1px solid #ddd; background:#f5f5f5;">
-          <button class="forge-cat-tab" data-category="" style="background:none; border:none; padding:4px 8px; cursor:pointer; ${allActive}">All</button>
-          ${tabs}
-        </div>
-        <div style="max-height:300px; overflow-y:auto; padding:4px;">
-          ${powerRows}
-        </div>
-      </div>
-    `;
-  }
-
-  _buildSummaryHTML() {
-    if (!this._item || this._selectedPowers.size === 0) return "";
-
-    const item = this._itemData;
-    const costObj = item.system?.cost ?? { gold: 0, silver: 0, copper: 0 };
-    const baseGold = costObj.gold ?? 0;
-    const baseSilver = costObj.silver ?? 0;
-    let powerCost = 0;
-    const nameParts = { prefix: [], base: item.name, suffix: [] };
-
-    for (const [name, data] of this._selectedPowers) {
-      const power = RELIC_POWERS[name];
-      if (!power) continue;
-      powerCost += power.cost;
-
-      // Build name
-      const input = data.userInput || "";
-      const formatted = power.nameFormat.text.replace("{input}", input);
-      if (power.nameFormat.position === "prefix") nameParts.prefix.push(formatted);
-      else if (power.nameFormat.position === "suffix") nameParts.suffix.push(formatted);
+      relicName = [...nameParts.prefix, nameParts.base, ...nameParts.suffix].join(" ");
+      baseCostDisplay = baseSilver > 0 ? `${baseGold}g ${baseSilver}s` : `${baseGold}g`;
+      const totalGold = baseGold + powerCost;
+      totalDisplay = baseSilver > 0 ? `${totalGold}g ${baseSilver}s` : `${totalGold}g`;
     }
 
-    const totalGold = baseGold + powerCost;
-    const relicName = [...nameParts.prefix, nameParts.base, ...nameParts.suffix].join(" ");
-    const baseDisplay = baseSilver > 0 ? `${baseGold}g ${baseSilver}s` : `${baseGold}g`;
-
-    return `
-      <div class="forge-summary" style="border:1px solid #7b5ea7; border-radius:6px; padding:10px; background:rgba(123,94,167,0.05);">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div>
-            <strong style="font-size:1.1em; color:#7b5ea7;">${relicName}</strong><br>
-            <span style="color:#888;">Base: ${baseDisplay} + Powers: ${powerCost}g = <strong>${totalGold}g${baseSilver > 0 ? ` ${baseSilver}s` : ""}</strong></span>
-          </div>
-          <button class="forge-btn" style="background:#7b5ea7; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; font-size:1em;">
-            <i class="fas fa-hammer"></i> Forge Relic
-          </button>
-        </div>
-      </div>
-    `;
+    return {
+      item: this._item ? {
+        img: this._itemData.img || "icons/svg/item-bag.svg",
+        name: this._itemData.name,
+        metal: this._itemData.system?.metal || "none",
+        type: this._itemData.system?.equipmentType || "gear",
+      } : null,
+      categoryFilter: this._categoryFilter,
+      categories,
+      powers,
+      hasPowers,
+      relicName,
+      baseCostDisplay,
+      powerCost,
+      totalDisplay,
+    };
   }
 
-  _bindEvents(el) {
+  /* ---- Event binding ---- */
+
+  _onRender(context, options) {
+    super._onRender(context, options);
+    const el = this.element;
+    const $$ = (sel) => [...el.querySelectorAll(sel)];
+    const on = (sel, evt, fn) => $$(sel).forEach(n => n.addEventListener(evt, fn));
+
     // Drop zone
     const dropZone = el.querySelector(".forge-drop-zone");
     if (dropZone) {
-      dropZone.addEventListener("dragover", ev => { ev.preventDefault(); dropZone.style.borderColor = "#7b5ea7"; });
-      dropZone.addEventListener("dragleave", () => { dropZone.style.borderColor = "#999"; });
+      dropZone.addEventListener("dragover", ev => { ev.preventDefault(); dropZone.classList.add("drag-over"); });
+      dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
       dropZone.addEventListener("drop", async (ev) => {
         ev.preventDefault();
-        dropZone.style.borderColor = "#999";
+        dropZone.classList.remove("drag-over");
         const data = JSON.parse(ev.dataTransfer.getData("text/plain"));
         if (data.type !== "Item") return;
         const item = await fromUuid(data.uuid);
@@ -435,7 +375,7 @@ class RelicForgeApp extends ApplicationV2 {
           return;
         }
         this.loadItem(item);
-        this.render(true);
+        this.render();
       });
     }
 
@@ -445,38 +385,39 @@ class RelicForgeApp extends ApplicationV2 {
       this._itemData = null;
       this._selectedPowers.clear();
       this._categoryFilter = null;
-      this.render(true);
+      this.render();
     });
 
     // Category tabs
-    el.querySelectorAll(".forge-cat-tab").forEach(tab => {
-      tab.addEventListener("click", () => {
-        this._categoryFilter = tab.dataset.category || null;
-        this.render(true);
-      });
+    on(".forge-cat-tab", "click", ev => {
+      this._categoryFilter = ev.currentTarget.dataset.category || null;
+      this.render();
     });
 
     // Power checkboxes
-    el.querySelectorAll(".forge-power-check").forEach(cb => {
-      cb.addEventListener("change", () => {
-        const name = cb.dataset.power;
-        if (cb.checked) {
-          this._selectedPowers.set(name, { userInput: "" });
-        } else {
-          this._selectedPowers.delete(name);
-        }
-        this.render(true);
-      });
+    on(".forge-power-check", "change", ev => {
+      const name = ev.currentTarget.dataset.power;
+      if (ev.currentTarget.checked) {
+        this._selectedPowers.set(name, { userInput: "" });
+      } else {
+        this._selectedPowers.delete(name);
+      }
+      this.render();
     });
 
-    // Power inputs (select/text)
-    el.querySelectorAll(".forge-power-input").forEach(input => {
-      input.addEventListener("change", () => {
-        const name = input.dataset.power;
-        const entry = this._selectedPowers.get(name);
-        if (entry) entry.userInput = input.value;
-        this.render(true);
-      });
+    // Set select values (can't do equality check in Handlebars easily)
+    el.querySelectorAll("select.forge-power-input").forEach(sel => {
+      const name = sel.dataset.power;
+      const entry = this._selectedPowers.get(name);
+      if (entry?.userInput) sel.value = entry.userInput;
+    });
+
+    // Power inputs
+    on(".forge-power-input", "change", ev => {
+      const name = ev.currentTarget.dataset.power;
+      const entry = this._selectedPowers.get(name);
+      if (entry) entry.userInput = ev.currentTarget.value;
+      this.render();
     });
 
     // Forge button
@@ -513,13 +454,11 @@ class RelicForgeApp extends ApplicationV2 {
       powerCost += power.cost;
       userInputs[name] = data.userInput || "";
 
-      // Build name
       const input = data.userInput || "";
       const formatted = power.nameFormat.text.replace("{input}", input);
       if (power.nameFormat.position === "prefix") nameParts.prefix.push(formatted);
       else if (power.nameFormat.position === "suffix") nameParts.suffix.push(formatted);
 
-      // Build Active Effect
       const changes = power.effects.map(e => ({
         key: e.key.replace("{input}", input),
         mode: e.mode,
@@ -531,16 +470,12 @@ class RelicForgeApp extends ApplicationV2 {
         changes,
         disabled: false,
         transfer: true,
-        flags: {
-          [MODULE_ID]: { relicPower: name, managed: true },
-        },
+        flags: { [MODULE_ID]: { relicPower: name, managed: true } },
       });
     }
 
     const relicName = [...nameParts.prefix, nameParts.base, ...nameParts.suffix].join(" ");
     updates.name = relicName;
-
-    // Store forge metadata
     updates[`flags.${MODULE_ID}.relicForge`] = {
       forged: true,
       powers: [...this._selectedPowers.keys()],
@@ -549,15 +484,11 @@ class RelicForgeApp extends ApplicationV2 {
       forgedAt: Date.now(),
     };
 
-    // Apply updates
     await item.update(updates);
-
-    // Create Active Effects on the item
     if (effects.length > 0) {
       await item.createEmbeddedDocuments("ActiveEffect", effects);
     }
 
-    // Post chat card
     const powerList = [...this._selectedPowers.keys()].join(", ");
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker(),
@@ -585,8 +516,6 @@ class RelicForgeApp extends ApplicationV2 {
     });
 
     ui.notifications.info(`${relicName} has been forged!`);
-
-    // Reset and close
     this._item = null;
     this._itemData = null;
     this._selectedPowers.clear();

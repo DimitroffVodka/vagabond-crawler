@@ -1,0 +1,79 @@
+<form class="vagabond-relic-forge">
+
+  {{!-- DROP ZONE (no item loaded) --}}
+  {{#unless item}}
+  <div class="forge-drop-zone">
+    <i class="fas fa-hammer"></i>
+    <p>Drop an equipment item here to begin forging.</p>
+  </div>
+  {{/unless}}
+
+  {{!-- ITEM LOADED --}}
+  {{#if item}}
+
+  {{!-- Item Preview --}}
+  <div class="forge-item-preview">
+    <img src="{{item.img}}" width="40" height="40" />
+    <div class="forge-item-info">
+      <strong>{{item.name}}</strong>
+      <span class="forge-item-meta">Metal: {{item.metal}} &bull; Type: {{item.type}}</span>
+    </div>
+    <button type="button" class="forge-clear-item" title="Remove item">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+
+  {{!-- Category Filter --}}
+  <div class="forge-category-tabs">
+    <button type="button" class="forge-cat-tab {{#unless categoryFilter}}active{{/unless}}" data-category="">All</button>
+    {{#each categories}}
+    <button type="button" class="forge-cat-tab {{#if this.active}}active{{/if}}" data-category="{{this.name}}">{{this.name}}</button>
+    {{/each}}
+  </div>
+
+  {{!-- Power List --}}
+  <div class="forge-power-list">
+    {{#each powers}}
+    <div class="forge-power-row {{#if this.selected}}selected{{/if}}">
+      <label class="forge-power-check-label">
+        <input type="checkbox" class="forge-power-check" data-power="{{this.name}}" {{#if this.selected}}checked{{/if}} />
+        <strong>{{this.name}}</strong>
+        <span class="forge-power-cost">{{this.cost}}g</span>
+      </label>
+      <div class="forge-power-desc">{{this.description}}</div>
+      {{#if this.showInput}}
+      <div class="forge-power-input-row">
+        {{#if this.isSelect}}
+        <label>{{this.inputLabel}}:</label>
+        <select class="forge-power-input" data-power="{{this.name}}">
+          <option value="">-- Select --</option>
+          {{#each this.inputOptions}}
+          <option value="{{this}}">{{this}}</option>
+          {{/each}}
+        </select>
+        {{else}}
+        <label>{{this.inputLabel}}:</label>
+        <input type="text" class="forge-power-input" data-power="{{this.name}}" value="{{this.userInput}}" placeholder="{{this.inputLabel}}" />
+        {{/if}}
+      </div>
+      {{/if}}
+    </div>
+    {{/each}}
+  </div>
+
+  {{!-- Summary --}}
+  {{#if hasPowers}}
+  <div class="forge-summary">
+    <div class="forge-summary-info">
+      <div class="forge-relic-name">{{relicName}}</div>
+      <div class="forge-cost-line">Base: {{baseCostDisplay}} + Powers: {{powerCost}}g = <strong>{{totalDisplay}}</strong></div>
+    </div>
+    <button type="button" class="forge-btn">
+      <i class="fas fa-hammer"></i> Forge Relic
+    </button>
+  </div>
+  {{/if}}
+
+  {{/if}}
+
+</form>
