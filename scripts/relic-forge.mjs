@@ -385,12 +385,7 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
         value: String(e.value).replace("{input}", input),
       }));
 
-      // Merge addProperties into weapon properties
-      if (power.addProperties) {
-        for (const prop of power.addProperties) {
-          changes.push({ key: "system.properties", mode: 2, value: prop });
-        }
-      }
+      // Note: addProperties are handled below by directly updating the item's properties array
 
       if (changes.length > 0) {
         effectDocs.push({
@@ -416,6 +411,15 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       powerCost,
       forgedAt: Date.now(),
     };
+
+    // Directly add properties from Ace powers to the item's properties array
+    const existingProps = new Set(item.system.properties || []);
+    for (const power of allPowers) {
+      if (power.addProperties) {
+        for (const prop of power.addProperties) existingProps.add(prop);
+      }
+    }
+    updates["system.properties"] = Array.from(existingProps);
 
     await item.update(updates);
     if (effectDocs.length > 0) {

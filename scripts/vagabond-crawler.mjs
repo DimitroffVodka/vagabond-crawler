@@ -17,6 +17,7 @@ import { registerMagicWardHook } from "./npc-abilities.mjs";
 import { ItemDrops }        from "./item-drops.mjs";
 import { LootDrops }        from "./loot-drops.mjs";
 import { RelicForge }       from "./relic-forge.mjs";
+import { RelicEffects }     from "./relic-effects.mjs";
 
 export const MODULE_ID = "vagabond-crawler";
 
@@ -134,6 +135,7 @@ Hooks.once("ready", async () => {
     itemDrops: ItemDrops,
     lootDrops: LootDrops,
     relicForge: RelicForge,
+    relicEffects: RelicEffects,
     debugCombat: () => {
       const combat = game.combat;
       if (!combat) return "No active combat";
@@ -185,6 +187,7 @@ Hooks.once("ready", async () => {
   ItemDrops.init();
   LootDrops.init();
   RelicForge.init();
+  RelicEffects.init();
 
   // Start light tracker + real-time engine if enabled
   LightTracker.init();
