@@ -105,10 +105,57 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this._slots           = [];
     this._lastResult      = null;
     this._selectedTableId = game.tables.size > 0 ? game.tables.contents[0].id : null;
+    // Browse tab state
+    this._browseSource    = "vagabond.bestiary";
+    this._browseSearch    = "";
+    this._browseType      = "";
+    this._browseTlMin     = "";
+    this._browseTlMax     = "";
+    this._browseSortCol   = "name";
+    this._browseSortAsc   = true;
+    this._browseCache     = {};
   }
 
   async _prepareContext() {
-    return this.getData();
+    const ctx = this.getData();
+
+    if (ctx.isBrowseMode) {
+      const sources = [
+        { id: "world", label: "World NPCs" },
+        { id: "scene", label: "Scene NPCs" },
+        { id: "vagabond.bestiary", label: "Bestiary" },
+        { id: "vagabond.humanlike", label: "Humanlike" },
+      ];
+      ctx.browseSources = sources.map(s => ({ ...s, selected: s.id === this._browseSource }));
+
+      let npcs = await this._getBrowseNPCs(this._browseSource);
+
+      // Type filter
+      if (this._browseType) npcs = npcs.filter(n => n.beingType === this._browseType);
+
+      // TL range
+      const tlMin = this._browseTlMin !== "" ? parseFloat(this._browseTlMin) : null;
+      const tlMax = this._browseTlMax !== "" ? parseFloat(this._browseTlMax) : null;
+      if (tlMin !== null) npcs = npcs.filter(n => n.threatLevel >= tlMin);
+      if (tlMax !== null) npcs = npcs.filter(n => n.threatLevel <= tlMax);
+
+      // Collect types before search filter
+      const allNpcs = await this._getBrowseNPCs(this._browseSource);
+      ctx.browseBeingTypes = [...new Set(allNpcs.map(n => n.beingType).filter(t => t && t !== "—"))].sort();
+
+      // Sort
+      const col = this._browseSortCol;
+      const dir = this._browseSortAsc ? 1 : -1;
+      npcs.sort((a, b) => {
+        const av = a[col], bv = b[col];
+        if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+        return String(av || "").localeCompare(String(bv || "")) * dir;
+      });
+
+      ctx.browseNpcs = npcs;
+    }
+
+    return ctx;
   }
 
   getData() {
@@ -118,6 +165,8 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     return {
       isBuildMode: this._mode === "build",
+      isBrowseMode: this._mode === "browse",
+      isExistingMode: this._mode === "existing",
       dieTypes: ["d4","d6","d8","d10","d12"].map(d => ({ value: d, selected: d === this._dieType })),
       tableName: this._tableName,
       slots: this._slots.map((s, i) => ({
@@ -132,6 +181,13 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       selectedTablePreview: this._getTablePreview(this._selectedTableId),
       lastResult:     this._lastResult,
       registeredTable: this._getRegisteredTableName(),
+      // Browse tab data (populated async in _prepareContext)
+      browseSources: [],
+      browseNpcs: [],
+      browseBeingTypes: [],
+      browseTypeFilter: this._browseType,
+      browseTlMin: this._browseTlMin,
+      browseTlMax: this._browseTlMax,
     };
   }
 
@@ -240,6 +296,73 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
           this.render();
         } catch (e) { console.error(`${MODULE_ID} | Drop error:`, e); }
       });
+    });
+
+    // ── Browse tab events ──
+    $(".browse-source-filter")?.addEventListener("change", ev => {
+      this._browseSource = ev.currentTarget.value;
+      this._browseType = "";
+      this.render();
+    });
+
+    const browseSearch = $(".browse-search-input");
+    if (browseSearch) {
+      browseSearch.value = this._browseSearch;
+      browseSearch.addEventListener("input", () => {
+        this._browseSearch = browseSearch.value;
+        const search = this._browseSearch.toLowerCase();
+        $$(".browse-npc-row").forEach(row => {
+          const name = row.querySelector(".loot-npc-name")?.textContent?.toLowerCase() || "";
+          row.style.display = search && !name.includes(search) ? "none" : "";
+        });
+      });
+    }
+
+    $(".browse-type-filter")?.addEventListener("change", ev => {
+      this._browseType = ev.currentTarget.value;
+      this.render();
+    });
+
+    $(".browse-tl-min")?.addEventListener("change", ev => {
+      this._browseTlMin = ev.currentTarget.value;
+      this.render();
+    });
+    $(".browse-tl-max")?.addEventListener("change", ev => {
+      this._browseTlMax = ev.currentTarget.value;
+      this.render();
+    });
+
+    // Browse sort
+    on(".loot-sortable", "click", ev => {
+      const col = ev.currentTarget.dataset.sort;
+      if (this._browseSortCol === col) this._browseSortAsc = !this._browseSortAsc;
+      else { this._browseSortCol = col; this._browseSortAsc = true; }
+      this.render();
+    });
+
+    // Browse drag — make rows draggable as Actor type
+    $$(".browse-npc-row").forEach(row => {
+      row.addEventListener("dragstart", ev => {
+        const uuid = row.dataset.uuid;
+        ev.dataTransfer.setData("text/plain", JSON.stringify({ type: "Actor", uuid }));
+      });
+    });
+
+    // Browse double-click to inspect
+    $$(".browse-npc-row").forEach(row => {
+      const nameCell = row.querySelector(".loot-npc-name");
+      const imgCell = row.querySelector(".loot-npc-img");
+      const handler = async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const uuid = row.dataset.uuid;
+        if (uuid) {
+          const doc = await fromUuid(uuid);
+          if (doc) doc.sheet.render(true);
+        }
+      };
+      if (nameCell) nameCell.addEventListener("dblclick", handler);
+      if (imgCell) imgCell.addEventListener("dblclick", handler);
     });
   }
 
@@ -530,6 +653,50 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
         };
       });
     return { formula: table.formula, rows };
+  }
+
+  // ── Browse NPCs ──────────────────────────────────────────────────────────────
+
+  async _getBrowseNPCs(sourceId) {
+    const mapActor = (a, uuid) => ({
+      id: a.id || a._id, name: a.name, img: a.img,
+      uuid: uuid || a.uuid,
+      beingType: a.system?.beingType || "—",
+      threatLevel: a.system?.threatLevel ?? 0,
+      threatLevelDisplay: a.system?.threatLevelFormatted ?? a.system?.threatLevel ?? "—",
+    });
+
+    if (sourceId === "world") {
+      return game.actors.filter(a => a.type === "npc").map(a => mapActor(a, a.uuid));
+    }
+
+    if (sourceId === "scene") {
+      const seen = new Set();
+      return (canvas.tokens?.placeables || [])
+        .filter(t => t.actor?.type === "npc")
+        .map(t => {
+          if (seen.has(t.actor.id)) return null;
+          seen.add(t.actor.id);
+          return mapActor(t.actor, t.actor.uuid);
+        })
+        .filter(Boolean);
+    }
+
+    // Compendium
+    if (!this._browseCache[sourceId]) {
+      const pack = game.packs.get(sourceId);
+      if (!pack) return [];
+      const index = await pack.getIndex({ fields: ["img", "system.beingType", "system.threatLevel", "system.threatLevelFormatted"] });
+      this._browseCache[sourceId] = index.map(entry => ({
+        id: entry._id, name: entry.name,
+        img: entry.img || "icons/svg/mystery-man.svg",
+        uuid: `Compendium.${sourceId}.Actor.${entry._id}`,
+        beingType: entry.system?.beingType || "—",
+        threatLevel: entry.system?.threatLevel ?? 0,
+        threatLevelDisplay: entry.system?.threatLevelFormatted ?? entry.system?.threatLevel ?? "—",
+      }));
+    }
+    return [...this._browseCache[sourceId]];
   }
 
 }

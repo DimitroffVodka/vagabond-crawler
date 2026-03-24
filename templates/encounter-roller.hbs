@@ -4,7 +4,10 @@
     <button type="button" class="tab-btn {{#if isBuildMode}}active{{/if}}" data-mode="build">
       <i class="fas fa-hammer"></i> Build Table
     </button>
-    <button type="button" class="tab-btn {{#unless isBuildMode}}active{{/unless}}" data-mode="existing">
+    <button type="button" class="tab-btn {{#if isBrowseMode}}active{{/if}}" data-mode="browse">
+      <i class="fas fa-skull-crossbones"></i> Browse NPCs
+    </button>
+    <button type="button" class="tab-btn {{#if isExistingMode}}active{{/if}}" data-mode="existing">
       <i class="fas fa-table"></i> Roll Tables
     </button>
   </div>
@@ -59,8 +62,72 @@
   </div>
   {{/if}}
 
+  {{!-- BROWSE NPCs TAB --}}
+  {{#if isBrowseMode}}
+  <div class="loot-npc-panel">
+    <div class="loot-filter-panel">
+      <h3>Filters</h3>
+      <div class="loot-filter-row">
+        <label>Source</label>
+        <select class="browse-source-filter">
+          {{#each browseSources}}
+          <option value="{{id}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+      </div>
+      <div class="loot-filter-row">
+        <label>Search</label>
+        <input type="text" class="browse-search-input" placeholder="Filter by name..." />
+      </div>
+      <div class="loot-filter-row">
+        <label>Creature Type</label>
+        <select class="browse-type-filter">
+          <option value="">All Types</option>
+          {{#each browseBeingTypes}}
+          <option value="{{this}}" {{#if (eq this ../browseTypeFilter)}}selected{{/if}}>{{this}}</option>
+          {{/each}}
+        </select>
+      </div>
+      <div class="loot-filter-row">
+        <label>TL Range</label>
+        <div style="display:flex; gap:4px; align-items:center;">
+          <input type="number" class="browse-tl-min" value="{{browseTlMin}}" placeholder="Min" step="0.1" style="width:55px;" />
+          <span style="color:#888;">–</span>
+          <input type="number" class="browse-tl-max" value="{{browseTlMax}}" placeholder="Max" step="0.1" style="width:55px;" />
+        </div>
+      </div>
+      <p class="table-hint" style="margin-top:8px;">Drag NPCs from the list into Build Table slots.</p>
+    </div>
+    <div class="loot-list-panel">
+      <table class="loot-npc-table">
+        <thead>
+          <tr>
+            <th style="width:32px;"></th>
+            <th class="loot-sortable" data-sort="name">Name <i class="fas fa-sort"></i></th>
+            <th class="loot-sortable" data-sort="beingType" style="width:90px;">Type <i class="fas fa-sort"></i></th>
+            <th class="loot-sortable" data-sort="threatLevel" style="width:40px;">TL <i class="fas fa-sort"></i></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each browseNpcs}}
+          <tr class="loot-npc-row browse-npc-row" data-actor-id="{{id}}" data-uuid="{{uuid}}" draggable="true">
+            <td class="loot-npc-img" title="Double-click to inspect"><img src="{{img}}" width="28" height="28" style="border-radius:3px;" /></td>
+            <td class="loot-npc-name" title="Double-click to inspect">{{name}}</td>
+            <td class="loot-npc-type" style="font-size:0.8em; color:#aaa;">{{beingType}}</td>
+            <td class="loot-npc-tl" style="text-align:center;">{{threatLevelDisplay}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+      {{#unless browseNpcs.length}}
+      <p style="text-align:center; color:#888; padding:20px;">No NPCs found matching filters.</p>
+      {{/unless}}
+    </div>
+  </div>
+  {{/if}}
+
   {{!-- ROLL TABLES TAB --}}
-  {{#unless isBuildMode}}
+  {{#if isExistingMode}}
   <div class="encounter-existing-section">
     {{#if registeredTable}}
     <div class="registered-table-group">
@@ -117,7 +184,7 @@
     <p class="no-tables-msg"><em>No roll tables found. Build one in the Build Table tab.</em></p>
     {{/if}}
   </div>
-  {{/unless}}
+  {{/if}}
 
   {{!-- RESULT PANEL --}}
   {{#if lastResult}}
