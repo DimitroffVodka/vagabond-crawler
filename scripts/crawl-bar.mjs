@@ -109,6 +109,9 @@ export const CrawlBar = {
         <button class="vcb-btn" data-action="addSelectedTokens" title="Add selected tokens to tracker">
           ${ICONS.addTokens} Add Tokens
         </button>
+        <button class="vcb-btn vcb-combat-btn" data-action="startCombat">
+          ${ICONS.combat} Combat
+        </button>
 
         <div class="vcb-divider"></div>
 
@@ -116,20 +119,15 @@ export const CrawlBar = {
                 title="Left-click: Open encounter roller&#10;Right-click: Enc. check & threshold${tableName ? "&#10;Table: " + tableName : ""}">
           ${ICONS.encounter} Encounter${tableName ? ` <span class="vcb-enc-table-indicator">●</span>` : ""}
         </button>
-
-        <div class="vcb-divider"></div>
-
         <button class="vcb-btn" data-action="lightTracker">
           ${ICONS.lights} Lights
-        </button>
-        <button class="vcb-btn vcb-combat-btn" data-action="startCombat">
-          ${ICONS.combat} Combat
         </button>
         <button class="vcb-btn" data-action="restBreather">
           ${ICONS.rest} Rest
         </button>
-        <button class="vcb-btn" data-action="relicForge" title="Open the Relic Forge">
-          <i class="fas fa-hammer"></i> Forge
+        <button class="vcb-btn" data-action="lootForge"
+                title="Left-click: Open Relic Forge&#10;Right-click: Loot settings">
+          <i class="fas fa-hammer"></i> Forge & Loot
         </button>
         <button class="vcb-btn vcb-danger-btn" data-action="endCrawl">
           ${ICONS.close} End
@@ -157,6 +155,16 @@ export const CrawlBar = {
         ev.preventDefault();
         ev.stopPropagation();
         this._showEncounterMenu(ev);
+      });
+    }
+
+    // Right-click context menu on Forge & Loot button
+    const forgeLootBtn = this._el.querySelector('[data-action="lootForge"]');
+    if (forgeLootBtn) {
+      forgeLootBtn.addEventListener("contextmenu", ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this._showForgeLootMenu(ev);
       });
     }
   },
@@ -250,7 +258,7 @@ export const CrawlBar = {
         await this._startCombat();
         break;
 
-      case "relicForge":
+      case "lootForge":
         RelicForge.open();
         break;
 
@@ -352,6 +360,101 @@ export const CrawlBar = {
     if (this._encMenuDismiss) {
       document.removeEventListener("pointerdown", this._encMenuDismiss);
       this._encMenuDismiss = null;
+    }
+  },
+
+  // ── Forge & Loot context menu (right-click) ─────────────────────────────
+
+  _showForgeLootMenu(ev) {
+    this._dismissForgeLootMenu();
+
+    const lootEnabled = game.settings.get(MODULE_ID, "lootDropEnabled");
+    const lootChance = game.settings.get(MODULE_ID, "lootDropChance");
+    const itemDropsEnabled = game.settings.get(MODULE_ID, "itemDropsEnabled");
+
+    const menu = document.createElement("div");
+    menu.className = "vcb-clock-menu";
+
+    menu.innerHTML = `
+      <div class="vcb-clock-menu-item" data-fl="forge">
+        <i class="fas fa-hammer"></i> Open Relic Forge
+      </div>
+      <div class="vcb-enc-menu-divider"></div>
+      <div class="vcb-clock-menu-item" data-fl="toggleLoot">
+        <i class="fas fa-${lootEnabled ? "toggle-on" : "toggle-off"}" style="color:${lootEnabled ? "#4caf50" : "#888"};"></i>
+        Loot Drops: ${lootEnabled ? "ON" : "OFF"}
+      </div>
+      ${lootEnabled ? `
+      <div class="vcb-enc-menu-section">
+        <div style="padding:4px 8px; color:#aaa; font-size:0.8em;">Drop Chance: ${lootChance}%</div>
+        <input type="range" class="vcb-loot-chance-slider" min="0" max="100" value="${lootChance}"
+               style="width:calc(100% - 16px); margin:2px 8px;">
+      </div>
+      ` : ""}
+      <div class="vcb-enc-menu-divider"></div>
+      <div class="vcb-clock-menu-item" data-fl="toggleItemDrops">
+        <i class="fas fa-${itemDropsEnabled ? "toggle-on" : "toggle-off"}" style="color:${itemDropsEnabled ? "#4caf50" : "#888"};"></i>
+        Item Drops: ${itemDropsEnabled ? "ON" : "OFF"}
+      </div>
+    `;
+
+    menu.style.left = `${ev.clientX}px`;
+    menu.style.bottom = `${window.innerHeight - ev.clientY + 4}px`;
+    document.body.appendChild(menu);
+
+    const rect = menu.getBoundingClientRect();
+    if (rect.top < 0) { menu.style.bottom = "auto"; menu.style.top = `${ev.clientY + 4}px`; }
+    if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 8}px`;
+
+    // Open Relic Forge
+    menu.querySelector('[data-fl="forge"]')?.addEventListener("click", () => {
+      this._dismissForgeLootMenu();
+      RelicForge.open();
+    });
+
+    // Toggle loot drops
+    menu.querySelector('[data-fl="toggleLoot"]')?.addEventListener("click", async () => {
+      await game.settings.set(MODULE_ID, "lootDropEnabled", !lootEnabled);
+      this._dismissForgeLootMenu();
+      ui.notifications.info(`Loot Drops ${!lootEnabled ? "enabled" : "disabled"}.`);
+    });
+
+    // Loot chance slider
+    const slider = menu.querySelector(".vcb-loot-chance-slider");
+    if (slider) {
+      const label = slider.previousElementSibling;
+      slider.addEventListener("input", () => {
+        if (label) label.textContent = `Drop Chance: ${slider.value}%`;
+      });
+      slider.addEventListener("change", async () => {
+        await game.settings.set(MODULE_ID, "lootDropChance", parseInt(slider.value));
+        ui.notifications.info(`Loot drop chance: ${slider.value}%`);
+      });
+    }
+
+    // Toggle item drops
+    menu.querySelector('[data-fl="toggleItemDrops"]')?.addEventListener("click", async () => {
+      await game.settings.set(MODULE_ID, "itemDropsEnabled", !itemDropsEnabled);
+      this._dismissForgeLootMenu();
+      ui.notifications.info(`Item Drops ${!itemDropsEnabled ? "enabled" : "disabled"}.`);
+    });
+
+    // Click-away dismiss
+    this._forgeLootDismiss = (e) => {
+      if (!menu.contains(e.target)) this._dismissForgeLootMenu();
+    };
+    setTimeout(() => document.addEventListener("pointerdown", this._forgeLootDismiss), 0);
+    this._forgeLootMenu = menu;
+  },
+
+  _dismissForgeLootMenu() {
+    if (this._forgeLootMenu) {
+      this._forgeLootMenu.remove();
+      this._forgeLootMenu = null;
+    }
+    if (this._forgeLootDismiss) {
+      document.removeEventListener("pointerdown", this._forgeLootDismiss);
+      this._forgeLootDismiss = null;
     }
   },
 
