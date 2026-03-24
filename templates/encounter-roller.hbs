@@ -106,15 +106,17 @@
             <th class="loot-sortable" data-sort="name">Name <i class="fas fa-sort"></i></th>
             <th class="loot-sortable" data-sort="beingType" style="width:90px;">Type <i class="fas fa-sort"></i></th>
             <th class="loot-sortable" data-sort="threatLevel" style="width:40px;">TL <i class="fas fa-sort"></i></th>
+            <th style="width:30px;"></th>
           </tr>
         </thead>
         <tbody>
           {{#each browseNpcs}}
-          <tr class="loot-npc-row browse-npc-row" data-actor-id="{{id}}" data-uuid="{{uuid}}" draggable="true">
+          <tr class="loot-npc-row browse-npc-row" data-actor-id="{{id}}" data-uuid="{{uuid}}" data-name="{{name}}" data-appearing="{{appearing}}" draggable="true">
             <td class="loot-npc-img" title="Double-click to inspect"><img src="{{img}}" width="28" height="28" style="border-radius:3px;" /></td>
             <td class="loot-npc-name" title="Double-click to inspect">{{name}}</td>
             <td class="loot-npc-type" style="font-size:0.8em; color:#aaa;">{{beingType}}</td>
             <td class="loot-npc-tl" style="text-align:center;">{{threatLevelDisplay}}</td>
+            <td><button type="button" class="browse-add-btn" title="Add to encounter table"><i class="fas fa-plus"></i></button></td>
           </tr>
           {{/each}}
         </tbody>

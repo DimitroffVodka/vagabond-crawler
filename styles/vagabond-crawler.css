@@ -1817,6 +1817,17 @@ body.theme-light .vcb-phase-badge {
   text-overflow: ellipsis;
   max-width: 200px;
 }
+.browse-add-btn {
+  background: rgba(76,175,80,0.2);
+  border: 1px solid rgba(76,175,80,0.4);
+  color: #4caf50;
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.8em;
+}
+.browse-add-btn:hover { background: rgba(76,175,80,0.4); }
+
 .loot-sortable { cursor: pointer; user-select: none; }
 .loot-sortable:hover { color: #f4c542; }
 .loot-sortable i { font-size: 0.7em; margin-left: 2px; opacity: 0.5; }

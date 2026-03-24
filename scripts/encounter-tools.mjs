@@ -340,6 +340,23 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.render();
     });
 
+    // Browse "+" button — add NPC to next empty Build Table slot
+    on(".browse-add-btn", "click", ev => {
+      ev.stopPropagation();
+      const row = ev.currentTarget.closest(".browse-npc-row");
+      const uuid = row.dataset.uuid;
+      const name = row.dataset.name;
+      const appearing = row.dataset.appearing || "1";
+
+      const emptyIdx = this._slots.findIndex(s => s === null);
+      if (emptyIdx === -1) {
+        ui.notifications.warn("All slots are full. Increase the die size or clear a slot.");
+        return;
+      }
+      this._slots[emptyIdx] = { name, uuid, appearing };
+      ui.notifications.info(`Added ${name} to slot ${emptyIdx + 1}.`);
+    });
+
     // Browse drag — make rows draggable as Actor type
     $$(".browse-npc-row").forEach(row => {
       row.addEventListener("dragstart", ev => {
@@ -664,6 +681,7 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       beingType: a.system?.beingType || "—",
       threatLevel: a.system?.threatLevel ?? 0,
       threatLevelDisplay: a.system?.threatLevelFormatted ?? a.system?.threatLevel ?? "—",
+      appearing: a.system?.appearing || a.system?.appearingFormatted || "1",
     });
 
     if (sourceId === "world") {
@@ -686,7 +704,7 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!this._browseCache[sourceId]) {
       const pack = game.packs.get(sourceId);
       if (!pack) return [];
-      const index = await pack.getIndex({ fields: ["img", "system.beingType", "system.threatLevel", "system.threatLevelFormatted"] });
+      const index = await pack.getIndex({ fields: ["img", "system.beingType", "system.threatLevel", "system.threatLevelFormatted", "system.appearing"] });
       this._browseCache[sourceId] = index.map(entry => ({
         id: entry._id, name: entry.name,
         img: entry.img || "icons/svg/mystery-man.svg",
@@ -694,6 +712,7 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
         beingType: entry.system?.beingType || "—",
         threatLevel: entry.system?.threatLevel ?? 0,
         threatLevelDisplay: entry.system?.threatLevelFormatted ?? entry.system?.threatLevel ?? "—",
+        appearing: entry.system?.appearing || "1",
       }));
     }
     return [...this._browseCache[sourceId]];
