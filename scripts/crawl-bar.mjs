@@ -78,7 +78,13 @@ export const CrawlBar = {
             ? `<button class="vcb-btn vcb-danger-btn" data-action="endEncounter">${ICONS.close} End Encounter</button>`
             : `<button class="vcb-btn vcb-combat-btn" data-action="beginEncounter">${ICONS.combat} Begin Encounter</button>`
           }
-          <button class="vcb-btn vcb-danger-btn" data-action="endCrawl">${ICONS.close} End Crawl</button>
+          <div class="vcb-divider"></div>
+          <button class="vcb-btn" data-action="addSelectedTokens" title="Add selected tokens to tracker">
+            ${ICONS.addTokens} Add Tokens
+          </button>
+          <button class="vcb-btn vcb-danger-btn" data-action="deleteEncounter" title="Delete the combat encounter without ending it">
+            ${ICONS.close} Delete Encounter
+          </button>
         </div>`;
       this._bindEvents();
       return;
@@ -209,6 +215,21 @@ export const CrawlBar = {
         // End the Foundry combat — the deleteCombat hook handles crawl resume
         if (game.combat) {
           await game.combat.endCombat();
+        }
+        break;
+
+      case "deleteEncounter":
+        // Delete the combat without the "end encounter" flow (no resume prompt)
+        if (game.combat) {
+          const ok = await confirmDialog({ title: "Delete Encounter", content: "Delete this combat encounter? This will not trigger the end-of-combat flow." });
+          if (ok) {
+            await game.combat.delete();
+            await CrawlState.resume();
+            if (CrawlClock.available) await CrawlClock.show();
+            await MovementTracker.resetAll();
+            this.render();
+            (await import("./crawl-strip.mjs")).CrawlStrip.render();
+          }
         }
         break;
 
@@ -439,15 +460,18 @@ export const CrawlBar = {
     // Activate it so it's the viewed combat
     if (combat.active === false) await combat.activate();
 
-    // Collect token documents to add — crawl members + selected tokens, deduped
+    // Collect token documents to add — ALL crawl members (players + NPCs) + selected tokens, deduped
     const existingTokenIds = new Set(combat.combatants.map(c => c.tokenId));
 
     const tokenDocs = new Map();
-    for (const m of CrawlState.playerMembers) {
+    // Add all crawl strip members (players AND NPCs)
+    for (const m of CrawlState.members) {
+      if (m.type === "gm") continue; // skip GM placeholder
       if (!m.tokenId || existingTokenIds.has(m.tokenId)) continue;
       const token = canvas.tokens?.get(m.tokenId)?.document;
       if (token) tokenDocs.set(m.tokenId, token);
     }
+    // Also add any currently selected tokens not already tracked
     for (const t of canvas.tokens?.controlled ?? []) {
       if (existingTokenIds.has(t.id)) continue;
       tokenDocs.set(t.id, t.document);
