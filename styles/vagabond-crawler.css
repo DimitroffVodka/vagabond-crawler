@@ -1749,7 +1749,7 @@ body.theme-light .vcb-phase-badge {
 .loot-filter-row input[type="number"] {
   padding: 4px 6px;
   font-size: 0.85rem;
-  background: rgba(0,0,0,0.3);
+  background: #1a1a2e;
   border: 1px solid rgba(255,255,255,0.15);
   border-radius: 3px;
   color: #ddd;
@@ -1816,9 +1816,15 @@ body.theme-light .vcb-phase-badge {
 .loot-npc-table input[type="number"] {
   padding: 2px 4px;
   font-size: 0.8rem;
-  background: rgba(0,0,0,0.3);
+  background: #1a1a2e;
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 2px;
   color: #ddd;
   width: 100%;
+}
+.loot-npc-table select option,
+.loot-filter-panel select option,
+.loot-assign-table option {
+  background: #1a1a2e;
+  color: #ddd;
 }
