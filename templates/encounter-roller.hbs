@@ -10,6 +10,9 @@
     <button type="button" class="tab-btn {{#if isExistingMode}}active{{/if}}" data-mode="existing">
       <i class="fas fa-table"></i> Roll Tables
     </button>
+    <button type="button" class="tab-btn {{#if isMutateMode}}active{{/if}}" data-mode="mutate">
+      <i class="fas fa-dna"></i> Mutate
+    </button>
   </div>
 
   {{!-- BUILD TABLE TAB --}}
@@ -185,6 +188,91 @@
     {{else}}
     <p class="no-tables-msg"><em>No roll tables found. Build one in the Build Table tab.</em></p>
     {{/if}}
+  </div>
+  {{/if}}
+
+  {{!-- MUTATE TAB --}}
+  {{#if isMutateMode}}
+  <div class="encounter-mutate-section">
+
+    {{!-- Base Monster Selector --}}
+    <div class="mutate-base-row">
+      <label>Base Monster:</label>
+      <select class="mutate-source-select" style="width:120px;">
+        {{#each mutateSources}}
+        <option value="{{id}}" {{#if active}}selected{{/if}}>{{label}}</option>
+        {{/each}}
+      </select>
+      <select class="mutate-monster-select" style="flex:1;">
+        <option value="">— Select a Monster —</option>
+        {{#each mutateMonsters}}
+        <option value="{{uuid}}" {{#if selected}}selected{{/if}}>{{name}} (TL {{threatLevelDisplay}})</option>
+        {{/each}}
+      </select>
+    </div>
+
+    {{!-- Stat Preview --}}
+    {{#if mutateBase}}
+    <div class="mutate-stats-row">
+      <div class="stat-chip">TL: <strong>{{mutateBase.tl}}</strong>{{#if mutateDelta}} → <strong class="mutate-new-tl">{{mutateNew.tl}}</strong> (<span class="{{#if mutateDeltaPositive}}stat-up{{else}}stat-down{{/if}}">{{mutateDeltaDisplay}}</span>){{/if}}</div>
+      <div class="stat-chip">HP: <strong>{{mutateBase.hp}}</strong>{{#if mutateDelta}} → <strong>{{mutateNew.hp}}</strong>{{/if}}</div>
+      <div class="stat-chip">Armor: <strong>{{mutateBase.armor}}</strong>{{#if mutateDelta}} → <strong>{{mutateNew.armor}}</strong>{{/if}}</div>
+      <div class="stat-chip">DPR: <strong>{{mutateBase.dpr}}</strong>{{#if mutateDelta}} → <strong>{{mutateNew.dpr}}</strong>{{/if}}</div>
+      <div class="stat-chip">Speed: <strong>{{mutateBase.speed}}</strong>{{#if mutateDelta}} → <strong>{{mutateNew.speed}}</strong>{{/if}}</div>
+    </div>
+
+    {{!-- Boons & Banes --}}
+    <div class="mutate-mutations-grid">
+      <div class="mutate-column">
+        <h4 class="mutate-col-header boon-header"><i class="fas fa-arrow-up"></i> Boons</h4>
+        <div class="mutate-list">
+          {{#each mutateBoons}}
+          <label class="mutate-item {{#if checked}}active{{/if}}">
+            <input type="checkbox" class="mutate-check" data-mutation-id="{{id}}" {{#if checked}}checked{{/if}}>
+            <span class="mutate-name">{{name}}</span>
+            <span class="mutate-tl-tag {{#if isOnFormula}}on-formula{{else}}off-formula{{/if}}">{{tlDisplay}}</span>
+          </label>
+          {{/each}}
+        </div>
+      </div>
+      <div class="mutate-column">
+        <h4 class="mutate-col-header bane-header"><i class="fas fa-arrow-down"></i> Banes</h4>
+        <div class="mutate-list">
+          {{#each mutateBanes}}
+          <label class="mutate-item {{#if checked}}active{{/if}}">
+            <input type="checkbox" class="mutate-check" data-mutation-id="{{id}}" {{#if checked}}checked{{/if}}>
+            <span class="mutate-name">{{name}}</span>
+            <span class="mutate-tl-tag {{#if isOnFormula}}on-formula{{else}}off-formula{{/if}}">{{tlDisplay}}</span>
+          </label>
+          {{/each}}
+        </div>
+      </div>
+    </div>
+
+    {{!-- Name & Prompt --}}
+    <div class="mutate-output-section">
+      <div class="mutate-name-row">
+        <label>Name:</label>
+        <input type="text" class="mutate-custom-name" value="{{mutateGeneratedName}}" placeholder="{{mutateGeneratedName}}">
+      </div>
+      <div class="mutate-prompt-row">
+        <label>AI Art Prompt:</label>
+        <textarea class="mutate-prompt-text" rows="3" readonly>{{mutatePrompt}}</textarea>
+        <button type="button" class="mutate-copy-prompt" title="Copy to clipboard"><i class="fas fa-copy"></i></button>
+      </div>
+      <div class="mutate-actions-row">
+        <button type="button" class="mutate-create-btn"><i class="fas fa-plus-circle"></i> Create Monster</button>
+        <button type="button" class="mutate-reset-btn"><i class="fas fa-undo"></i> Reset</button>
+      </div>
+    </div>
+
+    {{else}}
+    <div class="mutate-empty-state">
+      <i class="fas fa-dna" style="font-size:2em; display:block; margin-bottom:8px; color:#666;"></i>
+      <p>Select a base monster to begin mutating.</p>
+    </div>
+    {{/if}}
+
   </div>
   {{/if}}
 

@@ -1848,3 +1848,179 @@ body.theme-light .vcb-phase-badge {
   background: #1a1a2e;
   color: #ddd;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Monster Mutator (Mutate Tab)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.encounter-mutate-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.mutate-base-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mutate-base-row label { font-weight: bold; white-space: nowrap; }
+.mutate-base-row select {
+  padding: 4px 6px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 3px;
+  color: #ddd;
+}
+.mutate-base-row select option { background: #1a1a2e; color: #ddd; }
+
+.mutate-stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.stat-chip {
+  padding: 3px 8px;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  font-size: 0.85em;
+  color: #ccc;
+}
+.stat-chip strong { color: #f4c542; }
+.mutate-new-tl { color: #4caf50; }
+.stat-up { color: #4caf50; }
+.stat-down { color: #e74c3c; }
+
+.mutate-mutations-grid {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.mutate-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.mutate-col-header {
+  font-size: 0.9em;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin: 0 0 4px 0;
+}
+.boon-header { background: rgba(76,175,80,0.15); color: #4caf50; }
+.bane-header { background: rgba(231,76,60,0.15); color: #e74c3c; }
+
+.mutate-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 250px;
+}
+
+.mutate-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.85em;
+  background: rgba(0,0,0,0.1);
+  border: 1px solid transparent;
+  transition: all 0.1s;
+}
+.mutate-item:hover { background: rgba(255,255,255,0.05); }
+.mutate-item.active { background: rgba(244,197,66,0.1); border-color: rgba(244,197,66,0.3); }
+.mutate-item input[type="checkbox"] { margin: 0; }
+.mutate-name { flex: 1; color: #ddd; }
+.mutate-tl-tag {
+  font-size: 0.8em;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-weight: bold;
+}
+.mutate-tl-tag.on-formula { background: rgba(244,197,66,0.2); color: #f4c542; }
+.mutate-tl-tag.off-formula { background: rgba(150,150,150,0.15); color: #888; }
+
+.mutate-output-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 8px;
+}
+
+.mutate-name-row, .mutate-prompt-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mutate-name-row label, .mutate-prompt-row label { font-weight: bold; white-space: nowrap; font-size: 0.9em; }
+.mutate-custom-name {
+  flex: 1;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 3px;
+  color: #f4c542;
+  font-weight: bold;
+}
+.mutate-prompt-row { align-items: flex-start; }
+.mutate-prompt-text {
+  flex: 1;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 3px;
+  color: #aaa;
+  font-size: 0.8em;
+  resize: none;
+}
+.mutate-copy-prompt {
+  background: rgba(88,101,242,0.3);
+  border: 1px solid rgba(88,101,242,0.5);
+  color: #7289da;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.mutate-copy-prompt:hover { background: rgba(88,101,242,0.5); }
+
+.mutate-actions-row {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.mutate-create-btn {
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #2e7d32, #4caf50);
+  border: 1px solid #4caf50;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+.mutate-create-btn:hover { background: linear-gradient(135deg, #4caf50, #66bb6a); }
+.mutate-reset-btn {
+  padding: 6px 10px;
+  background: rgba(150,150,150,0.15);
+  border: 1px solid rgba(150,150,150,0.3);
+  color: #aaa;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.mutate-reset-btn:hover { background: rgba(150,150,150,0.25); }
+
+.mutate-empty-state {
+  text-align: center;
+  padding: 30px;
+  color: #888;
+}

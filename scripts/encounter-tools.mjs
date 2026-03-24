@@ -13,6 +13,8 @@
 import { MODULE_ID } from "./vagabond-crawler.mjs";
 import { confirmDialog } from "./dialog-helpers.mjs";
 import { ICONS } from "./icons.mjs";
+import { MUTATIONS, MUTATION_CATEGORIES, getMutation, getBoons, getBanes } from "./mutation-data.mjs";
+import { getStatSummary, applyMutations, generateMutatedName, generatePrompt, createMutatedActor, calculateHP, calculateDPR, calculateTL } from "./monster-mutator.mjs";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -114,6 +116,12 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this._browseSortCol   = "name";
     this._browseSortAsc   = true;
     this._browseCache     = {};
+    // Mutate tab state
+    this._mutateSource    = "vagabond.bestiary";
+    this._mutateBaseUuid  = "";
+    this._mutateBaseData  = null;
+    this._mutateSelected  = new Set();
+    this._mutateCustomName = "";
   }
 
   async _prepareContext() {
@@ -155,6 +163,65 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       ctx.browseNpcs = npcs;
     }
 
+    // ── Mutate tab ──
+    if (ctx.isMutateMode) {
+      const sources = [
+        { id: "vagabond.bestiary", label: "Bestiary", active: this._mutateSource === "vagabond.bestiary" },
+        { id: "vagabond.humanlike", label: "Humanlike", active: this._mutateSource === "vagabond.humanlike" },
+        { id: "world", label: "World NPCs", active: this._mutateSource === "world" },
+      ];
+      ctx.mutateSources = sources;
+
+      // Load monster list (reuse browse cache)
+      const monsters = await this._getBrowseNPCs(this._mutateSource);
+      monsters.sort((a, b) => a.name.localeCompare(b.name));
+      ctx.mutateMonsters = monsters.map(m => ({
+        ...m,
+        selected: m.uuid === this._mutateBaseUuid,
+      }));
+
+      // If a base monster is selected, prepare mutation data
+      if (this._mutateBaseUuid && this._mutateBaseData) {
+        const baseSystem = this._mutateBaseData.system;
+        const baseSummary = getStatSummary(baseSystem);
+        ctx.mutateBase = baseSummary;
+
+        // Calculate mutated stats
+        const mutatedData = foundry.utils.deepClone(this._mutateBaseData);
+        const { appliedMutations, prefixes, suffixes, tlDelta } = applyMutations(mutatedData, [...this._mutateSelected]);
+        const mutatedSystem = mutatedData.system;
+        const mutatedSummary = getStatSummary(mutatedSystem);
+        ctx.mutateNew = mutatedSummary;
+
+        const hasMutations = this._mutateSelected.size > 0;
+        ctx.mutateDelta = hasMutations;
+        ctx.mutateDeltaPositive = (mutatedSummary.tl - baseSummary.tl) >= 0;
+        const delta = mutatedSummary.tl - baseSummary.tl;
+        ctx.mutateDeltaDisplay = (delta >= 0 ? "+" : "") + delta.toFixed(2);
+
+        // Name
+        const genName = generateMutatedName(this._mutateBaseData.name, prefixes, suffixes);
+        ctx.mutateGeneratedName = this._mutateCustomName || genName;
+
+        // Prompt
+        ctx.mutatePrompt = generatePrompt(this._mutateBaseData.name, mutatedSystem, [...this._mutateSelected]);
+
+        // Boons & Banes
+        ctx.mutateBoons = getBoons().map(m => ({
+          ...m,
+          checked: this._mutateSelected.has(m.id),
+          isOnFormula: m.tlDelta !== 0,
+          tlDisplay: m.tlDelta !== 0 ? `${m.tlDelta > 0 ? "+" : ""}${m.tlDelta.toFixed(1)}` : "off",
+        }));
+        ctx.mutateBanes = getBanes().map(m => ({
+          ...m,
+          checked: this._mutateSelected.has(m.id),
+          isOnFormula: m.tlDelta !== 0,
+          tlDisplay: m.tlDelta !== 0 ? `${m.tlDelta.toFixed(1)}` : "off",
+        }));
+      }
+    }
+
     return ctx;
   }
 
@@ -167,6 +234,7 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       isBuildMode: this._mode === "build",
       isBrowseMode: this._mode === "browse",
       isExistingMode: this._mode === "existing",
+      isMutateMode:   this._mode === "mutate",
       dieTypes: ["d4","d6","d8","d10","d12"].map(d => ({ value: d, selected: d === this._dieType })),
       tableName: this._tableName,
       slots: this._slots.map((s, i) => ({
@@ -380,6 +448,89 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       };
       if (nameCell) nameCell.addEventListener("dblclick", handler);
       if (imgCell) imgCell.addEventListener("dblclick", handler);
+    });
+
+    // ── Mutate tab ──
+
+    // Source selector
+    const mutSrcSelect = el.querySelector(".mutate-source-select");
+    if (mutSrcSelect) {
+      mutSrcSelect.addEventListener("change", () => {
+        this._mutateSource = mutSrcSelect.value;
+        this._mutateBaseUuid = "";
+        this._mutateBaseData = null;
+        this._mutateSelected.clear();
+        this._mutateCustomName = "";
+        this.render();
+      });
+    }
+
+    // Monster selector
+    const mutMonSelect = el.querySelector(".mutate-monster-select");
+    if (mutMonSelect) {
+      mutMonSelect.addEventListener("change", async () => {
+        this._mutateBaseUuid = mutMonSelect.value;
+        this._mutateSelected.clear();
+        this._mutateCustomName = "";
+        if (this._mutateBaseUuid) {
+          const actor = await fromUuid(this._mutateBaseUuid);
+          if (actor) this._mutateBaseData = actor.toObject();
+        } else {
+          this._mutateBaseData = null;
+        }
+        this.render();
+      });
+    }
+
+    // Mutation checkboxes
+    on(".mutate-check", "change", (ev) => {
+      const id = ev.currentTarget.dataset.mutationId;
+      if (ev.currentTarget.checked) {
+        this._mutateSelected.add(id);
+      } else {
+        this._mutateSelected.delete(id);
+      }
+      this.render();
+    });
+
+    // Custom name
+    const mutNameInput = el.querySelector(".mutate-custom-name");
+    if (mutNameInput) {
+      mutNameInput.addEventListener("change", () => {
+        this._mutateCustomName = mutNameInput.value.trim();
+      });
+    }
+
+    // Copy prompt
+    el.querySelector(".mutate-copy-prompt")?.addEventListener("click", async () => {
+      const textarea = el.querySelector(".mutate-prompt-text");
+      if (textarea) {
+        await navigator.clipboard.writeText(textarea.value);
+        ui.notifications.info("AI art prompt copied to clipboard!");
+      }
+    });
+
+    // Create Monster
+    el.querySelector(".mutate-create-btn")?.addEventListener("click", async () => {
+      if (!this._mutateBaseUuid) return;
+      try {
+        const actor = await createMutatedActor(
+          this._mutateBaseUuid,
+          [...this._mutateSelected],
+          this._mutateCustomName || null
+        );
+        ui.notifications.info(`Created: ${actor.name}`);
+      } catch (e) {
+        console.error(`${MODULE_ID} | Mutation failed:`, e);
+        ui.notifications.error("Failed to create mutated monster.");
+      }
+    });
+
+    // Reset
+    el.querySelector(".mutate-reset-btn")?.addEventListener("click", () => {
+      this._mutateSelected.clear();
+      this._mutateCustomName = "";
+      this.render();
     });
   }
 
