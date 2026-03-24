@@ -68,31 +68,51 @@
       </div>
       <div class="loot-filter-row">
         <label>Search</label>
-        <input type="text" class="loot-search-input" value="{{searchName}}" placeholder="Filter by name..." />
+        <input type="text" class="loot-search-input" placeholder="Filter by name..." />
       </div>
-
-      <h3 style="margin-top:12px;">Loot Table</h3>
       <div class="loot-filter-row">
-        <select class="loot-assign-table">
-          <option value="">— No Table —</option>
-          {{#each lootTables}}
-          <option value="{{uuid}}">{{name}}</option>
+        <label>Creature Type</label>
+        <select class="loot-type-filter">
+          <option value="">All Types</option>
+          {{#each beingTypes}}
+          <option value="{{this}}" {{#if (eq this ../typeFilter)}}selected{{/if}}>{{this}}</option>
           {{/each}}
         </select>
       </div>
       <div class="loot-filter-row">
-        <label>Drop Chance</label>
-        <div style="display:flex; align-items:center; gap:4px;">
-          <input type="number" class="loot-assign-chance" value="-1" min="-1" max="100" style="width:60px;" />
-          <span style="color:#888; font-size:0.85em;">% (-1 = global)</span>
+        <label>TL Range</label>
+        <div style="display:flex; gap:4px; align-items:center;">
+          <input type="number" class="loot-tl-min" value="{{tlMin}}" placeholder="Min" step="0.1" style="width:55px;" />
+          <span style="color:#888;">–</span>
+          <input type="number" class="loot-tl-max" value="{{tlMax}}" placeholder="Max" step="0.1" style="width:55px;" />
         </div>
       </div>
-      <button type="button" class="loot-apply-btn" style="margin-top:8px; width:100%;">
+
+      <h3 style="margin-top:12px;">Assign Table</h3>
+      <div class="loot-filter-row">
+        <select class="loot-assign-table">
+          <option value="">— No Table —</option>
+          {{#each tableGroups}}
+            {{#if label}}
+            <optgroup label="{{label}}">
+              {{#each tables}}
+              <option value="{{uuid}}">{{name}}</option>
+              {{/each}}
+            </optgroup>
+            {{else}}
+              {{#each tables}}
+              <option value="{{uuid}}">{{name}}</option>
+              {{/each}}
+            {{/if}}
+          {{/each}}
+        </select>
+      </div>
+      <button type="button" class="loot-apply-btn" style="margin-top:4px; width:100%;">
         <i class="fas fa-check"></i> Apply to Selected
       </button>
 
       {{#if selectedTablePreview}}
-      <h3 style="margin-top:12px;">Preview</h3>
+      <h3 style="margin-top:8px;">Preview</h3>
       <div class="loot-table-preview-mini">
         <div style="font-size:0.8em; color:#888; margin-bottom:2px;">{{selectedTablePreview.formula}}</div>
         {{#each selectedTablePreview.rows}}
@@ -114,15 +134,14 @@
             <th style="width:28px;"><input type="checkbox" class="loot-select-all" title="Select all" /></th>
             <th style="width:32px;"></th>
             <th class="loot-sortable" data-sort="name">Name <i class="fas fa-sort"></i></th>
-            <th class="loot-sortable" data-sort="beingType" style="width:100px;">Type <i class="fas fa-sort"></i></th>
+            <th class="loot-sortable" data-sort="beingType" style="width:90px;">Type <i class="fas fa-sort"></i></th>
             <th class="loot-sortable" data-sort="threatLevel" style="width:40px;">TL <i class="fas fa-sort"></i></th>
             <th style="width:130px;">Loot Table</th>
-            <th style="width:45px;">%</th>
           </tr>
         </thead>
         <tbody>
           {{#each npcs}}
-          <tr class="loot-npc-row" data-actor-id="{{id}}" data-name="{{nameLower}}" data-type="{{beingType}}" data-tl="{{threatLevel}}">
+          <tr class="loot-npc-row" data-actor-id="{{id}}">
             <td><input type="checkbox" class="npc-select" data-actor-id="{{id}}" /></td>
             <td><img src="{{img}}" width="28" height="28" style="border-radius:3px;" /></td>
             <td class="loot-npc-name">{{name}}</td>
@@ -131,20 +150,17 @@
             <td>
               <select class="npc-table-select" data-actor-id="{{id}}">
                 <option value="">—</option>
-                {{#each ../lootTables}}
-                <option value="{{uuid}}" {{#if (eq uuid ../currentTable)}}selected{{/if}}>{{name}}</option>
+                {{#each tableOptions}}
+                <option value="{{uuid}}" {{#if selected}}selected{{/if}}>{{name}}</option>
                 {{/each}}
               </select>
-            </td>
-            <td>
-              <input type="number" class="npc-chance-input" data-actor-id="{{id}}" value="{{dropChance}}" min="-1" max="100" style="width:42px;" />
             </td>
           </tr>
           {{/each}}
         </tbody>
       </table>
       {{#unless npcs.length}}
-      <p style="text-align:center; color:#888; padding:20px;">No NPCs found for this source.</p>
+      <p style="text-align:center; color:#888; padding:20px;">No NPCs found matching filters.</p>
       {{/unless}}
     </div>
 

@@ -2,14 +2,12 @@
  * Vagabond Crawler — Loot Manager
  *
  * Build loot tables and assign them to NPCs with an actor-browser-style
- * filterable NPC list (source dropdown + search + table assignment).
+ * filterable NPC list (source, type, TL range, search, sortable columns).
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
-
-const LOOT_TABLE_FLAG = "isLootTable";
 
 const NPC_SOURCES = [
   { id: "world",             label: "World NPCs" },
@@ -35,7 +33,7 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     id: "vagabond-crawler-loot-manager",
     window: { title: "Loot Manager", resizable: true },
-    position: { width: 860, height: 550 },
+    position: { width: 900, height: 580 },
   };
 
   static PARTS = {
@@ -52,7 +50,10 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this._selectedAssignTableUuid = "";
     this._sortColumn = "name";
     this._sortAsc = true;
-    this._npcCache = {};  // packId → actor[]
+    this._typeFilter = "";
+    this._tlMin = "";
+    this._tlMax = "";
+    this._npcCache = {};
   }
 
   async _prepareContext() { return this.getData(); }
@@ -67,18 +68,32 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       img: s?.img || null, weight: s?.weight ?? 1,
     }));
 
-    // All world RollTables (any table can be used as loot)
-    const lootTables = game.tables
-      .map(t => ({ id: t.id, uuid: t.uuid, name: t.name, formula: t.formula }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    // All world RollTables grouped by folder
+    const tableGroups = this._getTableGroups();
+    const flatTables = tableGroups.flatMap(g => g.tables);
 
     // Sources
     const sources = NPC_SOURCES.map(s => ({
       ...s, selected: s.id === this._sourceFilter,
     }));
 
-    // NPCs based on source filter
+    // NPCs
     let npcs = await this._getNPCsForSource(this._sourceFilter);
+
+    // Type filter
+    if (this._typeFilter) {
+      npcs = npcs.filter(n => n.beingType === this._typeFilter);
+    }
+
+    // TL range filter
+    const tlMin = this._tlMin !== "" ? parseFloat(this._tlMin) : null;
+    const tlMax = this._tlMax !== "" ? parseFloat(this._tlMax) : null;
+    if (tlMin !== null) npcs = npcs.filter(n => n.threatLevel >= tlMin);
+    if (tlMax !== null) npcs = npcs.filter(n => n.threatLevel <= tlMax);
+
+    // Collect unique being types for filter dropdown
+    const allNpcs = await this._getNPCsForSource(this._sourceFilter);
+    const beingTypes = [...new Set(allNpcs.map(n => n.beingType).filter(t => t && t !== "—"))].sort();
 
     // Sort
     const col = this._sortColumn;
@@ -89,20 +104,25 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       return String(av || "").localeCompare(String(bv || "")) * dir;
     });
 
-    // Enrich with current loot assignments
+    // Enrich with current loot assignments — mark selected option in table list
     npcs = npcs.map(n => {
       const actor = game.actors.get(n.id);
+      const currentTable = actor?.getFlag(MODULE_ID, "lootTable") || "";
       return {
         ...n,
-        currentTable: actor?.getFlag(MODULE_ID, "lootTable") || "",
+        currentTable,
         dropChance: actor?.getFlag(MODULE_ID, "lootDropChance") ?? -1,
+        // Pre-build table options with selected state
+        tableOptions: flatTables.map(t => ({
+          uuid: t.uuid, name: t.name,
+          selected: t.uuid === currentTable,
+        })),
       };
     });
 
-    // Preview the currently selected assign table
+    // Preview
     let selectedTablePreview = null;
     if (this._selectedAssignTableUuid) {
-      // UUID format: RollTable.id or similar — extract the ID
       const tableId = this._selectedAssignTableUuid.split(".").pop();
       const table = game.tables.get(tableId);
       if (table) {
@@ -119,10 +139,33 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     return {
       isBuildMode, tableName: this._tableName, slots,
-      lootTables, hasLootTables: lootTables.length > 0,
+      tableGroups, hasWorldTables: flatTables.length > 0,
       sources, searchName: this._searchName,
       npcs, selectedTablePreview,
+      beingTypes, typeFilter: this._typeFilter,
+      tlMin: this._tlMin, tlMax: this._tlMax,
     };
+  }
+
+  _getTableGroups() {
+    const excluded = JSON.parse(game.settings.get(MODULE_ID, "excludedTableFolders") || "[]");
+    const groups = [];
+
+    // Ungrouped
+    const ungrouped = game.tables.filter(t => !t.folder);
+    if (ungrouped.length > 0) {
+      groups.push({ label: null, tables: ungrouped.map(t => ({ id: t.id, uuid: t.uuid, name: t.name })) });
+    }
+
+    // By folder
+    const folders = game.folders.filter(f => f.type === "RollTable" && !excluded.includes(f.id));
+    for (const folder of folders.sort((a, b) => a.name.localeCompare(b.name))) {
+      const tables = game.tables.filter(t => t.folder?.id === folder.id);
+      if (tables.length > 0) {
+        groups.push({ label: folder.name, tables: tables.map(t => ({ id: t.id, uuid: t.uuid, name: t.name })) });
+      }
+    }
+    return groups;
   }
 
   async _getNPCsForSource(sourceId) {
@@ -150,7 +193,7 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
         .filter(Boolean);
     }
 
-    // Compendium pack — need full documents for system data
+    // Compendium
     if (!this._npcCache[sourceId]) {
       const pack = game.packs.get(sourceId);
       if (!pack) return [];
@@ -165,7 +208,7 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
         isCompendium: true, packId: sourceId,
       }));
     }
-    return this._npcCache[sourceId];
+    return [...this._npcCache[sourceId]]; // return copy so filters don't mutate cache
   }
 
   /* ---- Events ---- */
@@ -179,7 +222,7 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     // Tabs
     on(".tab-btn", "click", ev => { this._mode = ev.currentTarget.dataset.mode; this.render(); });
 
-    // Build tab
+    // ── Build tab ──
     const nameInput = $(".table-name-input");
     if (nameInput) nameInput.addEventListener("input", () => { this._tableName = nameInput.value; });
 
@@ -210,15 +253,18 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     $(".save-table")?.addEventListener("click", () => this._saveAsLootTable());
 
-    // NPC Loot tab — filters
+    // ── NPC Loot tab ──
+
+    // Source filter
     $(".loot-source-filter")?.addEventListener("change", ev => {
       this._sourceFilter = ev.currentTarget.value;
+      this._typeFilter = ""; // reset type filter on source change
       this.render();
     });
 
+    // Search — filter in DOM
     const searchInput = $(".loot-search-input");
     if (searchInput) {
-      // Filter NPC rows in-place without re-rendering (preserves focus)
       searchInput.value = this._searchName;
       searchInput.addEventListener("input", () => {
         this._searchName = searchInput.value;
@@ -230,50 +276,59 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       });
     }
 
-    // Sortable column headers
-    on(".loot-sortable", "click", ev => {
-      const col = ev.currentTarget.dataset.sort;
-      if (this._sortColumn === col) {
-        this._sortAsc = !this._sortAsc;
-      } else {
-        this._sortColumn = col;
-        this._sortAsc = true;
-      }
+    // Type filter
+    $(".loot-type-filter")?.addEventListener("change", ev => {
+      this._typeFilter = ev.currentTarget.value;
       this.render();
     });
 
-    // Select all checkbox
+    // TL range
+    $(".loot-tl-min")?.addEventListener("change", ev => {
+      this._tlMin = ev.currentTarget.value;
+      this.render();
+    });
+    $(".loot-tl-max")?.addEventListener("change", ev => {
+      this._tlMax = ev.currentTarget.value;
+      this.render();
+    });
+
+    // Sortable columns
+    on(".loot-sortable", "click", ev => {
+      const col = ev.currentTarget.dataset.sort;
+      if (this._sortColumn === col) this._sortAsc = !this._sortAsc;
+      else { this._sortColumn = col; this._sortAsc = true; }
+      this.render();
+    });
+
+    // Select all
     $(".loot-select-all")?.addEventListener("change", ev => {
       const checked = ev.currentTarget.checked;
       el.querySelectorAll(".npc-select").forEach(cb => { cb.checked = checked; });
     });
 
+    // Assign table dropdown — also updates preview
+    $(".loot-assign-table")?.addEventListener("change", ev => {
+      this._selectedAssignTableUuid = ev.currentTarget.value;
+      this.render();
+    });
+
     // Apply to selected
     $(".loot-apply-btn")?.addEventListener("click", async () => {
       const tableUuid = $(".loot-assign-table")?.value || "";
-      const chance = parseInt($(".loot-assign-chance")?.value ?? -1);
       const checked = [...el.querySelectorAll(".npc-select:checked")];
       if (!checked.length) { ui.notifications.warn("Select NPCs first."); return; }
 
       for (const cb of checked) {
         const actor = game.actors.get(cb.dataset.actorId);
         if (!actor) continue;
-        if (tableUuid) {
-          await actor.setFlag(MODULE_ID, "lootTable", tableUuid);
-        } else {
-          await actor.unsetFlag(MODULE_ID, "lootTable");
-        }
-        if (chance >= 0) {
-          await actor.setFlag(MODULE_ID, "lootDropChance", chance);
-        } else {
-          await actor.unsetFlag(MODULE_ID, "lootDropChance");
-        }
+        if (tableUuid) await actor.setFlag(MODULE_ID, "lootTable", tableUuid);
+        else await actor.unsetFlag(MODULE_ID, "lootTable");
       }
-      ui.notifications.info(`Updated loot config for ${checked.length} NPC(s).`);
+      ui.notifications.info(`Assigned table to ${checked.length} NPC(s).`);
       this.render();
     });
 
-    // Per-NPC table assignment (inline)
+    // Per-NPC table select
     on(".npc-table-select", "change", async ev => {
       const actorId = ev.currentTarget.dataset.actorId;
       const tableUuid = ev.currentTarget.value;
@@ -283,19 +338,13 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       else await actor.unsetFlag(MODULE_ID, "lootTable");
     });
 
-    on(".npc-chance-input", "change", async ev => {
+    // Double-click NPC row to open actor sheet
+    on(".loot-npc-row", "dblclick", async ev => {
       const actorId = ev.currentTarget.dataset.actorId;
-      const chance = parseInt(ev.currentTarget.value);
       const actor = game.actors.get(actorId);
-      if (!actor) return;
-      if (chance >= 0) await actor.setFlag(MODULE_ID, "lootDropChance", chance);
-      else await actor.unsetFlag(MODULE_ID, "lootDropChance");
-    });
-
-    // Assign table select — also updates preview
-    $(".loot-assign-table")?.addEventListener("change", ev => {
-      this._selectedAssignTableUuid = ev.currentTarget.value;
-      this.render();
+      if (actor) {
+        actor.sheet.render(true);
+      }
     });
   }
 
@@ -334,7 +383,7 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     ui.notifications.info(`Loot table "${name}" created.`);
     this._tableName = "";
     this._slots = Array.from({ length: 10 }, () => null);
-    this._selectedPreviewTableId = table.id;
+    this._selectedAssignTableUuid = table.uuid;
     this._mode = "tables";
     this.render();
   }
