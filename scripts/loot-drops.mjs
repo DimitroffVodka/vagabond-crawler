@@ -9,6 +9,7 @@
 import { MODULE_ID } from "./vagabond-crawler.mjs";
 import { generateLoot } from "./loot-tables.mjs";
 import { LootManager } from "./loot-manager.mjs";
+import { LootTracker } from "./loot-tracker.mjs";
 
 const LOOT_BAG_ICON = "icons/containers/chest/chest-worn-oak-tan.webp";
 
@@ -358,6 +359,10 @@ export const LootDrops = {
         </div>
       </div>`,
     });
+
+    // Log to loot tracker
+    const sourceName = lootActor.getFlag(MODULE_ID, "sourceNpc") || "Unknown";
+    await LootTracker.logClaim(recipient.name, sourceName, myShare.currency, myShare.items);
 
     // Check if all shares are claimed — auto-delete bag
     const allClaimed = Object.values(allLoot).every(share => share.claimed);

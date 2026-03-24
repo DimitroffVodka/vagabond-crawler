@@ -9,6 +9,7 @@
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
+import { LootTracker } from "./loot-tracker.mjs";
 
 /* -------------------------------------------- */
 /*  Light Source Detection (exclude from drops)  */
@@ -281,6 +282,9 @@ export const ItemDrops = {
         </div>
       </div>`,
     });
+
+    // Log to loot tracker
+    await LootTracker.logPickup(recipient.name, itemData.name, itemData.img);
 
     console.log(`${MODULE_ID} | ${recipient.name} picked up ${itemData.name}`);
   },
