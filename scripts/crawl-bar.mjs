@@ -73,7 +73,6 @@ export const CrawlBar = {
       const combatStarted = game.combat?.started ?? false;
       this._el.innerHTML = `
         <div class="vcb-inner">
-          <span class="vcb-phase-badge vcb-phase-combat">${ICONS.combat} Combat Active</span>
           ${combatStarted
             ? `<button class="vcb-btn vcb-danger-btn" data-action="endEncounter">${ICONS.close} End Encounter</button>`
             : `<button class="vcb-btn vcb-combat-btn" data-action="beginEncounter">${ICONS.combat} Begin Encounter</button>`
@@ -535,6 +534,17 @@ export const CrawlBar = {
     catch { return null; }
   },
 };
+
+// When a combat is created (e.g. right-click Toggle Combat State), auto-pause crawl
+Hooks.on("createCombat", async () => {
+  if (!game.user.isGM || !CrawlState.active) return;
+  if (CrawlState.paused) return; // already in combat mode
+  if (CrawlClock.available) await CrawlClock.hide();
+  await CrawlState.pause();
+  CrawlBar.render();
+  const { CrawlStrip } = await import("./crawl-strip.mjs");
+  CrawlStrip.render();
+});
 
 // Re-render bar when combat starts (Begin Encounter from sidebar) so button swaps
 Hooks.on("combatStart", () => {
