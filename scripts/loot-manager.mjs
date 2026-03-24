@@ -49,7 +49,7 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this._slots = Array.from({ length: 10 }, () => null);
     this._sourceFilter = "scene";
     this._searchName = "";
-    this._selectedPreviewTableId = null;
+    this._selectedAssignTableUuid = "";
     this._npcCache = {};  // packId → actor[]
   }
 
@@ -88,13 +88,12 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       };
     });
 
-    // Preview table — default to first table
-    if (!this._selectedPreviewTableId && lootTables.length > 0) {
-      this._selectedPreviewTableId = lootTables[0].id;
-    }
+    // Preview the currently selected assign table
     let selectedTablePreview = null;
-    if (this._selectedPreviewTableId) {
-      const table = game.tables.get(this._selectedPreviewTableId);
+    if (this._selectedAssignTableUuid) {
+      // UUID format: RollTable.id or similar — extract the ID
+      const tableId = this._selectedAssignTableUuid.split(".").pop();
+      const table = game.tables.get(tableId);
       if (table) {
         selectedTablePreview = {
           name: table.name, formula: table.formula,
@@ -264,9 +263,9 @@ class LootManagerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       else await actor.unsetFlag(MODULE_ID, "lootDropChance");
     });
 
-    // Preview table select
-    $(".loot-preview-table")?.addEventListener("change", ev => {
-      this._selectedPreviewTableId = ev.currentTarget.value;
+    // Assign table select — also updates preview
+    $(".loot-assign-table")?.addEventListener("change", ev => {
+      this._selectedAssignTableUuid = ev.currentTarget.value;
       this.render();
     });
   }
