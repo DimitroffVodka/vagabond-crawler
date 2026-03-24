@@ -1,9 +1,9 @@
 /**
  * Vagabond Crawler — Loot Drops
  *
- * When combat ends, defeated NPCs can drop loot bags containing
- * currency and items. Players interact with loot bags via a
- * Take/Pass dialog triggered by clicking the loot bag token.
+ * When combat ends, defeated NPCs can drop loot bags. Each player
+ * rolls independently from the loot table and only sees their own share.
+ * Clicking a loot bag token opens the loot UI directly.
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
@@ -21,25 +21,28 @@ export const LootDrops = {
     game.settings.register(MODULE_ID, "lootDropEnabled", {
       name: "Loot Drops",
       hint: "Automatically generate loot bags from defeated NPCs when combat ends.",
-      scope: "world",
-      config: true,
-      type: Boolean,
-      default: false,
+      scope: "world", config: true, type: Boolean, default: false,
     });
 
     game.settings.register(MODULE_ID, "lootDropChance", {
       name: "Loot Drop Chance (%)",
       hint: "Default percentage chance (0-100) for an NPC to drop loot. Individual NPCs can override this.",
-      scope: "world",
-      config: true,
-      type: Number,
-      default: 50,
+      scope: "world", config: true, type: Number, default: 50,
     });
   },
 
   init() {
-    // Always register hooks — they check the setting internally
     Hooks.on("deleteCombat", (combat) => this._onCombatEnd(combat));
+
+    // Intercept double-click on loot bag tokens to show loot UI instead of NPC sheet
+    Hooks.on("renderActorSheet", (sheet, html, data) => {
+      const actor = sheet.actor;
+      if (!actor?.getFlag(MODULE_ID, "lootBag")) return;
+      // Close the sheet immediately and show loot dialog instead
+      sheet.close();
+      const token = canvas.tokens?.placeables.find(t => t.actor?.id === actor.id);
+      if (token) this._showLootDialog(actor, token);
+    });
 
     // TokenHUD: show loot bag interaction button
     Hooks.on("renderTokenHUD", (hud, html, tokenData) => this._onRenderTokenHUD(hud, html, tokenData));
@@ -47,9 +50,6 @@ export const LootDrops = {
     // Socket: handle player loot requests
     game.socket.on(`module.${MODULE_ID}`, async (data) => {
       if (!game.user.isGM) return;
-      if (data.action === "lootDrop:take") {
-        await this._handleTake(data);
-      }
       if (data.action === "lootDrop:takeAll") {
         await this._handleTakeAll(data);
       }
@@ -59,7 +59,7 @@ export const LootDrops = {
   },
 
   /* -------------------------------------------- */
-  /*  Combat End: Generate Loot                   */
+  /*  Combat End: Generate Per-Player Loot        */
   /* -------------------------------------------- */
 
   async _onCombatEnd(combat) {
@@ -69,7 +69,6 @@ export const LootDrops = {
     const scene = combat.scene || canvas.scene;
     if (!scene) return;
 
-    // Find defeated NPC combatants
     const defeated = combat.combatants.filter(c => {
       if (!c.actor || c.actor.type !== "npc") return false;
       if (c.defeated) return true;
@@ -79,7 +78,7 @@ export const LootDrops = {
 
     if (defeated.length === 0) return;
 
-    // Get active player characters for loot distribution
+    // Get player characters who were in combat
     const pcs = game.actors.filter(a => a.type === "character" && a.hasPlayerOwner);
     if (pcs.length === 0) return;
 
@@ -89,31 +88,41 @@ export const LootDrops = {
       const npc = combatant.actor;
       const token = combatant.token;
 
-      // Check drop chance (per-NPC override or global)
       const npcChance = npc.getFlag(MODULE_ID, "lootDropChance");
       const chance = (npcChance !== undefined && npcChance >= 0) ? npcChance : globalChance;
       const roll = Math.random() * 100;
       if (roll > chance) continue;
 
-      // Check for custom loot table
       const customTable = npc.getFlag(MODULE_ID, "lootTable") || null;
 
-      // Generate loot
-      const loot = await generateLoot(npc, customTable);
+      // Roll loot independently for each PC
+      const perPlayerLoot = {};
+      let anyLoot = false;
 
-      // Skip if nothing dropped
-      if (loot.currency.gold === 0 && loot.currency.silver === 0 &&
-          loot.currency.copper === 0 && loot.items.length === 0) continue;
+      for (const pc of pcs) {
+        const loot = await generateLoot(npc, customTable);
+        const hasLoot = loot.currency.gold > 0 || loot.currency.silver > 0 ||
+                        loot.currency.copper > 0 || loot.items.length > 0;
+        if (hasLoot) {
+          perPlayerLoot[pc.id] = {
+            currency: loot.currency,
+            items: loot.items,
+            claimed: false,
+          };
+          anyLoot = true;
+        }
+      }
 
-      // Create loot bag
-      await this._createLootBag(npc, token, loot, scene);
+      if (!anyLoot) continue;
+
+      await this._createLootBag(npc, token, perPlayerLoot, scene);
     }
   },
 
   /**
-   * Create a loot bag actor + token at the defeated NPC's position.
+   * Create a loot bag with per-player shares.
    */
-  async _createLootBag(npc, combatantToken, loot, scene) {
+  async _createLootBag(npc, combatantToken, perPlayerLoot, scene) {
     const x = combatantToken?.x ?? 0;
     const y = combatantToken?.y ?? 0;
 
@@ -132,7 +141,7 @@ export const LootDrops = {
       flags: {
         [MODULE_ID]: {
           lootBag: true,
-          lootContents: loot,
+          lootContents: perPlayerLoot,
           sourceNpc: npc.name,
         },
       },
@@ -147,14 +156,7 @@ export const LootDrops = {
       height: 0.5,
     }]);
 
-    // Post chat notification
-    const currencyParts = [];
-    if (loot.currency.gold > 0) currencyParts.push(`${loot.currency.gold} gold`);
-    if (loot.currency.silver > 0) currencyParts.push(`${loot.currency.silver} silver`);
-    if (loot.currency.copper > 0) currencyParts.push(`${loot.currency.copper} copper`);
-    const currencyText = currencyParts.length > 0 ? currencyParts.join(", ") : "no currency";
-    const itemCount = loot.items.length;
-
+    // Chat notification (don't reveal specific loot)
     await ChatMessage.create({
       speaker: { alias: "Loot" },
       content: `<div class="vagabond-chat-card-v2" data-card-type="generic">
@@ -172,15 +174,14 @@ export const LootDrops = {
           </header>
           <section class="content-body">
             <div class="card-description" style="text-align:center; padding:4px 0;">
-              <p>${currencyText}${itemCount > 0 ? ` and ${itemCount} item${itemCount > 1 ? "s" : ""}` : ""}</p>
-              <p style="color:#888; font-size:0.85em;">Click the loot bag token to collect.</p>
+              <p>A loot bag has appeared! Click it to see your share.</p>
             </div>
           </section>
         </div>
       </div>`,
     });
 
-    console.log(`${MODULE_ID} | Loot bag created for ${npc.name}: ${currencyText}, ${itemCount} items`);
+    console.log(`${MODULE_ID} | Loot bag created for ${npc.name} (${Object.keys(perPlayerLoot).length} player shares)`);
   },
 
   /* -------------------------------------------- */
@@ -212,11 +213,11 @@ export const LootDrops = {
   },
 
   /**
-   * Show the loot dialog for a loot bag.
+   * Show loot dialog — player only sees their own share.
    */
   async _showLootDialog(lootActor, lootToken) {
-    const loot = lootActor.getFlag(MODULE_ID, "lootContents");
-    if (!loot) {
+    const allLoot = lootActor.getFlag(MODULE_ID, "lootContents");
+    if (!allLoot) {
       ui.notifications.warn("This loot bag is empty.");
       return;
     }
@@ -227,13 +228,24 @@ export const LootDrops = {
       return;
     }
 
-    // Build loot display
-    const currencyLines = [];
-    if (loot.currency.gold > 0) currencyLines.push(`<span><i class="fas fa-coins" style="color:gold;"></i> ${loot.currency.gold} Gold</span>`);
-    if (loot.currency.silver > 0) currencyLines.push(`<span><i class="fas fa-coins" style="color:silver;"></i> ${loot.currency.silver} Silver</span>`);
-    if (loot.currency.copper > 0) currencyLines.push(`<span><i class="fas fa-coins" style="color:#b87333;"></i> ${loot.currency.copper} Copper</span>`);
+    // Get this player's share only
+    const myShare = allLoot[recipient.id];
+    if (!myShare) {
+      ui.notifications.info("This loot bag has nothing for you.");
+      return;
+    }
+    if (myShare.claimed) {
+      ui.notifications.info("You've already claimed your loot from this bag.");
+      return;
+    }
 
-    const itemLines = loot.items.map((item, i) => {
+    // Build loot display for this player only
+    const currencyLines = [];
+    if (myShare.currency.gold > 0) currencyLines.push(`<span><i class="fas fa-coins" style="color:gold;"></i> ${myShare.currency.gold} Gold</span>`);
+    if (myShare.currency.silver > 0) currencyLines.push(`<span><i class="fas fa-coins" style="color:silver;"></i> ${myShare.currency.silver} Silver</span>`);
+    if (myShare.currency.copper > 0) currencyLines.push(`<span><i class="fas fa-coins" style="color:#b87333;"></i> ${myShare.currency.copper} Copper</span>`);
+
+    const itemLines = myShare.items.map(item => {
       const img = item.img || "icons/svg/item-bag.svg";
       return `<div style="display:flex; align-items:center; gap:6px; padding:3px 0;">
         <img src="${img}" width="28" height="28" style="border:1px solid #999; border-radius:3px;">
@@ -243,15 +255,15 @@ export const LootDrops = {
 
     const content = `
       <div style="padding:4px;">
-        <p><strong>Loot from ${lootActor.getFlag(MODULE_ID, "sourceNpc")}</strong></p>
+        <p><strong>Your loot from ${lootActor.getFlag(MODULE_ID, "sourceNpc")}</strong></p>
         ${currencyLines.length > 0 ? `<div style="display:flex; gap:12px; padding:6px 0;">${currencyLines.join("")}</div>` : ""}
         ${itemLines ? `<div style="border-top:1px solid #ddd; margin-top:6px; padding-top:6px;">${itemLines}</div>` : ""}
-        ${!currencyLines.length && !itemLines ? "<p>Nothing left to take.</p>" : ""}
+        ${!currencyLines.length && !itemLines ? "<p>Nothing here for you.</p>" : ""}
       </div>
     `;
 
     const choice = await Dialog.prompt({
-      title: "Loot Bag",
+      title: "Your Loot",
       content,
       label: "Take All",
       callback: () => "takeAll",
@@ -278,8 +290,8 @@ export const LootDrops = {
   },
 
   /**
-   * Transfer all loot to the recipient and clean up.
-   * GM-only execution.
+   * Transfer this player's share and mark as claimed.
+   * Auto-delete bag when all shares are claimed.
    */
   async _handleTakeAll(data) {
     const { lootActorId, lootTokenId, recipientId, sceneId } = data;
@@ -287,46 +299,45 @@ export const LootDrops = {
     const lootActor = game.actors.get(lootActorId);
     if (!lootActor) return;
 
-    const loot = lootActor.getFlag(MODULE_ID, "lootContents");
-    if (!loot) return;
+    const allLoot = lootActor.getFlag(MODULE_ID, "lootContents");
+    if (!allLoot) return;
+
+    const myShare = allLoot[recipientId];
+    if (!myShare || myShare.claimed) return;
 
     const recipient = game.actors.get(recipientId);
     if (!recipient) return;
 
     // Transfer currency
     const updates = {};
-    if (loot.currency.gold > 0) {
-      updates["system.currency.gold"] = (recipient.system.currency?.gold ?? 0) + loot.currency.gold;
+    if (myShare.currency.gold > 0) {
+      updates["system.currency.gold"] = (recipient.system.currency?.gold ?? 0) + myShare.currency.gold;
     }
-    if (loot.currency.silver > 0) {
-      updates["system.currency.silver"] = (recipient.system.currency?.silver ?? 0) + loot.currency.silver;
+    if (myShare.currency.silver > 0) {
+      updates["system.currency.silver"] = (recipient.system.currency?.silver ?? 0) + myShare.currency.silver;
     }
-    if (loot.currency.copper > 0) {
-      updates["system.currency.copper"] = (recipient.system.currency?.copper ?? 0) + loot.currency.copper;
+    if (myShare.currency.copper > 0) {
+      updates["system.currency.copper"] = (recipient.system.currency?.copper ?? 0) + myShare.currency.copper;
     }
     if (Object.keys(updates).length > 0) {
       await recipient.update(updates);
     }
 
     // Transfer items
-    for (const itemData of loot.items) {
+    for (const itemData of myShare.items) {
       await Item.create(itemData, { parent: recipient });
     }
 
-    // Clean up: delete token and actor
-    const scene = game.scenes.get(sceneId) || canvas.scene;
-    const token = scene?.tokens.get(lootTokenId);
-    if (token) await token.delete();
-    await lootActor.delete();
+    // Mark this player's share as claimed
+    allLoot[recipientId].claimed = true;
+    await lootActor.setFlag(MODULE_ID, "lootContents", allLoot);
 
-    ui.notifications.info(`${recipient.name} collected all loot.`);
-
-    // Post chat message
+    // Post chat message (only visible to the player)
     const parts = [];
-    if (loot.currency.gold > 0) parts.push(`${loot.currency.gold}g`);
-    if (loot.currency.silver > 0) parts.push(`${loot.currency.silver}s`);
-    if (loot.currency.copper > 0) parts.push(`${loot.currency.copper}c`);
-    if (loot.items.length > 0) parts.push(`${loot.items.length} item${loot.items.length > 1 ? "s" : ""}`);
+    if (myShare.currency.gold > 0) parts.push(`${myShare.currency.gold}g`);
+    if (myShare.currency.silver > 0) parts.push(`${myShare.currency.silver}s`);
+    if (myShare.currency.copper > 0) parts.push(`${myShare.currency.copper}c`);
+    if (myShare.items.length > 0) parts.push(`${myShare.items.length} item${myShare.items.length > 1 ? "s" : ""}`);
 
     await ChatMessage.create({
       speaker: ChatMessage.getSpeaker({ actor: recipient }),
@@ -347,14 +358,17 @@ export const LootDrops = {
       </div>`,
     });
 
-    console.log(`${MODULE_ID} | ${recipient.name} took all loot: ${parts.join(", ")}`);
-  },
+    // Check if all shares are claimed — auto-delete bag
+    const allClaimed = Object.values(allLoot).every(share => share.claimed);
+    if (allClaimed) {
+      const scene = game.scenes.get(sceneId) || canvas.scene;
+      const token = scene?.tokens.get(lootTokenId);
+      if (token) await token.delete();
+      await lootActor.delete();
+      console.log(`${MODULE_ID} | Loot bag fully claimed and deleted.`);
+    }
 
-  /**
-   * Handle taking a specific item (future expansion).
-   */
-  async _handleTake(data) {
-    // TODO: Individual item take (for now, takeAll is the primary flow)
+    console.log(`${MODULE_ID} | ${recipient.name} claimed their loot: ${parts.join(", ")}`);
   },
 
   /**

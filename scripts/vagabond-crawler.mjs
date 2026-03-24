@@ -18,6 +18,7 @@ import { ItemDrops }        from "./item-drops.mjs";
 import { LootDrops }        from "./loot-drops.mjs";
 import { RelicForge }       from "./relic-forge.mjs";
 import { RelicEffects }     from "./relic-effects.mjs";
+import { LootManager }      from "./loot-manager.mjs";
 
 export const MODULE_ID = "vagabond-crawler";
 
@@ -136,6 +137,7 @@ Hooks.once("ready", async () => {
     lootDrops: LootDrops,
     relicForge: RelicForge,
     relicEffects: RelicEffects,
+    lootManager: LootManager,
     debugCombat: () => {
       const combat = game.combat;
       if (!combat) return "No active combat";
@@ -188,6 +190,7 @@ Hooks.once("ready", async () => {
   LootDrops.init();
   RelicForge.init();
   RelicEffects.init();
+  LootManager.init();
 
   // Start light tracker + real-time engine if enabled
   LightTracker.init();

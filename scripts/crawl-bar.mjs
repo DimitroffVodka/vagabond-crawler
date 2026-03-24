@@ -15,6 +15,7 @@ import { CrawlClock }      from "./crawl-clock.mjs";
 import { LightTracker }    from "./light-tracker.mjs";
 import { ICONS }           from "./icons.mjs";
 import { RelicForge }      from "./relic-forge.mjs";
+import { LootManager }     from "./loot-manager.mjs";
 
 const BAR_ID = "vagabond-crawler-bar";
 
@@ -379,6 +380,9 @@ export const CrawlBar = {
       <div class="vcb-clock-menu-item" data-fl="forge">
         <i class="fas fa-hammer"></i> Open Relic Forge
       </div>
+      <div class="vcb-clock-menu-item" data-fl="lootManager">
+        <i class="fas fa-treasure-chest"></i> Open Loot Manager
+      </div>
       <div class="vcb-enc-menu-divider"></div>
       <div class="vcb-clock-menu-item" data-fl="toggleLoot">
         <i class="fas fa-${lootEnabled ? "toggle-on" : "toggle-off"}" style="color:${lootEnabled ? "#4caf50" : "#888"};"></i>
@@ -410,6 +414,12 @@ export const CrawlBar = {
     menu.querySelector('[data-fl="forge"]')?.addEventListener("click", () => {
       this._dismissForgeLootMenu();
       RelicForge.open();
+    });
+
+    // Open Loot Manager
+    menu.querySelector('[data-fl="lootManager"]')?.addEventListener("click", () => {
+      this._dismissForgeLootMenu();
+      LootManager.open();
     });
 
     // Toggle loot drops
