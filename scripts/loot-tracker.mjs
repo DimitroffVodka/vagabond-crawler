@@ -177,87 +177,53 @@ export const LootTracker = {
 /*  Loot Tracker Application                    */
 /* -------------------------------------------- */
 
-class LootTrackerApp extends ApplicationV2 {
+class LootTrackerApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     id: "vagabond-crawler-loot-tracker",
     window: { title: "Loot Log", resizable: true },
     position: { width: 500, height: 500 },
   };
 
-  async _renderHTML() {
+  static PARTS = {
+    form: { template: "modules/vagabond-crawler/templates/loot-tracker.hbs" },
+  };
+
+  async _prepareContext() {
     const log = LootTracker.getLog();
-    const el = document.createElement("div");
-    el.classList.add("loot-tracker-container");
-    el.style.cssText = "display:flex; flex-direction:column; height:100%; gap:8px; padding:8px;";
 
-    // Toolbar
-    const toolbar = document.createElement("div");
-    toolbar.style.cssText = "display:flex; gap:6px; justify-content:flex-end;";
-    toolbar.innerHTML = `
-      <button class="lt-copy-btn" style="padding:4px 10px; cursor:pointer; background:rgba(88,101,242,0.3); border:1px solid rgba(88,101,242,0.6); color:#7289da; border-radius:4px;">
-        <i class="fab fa-discord"></i> Copy for Discord
-      </button>
-      <button class="lt-clear-btn" style="padding:4px 10px; cursor:pointer; background:rgba(192,57,43,0.2); border:1px solid rgba(192,57,43,0.4); color:#e74c3c; border-radius:4px;">
-        <i class="fas fa-trash"></i> Clear Log
-      </button>
-    `;
-    el.appendChild(toolbar);
+    // Build entries in reverse chronological order
+    const entries = [];
+    for (let i = log.length - 1; i >= 0; i--) {
+      const entry = log[i];
+      const iconHtml = entry.type === "currency"
+        ? '<i class="fas fa-coins" style="color:gold;"></i>'
+        : entry.img
+          ? `<img src="${entry.img}" width="20" height="20" style="border-radius:2px;">`
+          : '<i class="fas fa-box" style="color:#aaa;"></i>';
 
-    // Log entries
-    const list = document.createElement("div");
-    list.style.cssText = "flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:3px;";
+      const typeColor = entry.type === "currency" ? "#daa520"
+        : entry.type === "pickup" ? "#4caf50"
+        : "#ccc";
 
-    if (log.length === 0) {
-      list.innerHTML = `<div style="text-align:center; color:#888; padding:40px;">
-        <i class="fas fa-scroll" style="font-size:2em; display:block; margin-bottom:8px;"></i>
-        No loot recorded yet.
-      </div>`;
-    } else {
-      // Reverse chronological
-      for (let i = log.length - 1; i >= 0; i--) {
-        const entry = log[i];
-        const icon = entry.type === "currency"
-          ? '<i class="fas fa-coins" style="color:gold;"></i>'
-          : entry.img
-            ? `<img src="${entry.img}" width="20" height="20" style="border-radius:2px;">`
-            : '<i class="fas fa-box" style="color:#aaa;"></i>';
-
-        const typeColor = entry.type === "currency" ? "#daa520"
-          : entry.type === "pickup" ? "#4caf50"
-          : "#ccc";
-
-        const row = document.createElement("div");
-        row.style.cssText = `display:flex; align-items:center; gap:8px; padding:4px 8px; background:rgba(0,0,0,0.15); border-radius:4px; font-size:0.9em;`;
-        row.innerHTML = `
-          <span style="color:#888; font-size:0.8em; width:45px; flex-shrink:0;">${entry.time}</span>
-          <span style="width:20px; text-align:center; flex-shrink:0;">${icon}</span>
-          <span style="color:#f4c542; font-weight:bold; min-width:80px;">${entry.player}</span>
-          <span style="color:${typeColor}; flex:1;">${entry.detail}</span>
-          <span style="color:#888; font-size:0.8em;">${entry.source}</span>
-        `;
-        list.appendChild(row);
-      }
+      entries.push({ ...entry, iconHtml, typeColor });
     }
 
-    el.appendChild(list);
-    return el;
+    return { entries };
   }
 
-  _replaceHTML(result, content, options) {
-    const target = this.element;
-    if (!target) return;
-    target.innerHTML = "";
-    target.appendChild(result);
+  _onRender(context, options) {
+    super._onRender(context, options);
+    const el = this.element;
 
     // Copy for Discord
-    result.querySelector(".lt-copy-btn")?.addEventListener("click", async () => {
+    el.querySelector(".lt-copy-btn")?.addEventListener("click", async () => {
       const text = LootTracker.formatForDiscord();
       await navigator.clipboard.writeText(text);
       ui.notifications.info("Loot log copied to clipboard!");
     });
 
     // Clear log
-    result.querySelector(".lt-clear-btn")?.addEventListener("click", async () => {
+    el.querySelector(".lt-clear-btn")?.addEventListener("click", async () => {
       const ok = await Dialog.confirm({
         title: "Clear Loot Log",
         content: "Clear all loot log entries?",
