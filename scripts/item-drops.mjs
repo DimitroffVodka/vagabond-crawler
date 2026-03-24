@@ -161,10 +161,13 @@ export const ItemDrops = {
       },
     });
 
-    // Place token on the scene
+    // Place token on the scene — explicitly set texture to the item's icon
     const scene = game.scenes.get(sceneId) || canvas.scene;
+    const tokenImg = itemData.img || "icons/svg/item-bag.svg";
     await scene.createEmbeddedDocuments("Token", [{
       actorId: actor.id,
+      name: itemData.name,
+      texture: { src: tokenImg },
       x: x - 25, // Center the 0.5-size token
       y: y - 25,
       width: 0.5,

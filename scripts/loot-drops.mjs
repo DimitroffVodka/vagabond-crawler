@@ -140,6 +140,8 @@ export const LootDrops = {
 
     await scene.createEmbeddedDocuments("Token", [{
       actorId: actor.id,
+      name: `Loot: ${npc.name}`,
+      texture: { src: LOOT_BAG_ICON },
       x, y,
       width: 0.5,
       height: 0.5,
