@@ -464,6 +464,19 @@ function _buildMenuData(actor, isNPC) {
       result.tabC = "Craft";
       result.itemsC = craftItems;
     }
+
+    // Beast form actions — polymorphed druid gets beast attacks in a new tab
+    // Uses vagabond-character-enhancer API (gracefully degrades if not installed)
+    const polymorphAPI = game.vagabondCharacterEnhancer?.polymorph;
+    if (polymorphAPI?.getPolymorphMenuData) {
+      const polyData = polymorphAPI.getPolymorphMenuData(actor);
+      if (polyData?.actions?.length > 0) {
+        // If polymorphed, beast actions replace weapons tab (beasts don't use weapons)
+        result.tabA = "Beast";
+        result.itemsA = [...polyData.actions, ...weapons];
+      }
+    }
+
     return result;
   }
 }
@@ -660,6 +673,14 @@ async function _fireAction(actor, type, indexStr, itemId) {
     } else if (type === "spell") {
       const item = actor.items.get(itemId); if (!item) return;
       CrawlerSpellDialog.show(actor, item);
+
+    } else if (type === "beastaction") {
+      // Beast form action — delegate to polymorph sheet's roll handler
+      const { PolymorphSheet } = await import("/modules/vagabond-character-enhancer/scripts/polymorph/polymorph-sheet.mjs");
+      const polyData = actor.getFlag("vagabond-character-enhancer", "polymorphData");
+      if (polyData && index !== null) {
+        await PolymorphSheet._rollBeastAction(actor, index, polyData);
+      }
 
     } else if (type === "craft") {
       const craftName = itemId; // craftName passed via itemId parameter path
