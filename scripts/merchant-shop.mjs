@@ -289,9 +289,15 @@ export const MerchantShop = {
       "system.currency.copper": remaining.copper,
     });
 
-    // Execute: create item(s) on buyer
+    // Execute: create item(s) on buyer. ALWAYS override quantity — the
+    // source itemData is cloned from the merchant's inventory (NPC mode)
+    // or the compendium entry, and its existing `quantity` reflects the
+    // merchant's stack size, not what the buyer requested. Leaving the
+    // original value in place on a single-item purchase used to transfer
+    // the entire stack by accident.
     const itemData = foundry.utils.deepClone(entry.itemData);
-    if (quantity > 1) itemData.system.quantity = quantity;
+    if (!itemData.system) itemData.system = {};
+    itemData.system.quantity = quantity;
     await Item.create(itemData, { parent: buyer });
 
     // Execute: update stock

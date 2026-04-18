@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.12.0
+
+Bug-fix / QA pass on systems exercised during live play — attribution in the session recap, loot visibility, merchant purchases, DPR math, and a pair of new features (unclaimed-loot tracking, auto-pause on encounter, proper Relic: +1 Enchantment Scrolls).
+
+### Session Recap
+
+- **Correct attacker attribution** — the combat stats (damage dealt, kills, defeated-by credit) used `game.combat.combatant.actor` as the attacker, i.e. whoever's turn it currently was. This collapsed under AOE spells, reactions, and any initiative that put a familiar or polymorph between the acting PC and the damage-log message firing. Example from a live session: Seven's multi-target `Burn` killed 5 Ettercaps + a Giant Spider, all credited to his Bee familiar (next combatant in initiative) rather than to Seven. Now the recap tracks the speaker of each `HIT` chat card and uses that as the attacker for any damage-log message that fires within 60 seconds, falling back to the combat turn-holder only if nothing recent is tracked.
+- **Familiar / polymorph unwrap** — damage dealt by a polymorph form (`flags.core.originalActor`) or a player-owned NPC (familiar, summon) now credits the controlling PC. Seven casting a spell while polymorphed into a Beetle no longer writes to a Beetle-named row.
+- **Unclaimed loot tracking** — loot rolls are now logged the moment the claim card is posted, not just when the Claim button is clicked. A new `### Unclaimed` section in the recap lists rolls that were never claimed, grouped by original recipient. Claims flip the existing entry to `claimed: true` via the chat message id — no duplicates.
+- **Legacy `lootLog` migration guard** — the old `sessionRecap.migrateFromLootLog()` read an unregistered world setting on `init`, throwing `"vagabond-crawler.lootLog" is not a registered game setting` for any world that never had the legacy setting. Now guards with `game.settings.settings.has(...)` before reading.
+
+### Monster Creator
+
+- **Combo / multi-attack checkbox** — each action now carries an explicit `Part of multi-attack routine` checkbox, displayed inline in the action grid and surfaced as a `COMBO` badge in the collapsed action summary. Replaces the fragile "type 'combo' into a note" legacy convention (which still works for old monsters).
+- **DPR math fix** — `calculateDPR` used `_averageDice(roll) + flat`, treating `rollDamage` and `flatDamage` as additive when they're actually alternative presentations of the same damage (roll-based vs. pre-averaged). Every action was counting twice. Now computes `roll_avg OR flat` (prefer roll, fall back to flat) and partitions actions into combo and single routines, returning `max(comboSum, bestSingle)`.
+- **Damage UI clarification** — the action row used a literal `+` between the rollDamage and flatDamage inputs, misreading as addition. Changed to `or`. The damage-summary helper likewise switched from `"1d6 +3"` to `"1d6 / 3"`, mirroring the Vagabond NPC sheet convention.
+- **Combo persistence** — combo membership is stashed on the actor as `flags.vagabond-crawler.actionCombos` (array of action names), since the Vagabond action schema rejects unknown fields. `_fromCompendiumActor` rehydrates the checkboxes when editing an existing monster.
+
+### Relic Forge & Enchantment Scrolls
+
+- **Relic: +1 Enchantment Scroll — now a real item** — four call-sites in the loot generator (Lv1 table, ARMOR_BASE d20 entry 20, Lv2 armor chain, treasure chain) used to produce a random spell scroll via `_createSpellScroll(0)` and just rename it `"Enchantment Scroll"`. Since the spell pool includes a spell literally named `Enchant`, players periodically got a `Scroll of Enchant` labeled as an enchantment upgrade. They are two different items; the +N Enchantment Scroll is a consumable that permanently stamps a Weapon/Armor/Trinket +1 onto an existing item, not a one-shot spell cast. New `_createEnchantmentScroll(bonus)` helper produces a proper consumable with `flags.vagabond-crawler.enchantmentScroll = { bonus }` and the 100g price that matches the Relic Forge's `bonus-weapon-1` power.
+- **Use flow** — new `EnchantmentScroll` subsystem with a right-click inventory context entry `Use Enchantment Scroll` → picker dialog grouped by slot (Weapons / Armor / Trinkets) → applies the chosen `bonus-<slot>-N` Relic Forge power (same AE key, same equip-gating, same `relicForge` flag) and consumes one scroll charge. Double-enchant guard (`_hasExistingBonus`) prevents stacking +N bonuses on the same item.
+
+### Merchant Shop
+
+- **Buying 1 item transferred the full stack** — in NPC-merchant mode, if the merchant had 3 Light Armors and a player bought 1, the buyer received a single stack of quantity 3 while the merchant's stock correctly decremented to 2. Root cause: `_handleBuy` cloned the merchant's item data (including its `system.quantity = 3`) and only overrode the quantity field when the buyer requested 2+ via an `if (quantity > 1)` guard. Now unconditional.
+
+### Encounter Tools
+
+- **Auto-pause on encounter hit** — when a random encounter check rolls a hit, the game now auto-pauses so the GM can prep before the encounter materializes. New world setting `Pause Game on Encounter Hit` (default on) for GMs who prefer to pause manually.
+
 ## v1.11.0
 
 Community contributor release — first external PR lands, major design pass across the whole module, and the documentation is now release-ready.

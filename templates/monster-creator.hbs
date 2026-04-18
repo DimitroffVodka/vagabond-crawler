@@ -305,7 +305,7 @@
         {{#each actionRows}}
         <details class="mc-action-card" data-action-index="{{index}}" {{#if open}}open{{/if}}>
           <summary class="mc-action-summary">
-            <span class="mc-action-summary-name">{{name}}</span>
+            <span class="mc-action-summary-name">{{name}}{{#if combo}} <span class="mc-combo-badge" title="Part of this monster's multi-attack routine">combo</span>{{/if}}</span>
             <span class="mc-action-summary-meta">{{attackTypeLabel}} · {{summary}}{{#if recharge}} · {{recharge}}{{/if}}{{#if causedStatuses.length}} · {{causedStatuses.length}} on-hit{{/if}}{{#if critCausedStatuses.length}} · {{critCausedStatuses.length}} crit{{/if}}</span>
             <button type="button" class="mc-action-delete" data-action="deleteAction" aria-label="Remove action {{name}}" title="Remove action"><i class="fas fa-times" aria-hidden="true"></i></button>
           </summary>
@@ -322,9 +322,9 @@
 
             <label>Damage</label>
             <div class="mc-action-dmgrow">
-              <input class="mc-action-roll"  data-action-field="rollDamage" value="{{rollDamage}}" placeholder="2d6" />
-              <span class="mc-hint">+</span>
-              <input class="mc-action-flat"  data-action-field="flatDamage" value="{{flatDamage}}" placeholder="flat" />
+              <input class="mc-action-roll"  data-action-field="rollDamage" value="{{rollDamage}}" placeholder="2d6" title="Dice formula to roll (e.g. 2d6)" />
+              <span class="mc-hint" title="Roll OR flat — not added together">or</span>
+              <input class="mc-action-flat"  data-action-field="flatDamage" value="{{flatDamage}}" placeholder="flat" title="Flat damage value (alternative to the roll, typically the average)" />
               <select class="mc-action-dtype" data-action-field="damageType">
                 {{#each damageTypeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}
               </select>
@@ -343,6 +343,12 @@
 
             <label>Extra</label>
             <input data-action-field="extraInfo" value="{{extraInfo}}" placeholder="and Frightened (Cd4) / etc." />
+
+            <label>Combo</label>
+            <label class="mc-cb-row" title="Part of this monster's multi-attack routine. All combo-flagged actions fire on the same turn, and DPR sums them.">
+              <input type="checkbox" data-action-field="combo" {{#if combo}}checked{{/if}} />
+              <span>Part of multi-attack routine</span>
+            </label>
           </div>
 
           {{!-- On-Hit Effects --}}

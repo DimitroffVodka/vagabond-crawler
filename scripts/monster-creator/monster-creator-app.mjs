@@ -470,6 +470,7 @@ function _blankAction() {
     extraInfo: "",
     weaponId: "", weaponPrevName: "", weaponPrevFlatDamage: "", weaponPrevRollDamage: "",
     causedStatuses: [], critCausedStatuses: [],
+    combo: false,  // true = part of this monster's multi-attack routine
   };
 }
 
@@ -508,18 +509,25 @@ function _fromCompendiumActor(actor) {
     immunities:       Array.isArray(s.immunities)       ? [...s.immunities]       : [],
     weaknesses:       Array.isArray(s.weaknesses)       ? [...s.weaknesses]       : [],
     statusImmunities: Array.isArray(s.statusImmunities) ? [...s.statusImmunities] : [],
-    actions: Array.isArray(s.actions) ? s.actions.map((a) => ({
-      name: a?.name ?? "", note: a?.note ?? "", recharge: a?.recharge ?? "",
-      attackType: a?.attackType ?? "melee",
-      flatDamage: a?.flatDamage ?? "", rollDamage: a?.rollDamage ?? "", damageType: a?.damageType ?? "-",
-      extraInfo: a?.extraInfo ?? "",
-      weaponId: a?.weaponId ?? "",
-      weaponPrevName: a?.weaponPrevName ?? "",
-      weaponPrevFlatDamage: a?.weaponPrevFlatDamage ?? "",
-      weaponPrevRollDamage: a?.weaponPrevRollDamage ?? "",
-      causedStatuses: Array.isArray(a?.causedStatuses) ? a.causedStatuses.map((c) => ({ ...c })) : [],
-      critCausedStatuses: Array.isArray(a?.critCausedStatuses) ? a.critCausedStatuses.map((c) => ({ ...c })) : [],
-    })) : [],
+    actions: (() => {
+      if (!Array.isArray(s.actions)) return [];
+      // Combo membership is persisted in a module flag because the system's
+      // action schema rejects unknown fields. Rehydrate into the form state.
+      const comboNames = new Set(actor.getFlag?.("vagabond-crawler", "actionCombos") ?? []);
+      return s.actions.map((a) => ({
+        name: a?.name ?? "", note: a?.note ?? "", recharge: a?.recharge ?? "",
+        attackType: a?.attackType ?? "melee",
+        flatDamage: a?.flatDamage ?? "", rollDamage: a?.rollDamage ?? "", damageType: a?.damageType ?? "-",
+        extraInfo: a?.extraInfo ?? "",
+        weaponId: a?.weaponId ?? "",
+        weaponPrevName: a?.weaponPrevName ?? "",
+        weaponPrevFlatDamage: a?.weaponPrevFlatDamage ?? "",
+        weaponPrevRollDamage: a?.weaponPrevRollDamage ?? "",
+        causedStatuses: Array.isArray(a?.causedStatuses) ? a.causedStatuses.map((c) => ({ ...c })) : [],
+        critCausedStatuses: Array.isArray(a?.critCausedStatuses) ? a.critCausedStatuses.map((c) => ({ ...c })) : [],
+        combo: comboNames.has(a?.name ?? ""),
+      }));
+    })(),
     abilities: Array.isArray(s.abilities) ? s.abilities.map((ab) => ({
       name: ab?.name ?? "", description: ab?.description ?? "",
     })) : [],
@@ -586,15 +594,24 @@ function _computePreview(data) {
 }
 
 /** Build the compact damage string shown on template buttons and on
- *  action-summary pills. Handles bare "d4" vs full "2d6" and flat bonuses. */
+ *  action-summary pills.
+ *
+ *  `flatDamage` is an ALTERNATIVE to the dice roll (most GMs run flat for
+ *  speed; rolling is optional), NOT a bonus that adds to the roll. The
+ *  display reflects that by joining with "/" when both are present — e.g.
+ *  "1d6 / 3" — instead of the old "1d6 +3" which read as addition. */
 function _damageDisplay(rollDamage, flatDamage, damageType) {
-  const parts = [];
   const roll = String(rollDamage ?? "").trim();
   const flat = String(flatDamage ?? "").trim();
-  if (roll) parts.push(roll);
-  if (flat && flat !== "0") parts.push(`+${flat}`);
-  if (!parts.length) return "—";
-  let out = parts.join(" ");
+  const hasRoll = !!roll;
+  const hasFlat = !!flat && flat !== "0";
+
+  let out;
+  if (hasRoll && hasFlat)      out = `${roll} / ${flat}`;
+  else if (hasRoll)            out = roll;
+  else if (hasFlat)            out = flat;
+  else                         return "—";
+
   if (damageType && damageType !== "-") out += ` ${damageType}`;
   return out;
 }
@@ -835,6 +852,18 @@ function _buildActorData(data) {
         brightness: 0,
         saturation: 0,
         contrast:   0,
+      },
+    },
+    // Combo/multi-attack membership. The Vagabond action schema rejects
+    // unknown fields, so we persist combo membership as an array of action
+    // names on a module flag. _fromCompendiumActor reads this back when
+    // editing an existing actor.
+    flags: {
+      "vagabond-crawler": {
+        actionCombos: (data.actions ?? [])
+          .filter((a) => a.combo)
+          .map((a) => a.name)
+          .filter((n) => !!n),
       },
     },
   };
@@ -1176,6 +1205,7 @@ class MonsterCreatorApp extends HandlebarsApplicationMixin(ApplicationV2) {
           damageType: a.damageType || "-",
           extraInfo: a.extraInfo ?? "",
           weaponId: a.weaponId ?? "",
+          combo: !!a.combo,
           summary: _damageDisplay(a.rollDamage, a.flatDamage, a.damageType),
           attackTypeLabel: ATTACK_TYPES.find((t) => t.value === a.attackType)?.label ?? a.attackType,
           attackTypeOptions: ATTACK_TYPES.map((t) => ({ ...t, selected: t.value === a.attackType })),
@@ -1551,7 +1581,10 @@ class MonsterCreatorApp extends HandlebarsApplicationMixin(ApplicationV2) {
         const field = ev.currentTarget.dataset.actionField;
         const action = this._data.actions[index];
         if (!action) return;
-        action[field] = ev.currentTarget.value;
+        // Checkboxes write their boolean state; text/select/number inputs
+        // write .value. Distinguishing by .type keeps a single handler.
+        const target = ev.currentTarget;
+        action[field] = target.type === "checkbox" ? !!target.checked : target.value;
         this._refreshActionsSummary();
         this._refreshActionCardSummary(index);
         this._refreshPreviewLine();
@@ -2042,7 +2075,12 @@ class MonsterCreatorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     if (!action) return;
     const nameEl = card.querySelector(".mc-action-summary-name");
     const metaEl = card.querySelector(".mc-action-summary-meta");
-    if (nameEl) nameEl.textContent = action.name || "(unnamed)";
+    if (nameEl) {
+      const safeName = action.name || "(unnamed)";
+      nameEl.innerHTML = action.combo
+        ? `${foundry.utils.escapeHTML(safeName)} <span class="mc-combo-badge" title="Part of this monster's multi-attack routine">combo</span>`
+        : foundry.utils.escapeHTML(safeName);
+    }
     if (metaEl) {
       const attackLabel = ATTACK_TYPES.find((t) => t.value === action.attackType)?.label ?? action.attackType;
       const dmg = _damageDisplay(action.rollDamage, action.flatDamage, action.damageType);

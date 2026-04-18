@@ -78,7 +78,14 @@ export const EncounterTools = {
     });
 
     // Auto-open encounter roller and roll the active table on hit
-    if (hit) this.rollInstantEncounter();
+    if (hit) {
+      // Pause the game (if enabled) so the GM can prep before the encounter
+      // materializes. Only GMs have permission to pause, so guard the call.
+      if (game.user.isGM && game.settings.get(MODULE_ID, "pauseOnEncounter") && !game.paused) {
+        game.togglePause(true, { broadcast: true });
+      }
+      this.rollInstantEncounter();
+    }
   },
 
   rollInstantEncounter() {

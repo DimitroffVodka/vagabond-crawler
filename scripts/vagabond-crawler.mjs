@@ -23,6 +23,7 @@ import { LootTracker }      from "./loot-tracker.mjs";
 import { LootGenerator }    from "./loot-generator.mjs";
 import { CountdownRoller }  from "./countdown-roller.mjs";
 import { ScrollForge }      from "./scroll-forge.mjs";
+import { EnchantmentScroll } from "./enchantment-scroll.mjs";
 import { MerchantShop }     from "./merchant-shop.mjs";
 import { PartyInventory }  from "./party-inventory.mjs";
 import { MonsterCreator }  from "./monster-creator/monster-creator-app.mjs";
@@ -72,6 +73,15 @@ Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "encounterRollGMOnly", {
     name: "Encounter Roll: GM Only",
     hint: "If enabled, encounter check results are whispered to the GM only.",
+    scope: "world", config: true, type: Boolean, default: true
+  });
+
+  // Auto-pause on rolled encounter — gives the GM a beat to prep before the
+  // table is rolled / creatures are placed. Only the GM can pause, so this
+  // only fires when a GM is driving the encounter check.
+  game.settings.register(MODULE_ID, "pauseOnEncounter", {
+    name: "Pause Game on Encounter Hit",
+    hint: "When an encounter check rolls a hit, automatically pause the game so the GM can set up.",
     scope: "world", config: true, type: Boolean, default: true
   });
 
@@ -194,6 +204,7 @@ Hooks.once("ready", async () => {
     lootGenerator: LootGenerator,
     countdownRoller: CountdownRoller,
     scrollForge: ScrollForge,
+    enchantmentScroll: EnchantmentScroll,
     merchantShop: MerchantShop,
     partyInventory: PartyInventory,
     monsterCreator: MonsterCreator,
@@ -252,6 +263,7 @@ Hooks.once("ready", async () => {
   MonsterCreator.init();
   RelicForge.init();
   RelicEffects.init();
+  EnchantmentScroll.init();
   LootManager.init();
   LootTracker.init();
   LootGenerator.init();
@@ -399,6 +411,44 @@ Hooks.once("ready", async () => {
   Hooks.on("renderVagabondCharacterSheet", _attachScrollCtx);
   Hooks.on("renderVagabondNPCSheet", _attachScrollCtx);
   Hooks.on("renderActorSheet", _attachScrollCtx);
+
+  // Enchantment Scroll context menu: "Use Scroll" on +N Enchantment Scroll items
+  const _attachEnchantCtx = (sheet) => {
+    const el = sheet.element;
+    if (!el) return;
+    const actor = sheet.actor;
+    if (!actor) return;
+    for (const card of el.querySelectorAll(".inventory-card")) {
+      if (card.dataset.vcEnchBound) continue;
+      const item = actor.items.get(card.dataset.itemId);
+      if (!item || !EnchantmentScroll.isEnchantmentScroll(item)) continue;
+      card.dataset.vcEnchBound = "1";
+      card.addEventListener("contextmenu", () => {
+        let attempts = 0;
+        const poll = setInterval(() => {
+          const menu = document.querySelector(".inventory-context-menu");
+          if (menu) {
+            clearInterval(poll);
+            if (menu.querySelector(".vc-ench-ctx-item")) return;
+            const li = document.createElement("li");
+            li.className = "vc-ench-ctx-item";
+            li.innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> Use Enchantment Scroll`;
+            li.addEventListener("click", async ev => {
+              ev.stopPropagation();
+              menu.remove();
+              await EnchantmentScroll.useScroll(item);
+            });
+            menu.insertBefore(li, menu.firstChild);
+          } else if (++attempts >= 10) {
+            clearInterval(poll);
+          }
+        }, 10);
+      });
+    }
+  };
+  Hooks.on("renderVagabondCharacterSheet", _attachEnchantCtx);
+  Hooks.on("renderVagabondNPCSheet", _attachEnchantCtx);
+  Hooks.on("renderActorSheet", _attachEnchantCtx);
 
   // Junk marking: "Mark as Junk" / "Unmark Junk" context menu on equipment items
   const _attachJunkCtx = (sheet) => {

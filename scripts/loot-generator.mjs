@@ -9,6 +9,7 @@ import {
   LEVEL1_TABLE,
 } from "./loot-data.mjs";
 import { LootTracker } from "./loot-tracker.mjs";
+import { SessionRecap } from "./session-recap.mjs";
 import { RELIC_POWERS } from "./relic-powers.mjs";
 
 /* ── Relic Power → Active Effect mapping ─────────────────── */
@@ -401,6 +402,50 @@ async function _createSpellScroll(manaCost) {
   };
 }
 
+/**
+ * Build a Relic: +N Enchantment Scroll — a one-shot consumable that, when
+ * used, lets the owner apply a `bonus-weapon-N` / `bonus-armor-N` /
+ * `bonus-trinket-N` relic power to an item they own.
+ *
+ * NOT to be confused with a spell scroll for the "Enchant" spell (see
+ * `_createSpellScroll` above). Both can end up with similar-looking names
+ * like "Scroll of Enchant" vs "+1 Enchantment Scroll" — the distinguishing
+ * feature is the `flags["vagabond-crawler"].enchantmentScroll` marker below.
+ *
+ * @param {number} bonus — +1 / +2 / +3 tier
+ * @returns {object} itemData ready for createEmbeddedDocuments
+ */
+function _createEnchantmentScroll(bonus = 1) {
+  const tierCost = { 1: 100, 2: 1250, 3: 5000 };
+  const goldValue = tierCost[bonus] ?? 100;
+  return {
+    name: `+${bonus} Enchantment Scroll`,
+    type: "equipment",
+    img: ICONS.scroll,
+    system: {
+      description:
+        `<p><strong>Relic: +${bonus} Enchantment Scroll</strong></p>` +
+        `<p>Right-click this scroll and choose <em>Use Scroll</em> to permanently ` +
+        `apply a <strong>+${bonus}</strong> enchantment to an equipped weapon, ` +
+        `armor, or trinket you own. The scroll is consumed on use.</p>` +
+        `<p><em>Weapons gain +${bonus} damage. Armor gains +${bonus} Armor. ` +
+        `Trinkets gain +${bonus} spell damage.</em></p>`,
+      equipmentType: "gear",
+      isConsumable: true,
+      quantity: 1,
+      baseSlots: 1,
+      baseCost: { gold: goldValue, silver: 0, copper: 0 },
+      gearCategory: "Scrolls",
+      lore: "Enchantment Scroll",
+    },
+    flags: {
+      [MODULE_ID]: {
+        enchantmentScroll: { bonus },
+      },
+    },
+  };
+}
+
 /** Get a random hostile NPC name from the most recent combat, or a random world NPC. */
 function _lastFoughtName() {
   // Try active combat first, then most recent
@@ -740,19 +785,21 @@ export const LootGenerator = {
       if (Object.keys(updates).length) await actor.update(updates);
     }
 
-    // Log via LootTracker
-    const itemNames = itemData?.map(d => d.name) ?? [];
-    const currParts = [];
-    if (currency?.gold) currParts.push(`${currency.gold} Gold`);
-    if (currency?.silver) currParts.push(`${currency.silver} Silver`);
-    if (currency?.copper) currParts.push(`${currency.copper} Copper`);
-
-    await LootTracker.logClaim(
-      actor.name,
-      `Loot Roll (Lv${flags.level})`,
-      currency ?? { gold: 0, silver: 0, copper: 0 },
-      (itemData ?? []).map(d => ({ name: d.name, img: d.img })),
-    );
+    // Flip the previously-logged unclaimed drop entries to claimed. If the
+    // original drop wasn't logged (card predates drop-tracking), fall back
+    // to a logClaim so the item still appears in the recap.
+    const preEntries = SessionRecap.getData()?.loot ?? [];
+    const hadDropEntry = preEntries.some(e => e.messageId === messageId);
+    if (hadDropEntry) {
+      await LootTracker.markClaimed(messageId, actor.name);
+    } else {
+      await LootTracker.logClaim(
+        actor.name,
+        `Loot Roll (Lv${flags.level})`,
+        currency ?? { gold: 0, silver: 0, copper: 0 },
+        (itemData ?? []).map(d => ({ name: d.name, img: d.img })),
+      );
+    }
 
     // Update the chat card to show claimed state
     const updatedContent = message.content
@@ -865,7 +912,7 @@ export const LootGenerator = {
     const whisperTargets = [game.user.id];
     if (owningPlayer) whisperTargets.push(owningPlayer.id);
 
-    await ChatMessage.create({
+    const claimMessage = await ChatMessage.create({
       content: cardContent,
       whisper: whisperTargets,
       speaker: ChatMessage.getSpeaker({ token: token.document ?? token }),
@@ -879,6 +926,17 @@ export const LootGenerator = {
           claimed: false,
         },
       },
+    });
+
+    // Log as unclaimed so the session recap captures rolls that are never
+    // claimed. The Claim button handler flips these entries to claimed via
+    // LootTracker.markClaimed(messageId).
+    await LootTracker.logDrop({
+      messageId: claimMessage.id,
+      playerName: actor.name,
+      sourceName: `Loot Roll (Lv${clampedLevel})`,
+      currency: currency ?? { gold: 0, silver: 0, copper: 0 },
+      items: (items ?? []).map(d => ({ name: d.name, img: d.img })),
     });
   },
 
@@ -1079,13 +1137,9 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
         itemData = [_lootItem(itemName, ICONS.artifact, 50, 0, "A magical trinket.")];
       }
     }
-    // Enchantment Scroll
+    // Relic: +1 Enchantment Scroll — upgrade consumable, NOT a spell scroll.
     else if (itemName.includes("Scroll")) {
-      const scrollItem = await _createSpellScroll(0);
-      if (scrollItem) {
-        scrollItem.name = "Enchantment Scroll (+1)";
-        itemData = [scrollItem];
-      }
+      itemData = [_createEnchantmentScroll(1)];
     }
 
     const entry = {
@@ -1272,14 +1326,10 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Special entries that aren't actual armor
     if (base.includes("Scroll, Enchantment")) {
-      // Enchantment scroll — create a spell scroll instead
-      const scrollItem = await _createSpellScroll(0);
-      if (scrollItem) {
-        scrollItem.name = result.item;
-        _addPowerValue(scrollItem, powerText, material);
-        return [scrollItem];
-      }
-      return [_lootItem(result.item, ICONS.scroll, 0, 0, "An enchantment scroll.")];
+      // Relic: +1 Enchantment Scroll — upgrade consumable, NOT a spell scroll.
+      // The ARMOR chain's power/material roll is ignored: the scroll's bonus is
+      // always +1 (rolling higher tiers comes from separate loot tables).
+      return [_createEnchantmentScroll(1)];
     }
     if (base.includes("Accessory")) {
       // Accessory: the item name from resolver already has the power text
@@ -1659,12 +1709,9 @@ export async function generateLevelLoot(level) {
       }
     }
     // Enchantment Scroll: create a spell scroll
+    // Relic: +1 Enchantment Scroll — upgrade consumable, NOT a spell scroll.
     else if (name.includes("Scroll")) {
-      const scrollItem = await _createSpellScroll(0);
-      if (scrollItem) {
-        scrollItem.name = "Enchantment Scroll (+1)";
-        items.push(scrollItem);
-      }
+      items.push(_createEnchantmentScroll(1));
     }
     return { currency, items };
   }
@@ -1773,11 +1820,8 @@ export async function generateLevelLoot(level) {
 
     // Special entries
     if (base.includes("Scroll, Enchantment")) {
-      const scrollItem = await _createSpellScroll(0);
-      if (scrollItem) {
-        scrollItem.name = "Enchantment Scroll";
-        items.push(scrollItem);
-      }
+      // Relic: +1 Enchantment Scroll — upgrade consumable, NOT a spell scroll.
+      items.push(_createEnchantmentScroll(1));
     } else if (base.includes("Accessory")) {
       // Accessory: d4 → 1-2 = Jewelry, 3-4 = Clothing
       const accRoll = await _roll("1d4");

@@ -28,29 +28,58 @@ export function calculateHP(hd, size = "medium") {
 }
 
 /**
- * Estimate average DPR from an actions array.
- * If any action is a combo, sum all. Otherwise, take the highest single.
+ * Estimate average per-turn damage (DPR) from an actions array.
+ *
+ * Model: a monster performs ONE "routine" per turn. A routine is either a
+ * single non-combo action, or the sum of every combo-flagged action (a
+ * multi-attack like Bite+Claw+Claw). DPR = the best routine's expected
+ * damage.
+ *
+ *   routine = max( comboSum, best non-combo single )
+ *
+ * Per-action average uses rollDamage OR flatDamage — NEVER both. The two
+ * fields are alternative presentations of the same damage (a dice formula
+ * versus a pre-computed average), not an addend.
+ *
+ * Combo membership is read from three sources, in order:
+ *   1. `action.combo === true`                            (explicit flag, preferred)
+ *   2. legacy "combo" substring in note / extraInfo       (backward compat)
  */
 export function calculateDPR(actions) {
   if (!actions || actions.length === 0) return 0;
 
-  const averages = actions.map(a => {
-    const roll = a.rollDamage || "";
-    const flat = parseInt(a.flatDamage) || 0;
-    return _averageDice(roll) + flat;
-  });
+  // Per-action average: prefer the rolled formula's expected value; fall
+  // back to the flat damage if no roll is defined. They are NOT summed.
+  const actionAvg = (a) => {
+    const rollAvg = _averageDice(a.rollDamage || "");
+    if (rollAvg > 0) return rollAvg;
+    const flat = parseFloat(a.flatDamage);
+    return Number.isFinite(flat) ? flat : 0;
+  };
 
-  // Check for combo — Vagabond uses note field or similar indicator
-  // For simplicity: if > 1 action and any has "combo" in its note, sum all
-  const hasCombo = actions.some(a =>
-    (a.note || "").toLowerCase().includes("combo") ||
-    (a.extraInfo || "").toLowerCase().includes("combo")
-  );
+  const isCombo = (a) => {
+    if (a.combo === true) return true;
+    // Legacy: users tagged multi-attacks by typing "combo" into a note.
+    const text = `${a.note || ""} ${a.extraInfo || ""}`.toLowerCase();
+    return text.includes("combo");
+  };
 
-  if (hasCombo) {
-    return averages.reduce((sum, avg) => sum + avg, 0);
+  let comboSum = 0;
+  let comboCount = 0;
+  let bestSingle = 0;
+  for (const a of actions) {
+    const avg = actionAvg(a);
+    if (isCombo(a)) {
+      comboSum += avg;
+      comboCount++;
+    } else if (avg > bestSingle) {
+      bestSingle = avg;
+    }
   }
-  return Math.max(...averages);
+
+  // A lone combo-flagged action with no siblings is effectively a single.
+  const comboRoutine = comboCount >= 2 ? comboSum : 0;
+  return Math.max(comboRoutine, bestSingle, comboCount === 1 ? comboSum : 0);
 }
 
 /**

@@ -4214,6 +4214,21 @@ body.theme-light .vcb-phase-badge {
   color: var(--vcb-text, #e7e1d4);
   flex: 0 1 auto;
 }
+/* Combo badge — small chrome pill on action summaries to mark multi-attack members. */
+#vagabond-crawler-monster-creator .mc-combo-badge {
+  display: inline-block;
+  font-size: 0.7em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  margin-left: 4px;
+  border-radius: 3px;
+  background: var(--vcb-accent-soft, rgba(200, 160, 80, 0.18));
+  color: var(--vcb-accent, #c8a050);
+  border: 1px solid var(--vcb-accent, rgba(200, 160, 80, 0.5));
+  vertical-align: middle;
+}
 #vagabond-crawler-monster-creator .mc-action-summary-meta {
   color: var(--vcb-text-faint, #706d65);
   font-size: 0.85em;

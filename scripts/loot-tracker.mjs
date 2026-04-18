@@ -47,6 +47,46 @@ export const LootTracker = {
     }
   },
 
+  /**
+   * Log loot the moment it is *rolled and offered*, before anyone clicks
+   * Claim. Every entry is tagged `claimed: false` and shares a `messageId`
+   * so the later markClaimed() call can flip them all atomically. If the
+   * Claim button is never pressed, the entries surface as "Unclaimed" in
+   * the session recap.
+   */
+  async logDrop({ messageId, playerName, sourceName, currency, items }) {
+    const parts = [];
+    if (currency?.gold > 0) parts.push(`${currency.gold} Gold`);
+    if (currency?.silver > 0) parts.push(`${currency.silver} Silver`);
+    if (currency?.copper > 0) parts.push(`${currency.copper} Copper`);
+
+    if (parts.length > 0) {
+      await SessionRecap.logDrop({
+        messageId,
+        player: playerName,
+        source: sourceName,
+        type: "currency",
+        detail: parts.join(", "),
+      });
+    }
+
+    for (const item of (items ?? [])) {
+      await SessionRecap.logDrop({
+        messageId,
+        player: playerName,
+        source: sourceName,
+        type: "item",
+        detail: item.name,
+        img: item.img,
+      });
+    }
+  },
+
+  /** Flip all unclaimed entries tied to `messageId` to claimed. */
+  async markClaimed(messageId, claimedByName = null) {
+    await SessionRecap.markClaimed(messageId, claimedByName);
+  },
+
   async logPickup(playerName, itemName, itemImg) {
     await this.log({
       player: playerName,

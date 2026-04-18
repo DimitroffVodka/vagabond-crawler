@@ -75,11 +75,45 @@ export const SessionRecap = {
     const data = this.getData();
     this._ensureStart(data);
     data.loot.push({
+      // Default to claimed so pre-existing call-sites (pickups, currency
+      // claims, bag shares) keep their previous behavior. The drop/claim
+      // flow below overrides this to track unclaimed rolls.
+      claimed: true,
       ...entry,
       timestamp: Date.now(),
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     });
     await this._save(data);
+  },
+
+  /**
+   * Log a loot drop as unclaimed. Use when loot is rolled for a player and
+   * a chat-card claim button is waiting to be clicked. Pass `messageId`
+   * (the Foundry chat message id) so `markClaimed()` can later flip the
+   * entry to claimed without duplicating it. If the card is never clicked,
+   * the entry surfaces in the session recap as unclaimed loot.
+   */
+  async logDrop(entry) {
+    await this.logLoot({ claimed: false, ...entry });
+  },
+
+  /**
+   * Flip every unclaimed loot entry tied to `messageId` to claimed state.
+   * Safe no-op if no matching entry exists (e.g. card predates the
+   * drop-tracking, or was logged via the old logClaim path).
+   */
+  async markClaimed(messageId, claimedByName = null) {
+    if (!messageId) return;
+    const data = this.getData();
+    let changed = false;
+    for (const entry of data.loot) {
+      if (entry.messageId !== messageId) continue;
+      if (entry.claimed) continue;
+      entry.claimed = true;
+      if (claimedByName) entry.claimedBy = claimedByName;
+      changed = true;
+    }
+    if (changed) await this._save(data);
   },
 
   // ── XP Logging ─────────────────────────────────────────────
@@ -143,6 +177,8 @@ export const SessionRecap = {
   // ── Migration ──────────────────────────────────────────────
 
   async migrateFromLootLog() {
+    // Legacy setting — only read if still registered (was removed in a later version)
+    if (!game.settings.settings.has(`${MODULE_ID}.lootLog`)) return;
     const oldLog = game.settings.get(MODULE_ID, "lootLog");
     if (!oldLog?.length) return;
     const data = this.getData();
@@ -161,6 +197,37 @@ export const SessionRecap = {
     if (!game.user.isGM) return;
 
     this._hasDamageLog = game.modules.get("damage-log")?.active ?? false;
+
+    // Last attacker seen on an attack chat card. Used to credit damage-log
+    // HP changes to the actual attacker instead of the current combat
+    // turn-holder (which is unreliable — AOE spells, reactions, and
+    // familiars in the initiative order all break turn-holder attribution).
+    this._lastAttacker = null;
+
+    // ── Attack card speaker tracker ────────────────────────
+    // On any chat card that resolves an attack roll as HIT (weapon attack,
+    // damaging spell, etc.), remember the speaker. The next damage-log
+    // message that fires within the time window is attributed to them.
+    Hooks.on("createChatMessage", (message) => {
+      if (this.getData().sessionState !== "active") return;
+      // Skip damage-log's own messages — those are the *target* updates,
+      // handled below.
+      if (message.flags?.["damage-log"]?.changes?.length) return;
+      const content = message.content ?? "";
+      // Only damage-dealing resolutions. Attacks that miss don't apply HP,
+      // and saves / checks use PASS/FAIL and never trigger damage-log.
+      if (!/\bHIT\b/.test(content)) return;
+      const actorId = message.speaker?.actor;
+      if (!actorId) return;
+      const actor = game.actors.get(actorId);
+      if (!actor) return;
+      this._lastAttacker = {
+        actorId: actor.id,
+        actor,
+        name: actor.name,
+        timestamp: Date.now(),
+      };
+    });
 
     // ── Combat start ───────────────────────────────────────
     Hooks.on("combatStart", (combat) => {
@@ -220,17 +287,29 @@ export const SessionRecap = {
         if (this.getData().sessionState !== "active") return;
         const flags = message.flags?.["damage-log"];
         if (!flags?.changes?.length) return;
-        if (!game.combat) return;
 
         const targetActorId = message.speaker?.actor;
         if (!targetActorId) return;
         const targetActor = game.actors.get(targetActorId);
         if (!targetActor) return;
 
-        const currentCombatant = game.combat.combatant;
-        const attackerActor = currentCombatant?.actor;
-        const attackerIsPC = attackerActor?.hasPlayerOwner
-          && (currentCombatant.token?.disposition ?? currentCombatant.token?.document?.disposition) === CONST.TOKEN_DISPOSITIONS.FRIENDLY;
+        // Resolve the attacker. Prefer the most recent HIT chat card
+        // (within the freshness window), fall back to the current
+        // combat turn-holder only if nothing recent is tracked.
+        const FRESH_MS = 60_000;
+        let attackerActor = null;
+        if (this._lastAttacker && Date.now() - this._lastAttacker.timestamp < FRESH_MS) {
+          attackerActor = this._lastAttacker.actor;
+        }
+        if (!attackerActor) {
+          attackerActor = game.combat?.combatant?.actor ?? null;
+        }
+        // Unwrap familiars / polymorph to the controlling PC so stats
+        // credit the player rather than their pet or transformed form.
+        attackerActor = this._unwrapToPC(attackerActor) ?? attackerActor;
+
+        const attackerIsPC = !!attackerActor?.hasPlayerOwner
+          && attackerActor.type === "character";
 
         for (const change of flags.changes) {
           if (change.id !== "hp") continue;
@@ -238,7 +317,7 @@ export const SessionRecap = {
           if (diff >= 0) continue;
           const absDiff = Math.abs(diff);
 
-          const targetIsPC = targetActor.hasPlayerOwner;
+          const targetIsPC = targetActor.hasPlayerOwner && targetActor.type === "character";
 
           if (targetIsPC) {
             this.updatePlayerStat(targetActorId, targetActor.name, "damageTaken", absDiff);
@@ -257,6 +336,46 @@ export const SessionRecap = {
         }
       });
     }
+  },
+
+  /**
+   * Resolve a combat actor to its controlling PC, if any.
+   *
+   * Handles:
+   *  - actor is already a PC → return as-is
+   *  - polymorph (flags.core.originalActor holds a uuid) → original PC
+   *  - familiar / summon / minion owned by a user whose assigned
+   *    .character is a different PC → that PC
+   *
+   * Returns null if no controlling PC can be resolved.
+   */
+  _unwrapToPC(actor) {
+    if (!actor) return null;
+    if (actor.type === "character" && actor.hasPlayerOwner) return actor;
+
+    // Polymorph: system-agnostic core flag set by Foundry's polymorph flow.
+    const origUuid = actor.flags?.core?.originalActor;
+    if (origUuid) {
+      try {
+        const orig = fromUuidSync(origUuid);
+        if (orig?.hasPlayerOwner && orig.type === "character") return orig;
+      } catch { /* fall through */ }
+    }
+
+    // Familiar / summon: player-owned NPC actor. Find an owning user
+    // whose assigned character is a different PC.
+    if (actor.hasPlayerOwner) {
+      const ownership = actor.ownership || {};
+      for (const [uid, level] of Object.entries(ownership)) {
+        if (uid === "default") continue;
+        if (level < CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER) continue;
+        const user = game.users.get(uid);
+        const pc = user?.character;
+        if (pc && pc.id !== actor.id && pc.type === "character") return pc;
+      }
+    }
+
+    return null;
   },
 
   // ── Roll Stats Hooks ──────────────────────────────────────
@@ -419,14 +538,18 @@ export const SessionRecap = {
 
     // ── Loot ───────────────────────────────────────────────
     if (data.loot.length > 0) {
-      const byPlayer = {};
+      // Claimed / picked-up loot is attributed to the owner; unclaimed
+      // rolls still carry the original intended recipient in `player`.
+      const claimedByPlayer = {};
+      const unclaimedByPlayer = {};
       for (const entry of data.loot) {
-        if (!byPlayer[entry.player]) byPlayer[entry.player] = [];
-        byPlayer[entry.player].push(entry);
+        const bucket = entry.claimed === false ? unclaimedByPlayer : claimedByPlayer;
+        if (!bucket[entry.player]) bucket[entry.player] = [];
+        bucket[entry.player].push(entry);
       }
 
       lines.push("## Loot");
-      for (const [player, entries] of Object.entries(byPlayer)) {
+      for (const [player, entries] of Object.entries(claimedByPlayer)) {
         lines.push(`### ${player}`);
 
         const currencyEntries = entries.filter(e => e.type === "currency");
@@ -454,6 +577,42 @@ export const SessionRecap = {
           for (const e of itemEntries) {
             const source = e.source !== "Ground" ? ` *(from ${e.source})*` : " *(picked up)*";
             lines.push(`  - ${e.detail}${source}`);
+          }
+        }
+        lines.push("");
+      }
+
+      // ── Unclaimed drops (rolled but Claim button never pressed) ──
+      const unclaimedPlayers = Object.entries(unclaimedByPlayer);
+      if (unclaimedPlayers.length > 0) {
+        lines.push("### Unclaimed");
+        for (const [player, entries] of unclaimedPlayers) {
+          const itemEntries = entries.filter(e => e.type === "item" || e.type === "pickup");
+          const currencyEntries = entries.filter(e => e.type === "currency");
+
+          const bits = [];
+          if (currencyEntries.length > 0) {
+            let tg = 0, ts = 0, tc = 0;
+            for (const e of currencyEntries) {
+              const gm = e.detail.match(/(\d+)\s*Gold/i);
+              const sm = e.detail.match(/(\d+)\s*Silver/i);
+              const cm = e.detail.match(/(\d+)\s*Copper/i);
+              if (gm) tg += parseInt(gm[1]);
+              if (sm) ts += parseInt(sm[1]);
+              if (cm) tc += parseInt(cm[1]);
+            }
+            const cparts = [];
+            if (tg > 0) cparts.push(`${tg}g`);
+            if (ts > 0) cparts.push(`${ts}s`);
+            if (tc > 0) cparts.push(`${tc}c`);
+            if (cparts.length > 0) bits.push(cparts.join(", "));
+          }
+          for (const e of itemEntries) {
+            const source = e.source && e.source !== "Ground" ? ` *(from ${e.source})*` : "";
+            bits.push(`${e.detail}${source}`);
+          }
+          if (bits.length > 0) {
+            lines.push(`- **${player}** (rolled, not claimed): ${bits.join(", ")}`);
           }
         }
         lines.push("");
