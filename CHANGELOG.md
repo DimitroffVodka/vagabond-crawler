@@ -43,6 +43,12 @@ Deep bug-fix pass on the Animation FX system — every sheet-level override path
 - **`ui.notifications` confirmation** after each sheet-override save — `[Animation FX] Saved override for action 0: modules/...` toast so you can tell Save actually ran vs. silently failed.
 - **Cleaner normalization** in the override app — optional fields (offsetX, sound, volume, miss block) are only written when set, keeping saved presets compact.
 
+### Countdown Dice & Session Recap
+
+- **Countdown dice auto-clean on NPC death** — Burning / Poisoned / Bleeding countdowns no longer keep ticking on a dead NPC. When an NPC's HP hits 0, every non-recharge countdown die linked to that actor is deleted (and its status icon cleared via the system's `deleteJournalEntry` hook). Scope is NPCs only — PCs at 0 HP are downed, not dead, and may be revived while their conditions are still supposed to matter.
+- **Encounter check logging in the recap** — every random-encounter d6 is now logged to the session recap (not just hits), with roll, threshold, hit/miss, clock label, and timestamp. The new `## Encounter Checks` section shows rolls/hits/hit-rate/avg d6 plus a chronological list.
+- **XP breakdown consolidation in the recap** — multiple XP awards to the same player over a session now merge into one list instead of repeating per-award. Preserves questionnaire order, shows `(3 XP ea)` rate tags for multi-point entries, and adds a per-event audit line when a player received awards in more than one sitting. Grand-total across all players still computed.
+
 ## v1.12.0
 
 Bug-fix / QA pass on systems exercised during live play — attribution in the session recap, loot visibility, merchant purchases, DPR math, and a pair of new features (unclaimed-loot tracking, auto-pause on encounter, proper Relic: +1 Enchantment Scrolls).

@@ -4,86 +4,113 @@
     {
       "id": 0,
       "subject": "Task 0: Scaffold subsystem + register settings",
-      "status": "pending",
+      "status": "completed",
       "description": "Scaffold AnimationFx singleton, register world + client settings, wire into vagabond-crawler.mjs.\n\n```json:metadata\n{\"files\":[\"scripts/animation-fx.mjs\",\"scripts/animation-fx-defaults.mjs\",\"scripts/vagabond-crawler.mjs\"],\"verifyCommand\":\"foundry-mcp: evaluate subsystem presence\",\"acceptanceCriteria\":[\"game.vagabondCrawler.animationFx singleton present\",\"settings registered\",\"no console errors\"]}\n```"
     },
     {
       "id": 1,
       "subject": "Task 1: Port default preset data",
-      "status": "pending",
-      "blockedBy": [0],
+      "status": "completed",
+      "blockedBy": [
+        0
+      ],
       "description": "Port weapons/skill-fallbacks/alchemical/gear defaults from vagabond-item-fx; add NPC action starter presets under unified {hit, miss} schema.\n\n```json:metadata\n{\"files\":[\"scripts/animation-fx-defaults.mjs\"],\"verifyCommand\":\"foundry-mcp: getConfig() preset counts\",\"acceptanceCriteria\":[\">=10 weapons\",\">=7 npcActions\",\"torch persist true\"]}\n```"
     },
     {
       "id": 2,
       "subject": "Task 2: Implement the resolver",
-      "status": "pending",
-      "blockedBy": [1],
+      "status": "completed",
+      "blockedBy": [
+        1
+      ],
       "description": "_resolve(source) handles item path + NPC action path with override flags and fallback chains.\n\n```json:metadata\n{\"files\":[\"scripts/animation-fx.mjs\"],\"verifyCommand\":\"foundry-mcp: _resolve against live compendium NPCs\",\"acceptanceCriteria\":[\"weapon by pattern\",\"alchemical exact/partial/default\",\"NPC action matched\",\"override flag wins\"]}\n```"
     },
     {
       "id": 3,
       "subject": "Task 3: Implement playback",
-      "status": "pending",
-      "blockedBy": [2],
+      "status": "completed",
+      "blockedBy": [
+        2
+      ],
       "description": "_play handles onToken/projectile/cone, hit/miss block selection, persistent toggle, sound, multi-target stagger.\n\n```json:metadata\n{\"files\":[\"scripts/animation-fx.mjs\"],\"verifyCommand\":\"foundry-mcp: _play on selected token\",\"acceptanceCriteria\":[\"all 3 types render\",\"persist toggles\",\"miss no-ops when absent\"]}\n```"
     },
     {
       "id": 4,
       "subject": "Task 4: Chat message hook (item path)",
-      "status": "pending",
-      "blockedBy": [3],
+      "status": "completed",
+      "blockedBy": [
+        3
+      ],
       "description": "createChatMessage hook for weapon/alchemical/gear. Gates on userId + enabled + flags. Determines outcome.\n\n```json:metadata\n{\"files\":[\"scripts/animation-fx.mjs\"],\"verifyCommand\":\"manual: roll weapon attack in-game\",\"acceptanceCriteria\":[\"animation plays on hit\",\"only acting user\",\"spells/armor skipped\"]}\n```"
     },
     {
       "id": 5,
       "subject": "Task 5: NPC action chat flag emission + wrapper",
-      "status": "pending",
-      "blockedBy": [4],
+      "status": "completed",
+      "blockedBy": [
+        4
+      ],
       "description": "Wrap VagabondChatCard.npcAction to emit flags.vagabond.actionIndex if system doesn't already.\n\n```json:metadata\n{\"files\":[\"scripts/animation-fx.mjs\"],\"verifyCommand\":\"foundry-mcp: trigger NPC action, inspect message flags\",\"acceptanceCriteria\":[\"actionIndex present in chat message flags\",\"no double-wrap\"]}\n```"
     },
     {
       "id": 6,
       "subject": "Task 6: Retire cone patch in npc-abilities.mjs",
-      "status": "pending",
-      "blockedBy": [3],
+      "status": "completed",
+      "blockedBy": [
+        3
+      ],
       "description": "Remove VagabondItemSequencer.play cone wrap; rely on unified AnimationFx playback.\n\n```json:metadata\n{\"files\":[\"scripts/npc-abilities.mjs\"],\"verifyCommand\":\"manual: breath action still animates\",\"acceptanceCriteria\":[\"cone wrap removed\",\"breath animation still plays\",\"other npc-abilities wraps intact\"]}\n```"
     },
     {
       "id": 7,
       "subject": "Task 7: Config window skeleton + Settings tab",
-      "status": "pending",
-      "blockedBy": [0],
+      "status": "completed",
+      "blockedBy": [
+        0
+      ],
       "description": "AnimationFxConfigApp skeleton with tab strip, Settings tab wired up, open() invokes it, settings menu entry registered.\n\n```json:metadata\n{\"files\":[\"scripts/animation-fx-config.mjs\",\"templates/animation-fx-config.hbs\",\"scripts/animation-fx.mjs\",\"scripts/vagabond-crawler.mjs\"],\"verifyCommand\":\"foundry-mcp: open() renders window\",\"acceptanceCriteria\":[\"window opens\",\"all 6 tabs present\",\"Settings tab saves\"]}\n```"
     },
     {
       "id": 8,
       "subject": "Task 8: Preset tabs with hit/miss editor",
-      "status": "pending",
-      "blockedBy": [7, 1],
+      "status": "completed",
+      "blockedBy": [
+        7,
+        1
+      ],
       "description": "Full preset row editor across 5 category tabs: add/delete preset, hit/miss blocks, file/sound pickers, preview, smart-default types.\n\n```json:metadata\n{\"files\":[\"scripts/animation-fx-config.mjs\",\"templates/animation-fx-config.hbs\"],\"verifyCommand\":\"manual: edit preset, save, reload, verify persisted\",\"acceptanceCriteria\":[\"edits persist\",\"add/delete works\",\"preview plays\",\"file picker works\",\"reset tab\"]}\n```"
     },
     {
       "id": 9,
       "subject": "Task 9: Per-item + per-action override dialogs",
-      "status": "pending",
-      "blockedBy": [2],
+      "status": "completed",
+      "blockedBy": [
+        2
+      ],
       "description": "Item sheet header button + NPC sheet action-row button, both open override dialog writing to flags.\n\n```json:metadata\n{\"files\":[\"scripts/animation-fx.mjs\"],\"verifyCommand\":\"manual: set override on sword, see custom animation\",\"acceptanceCriteria\":[\"item sheet button appears\",\"NPC action button appears\",\"overrides resolved correctly\"]}\n```"
     },
     {
       "id": 10,
       "subject": "Task 10: CSS styling",
-      "status": "pending",
-      "blockedBy": [7],
+      "status": "completed",
+      "blockedBy": [
+        7
+      ],
       "description": "vcfx- prefixed styles with hit/miss accent colors, light/dark theme support.\n\n```json:metadata\n{\"files\":[\"styles/vagabond-crawler.css\"],\"verifyCommand\":\"visual inspection of config window in both themes\",\"acceptanceCriteria\":[\"tabs styled\",\"preset rows styled\",\"hit green miss red accents\",\"light theme works\"]}\n```"
     },
     {
       "id": 11,
       "subject": "Task 11: CrawlBar integration + full verification",
-      "status": "pending",
-      "blockedBy": [5, 6, 8, 9, 10],
+      "status": "completed",
+      "blockedBy": [
+        5,
+        6,
+        8,
+        9,
+        10
+      ],
       "description": "Add Animation FX button to CrawlBar tool picker, run full spec testing matrix, update CLAUDE.md file map.\n\n```json:metadata\n{\"files\":[\"scripts/crawl-bar.mjs\",\"CLAUDE.md\"],\"verifyCommand\":\"run all 7 scenarios from spec Testing section\",\"acceptanceCriteria\":[\"CrawlBar button opens config\",\"all 7 test scenarios pass\",\"CLAUDE.md updated\"]}\n```"
     }
   ],
-  "lastUpdated": "2026-04-16T00:00:00Z"
+  "lastUpdated": "2026-04-16T23:16:58.500201+00:00"
 }

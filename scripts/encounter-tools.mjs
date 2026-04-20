@@ -15,6 +15,8 @@ import { confirmDialog } from "./dialog-helpers.mjs";
 import { ICONS } from "./icons.mjs";
 import { MonsterCreator } from "./monster-creator/monster-creator-app.mjs";
 import { calculateHP, calculateDPR } from "./monster-mutator.mjs";
+import { SessionRecap } from "./session-recap.mjs";
+import { CrawlState } from "./crawl-state.mjs";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -76,6 +78,22 @@ export const EncounterTools = {
       rolls:   [roll],
       whisper: gmOnly ? game.users.filter(u => u.isGM).map(u => u.id) : [],
     });
+
+    // Session Recap log. Captures every check, not just hits, so the
+    // recap can show hit rate, average, and escalation across cycles.
+    // Clock label is best-effort — CrawlState.clockFilled reflects
+    // whatever the clock reads at roll time (may or may not have ticked
+    // yet this scene, depending on GM workflow). Six-segment clock is
+    // hard-coded in crawl-clock.mjs (CRAWL_CLOCK_SEGMENTS).
+    if (game.user.isGM) {
+      const filled = CrawlState?.clockFilled ?? null;
+      SessionRecap.logEncounterCheck({
+        roll: roll.total,
+        threshold,
+        hit,
+        clockLabel: filled !== null ? `${filled}/6` : null,
+      }).catch(err => console.warn(`${MODULE_ID} | logEncounterCheck failed:`, err));
+    }
 
     // Auto-open encounter roller and roll the active table on hit
     if (hit) {

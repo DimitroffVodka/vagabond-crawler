@@ -17,6 +17,7 @@ const DEFAULT_DATA = {
   loot: [],
   xp: [],
   combats: [],
+  encounterChecks: [],
   playerStats: {},
 };
 
@@ -126,6 +127,28 @@ export const SessionRecap = {
       actorId,
       questions,
       totalXp,
+      timestamp: Date.now(),
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    });
+    await this._save(data);
+  },
+
+  // ── Encounter Check Logging ────────────────────────────────
+
+  /**
+   * Log one random-encounter check. Captures the d6 result, the
+   * threshold at roll time, whether it was a hit, and (if available)
+   * the crawl clock label so the recap can show escalation.
+   */
+  async logEncounterCheck({ roll, threshold, hit, clockLabel = null }) {
+    const data = this.getData();
+    this._ensureStart(data);
+    if (!Array.isArray(data.encounterChecks)) data.encounterChecks = [];
+    data.encounterChecks.push({
+      roll: Number(roll),
+      threshold: Number(threshold),
+      hit: !!hit,
+      clockLabel,
       timestamp: Date.now(),
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     });
@@ -445,6 +468,28 @@ export const SessionRecap = {
     lines.push(`**Duration:** ${duration}`);
     lines.push("");
 
+    // ── Encounter Checks ───────────────────────────────────
+    // Records every random-encounter d6 the Crawler rolled during the
+    // session. Shows cycle hit rate + avg + a chronological list.
+    const checks = Array.isArray(data.encounterChecks) ? data.encounterChecks : [];
+    if (checks.length > 0) {
+      lines.push("## Encounter Checks");
+      const hits = checks.filter(c => c.hit).length;
+      const hitPct = Math.round((hits / checks.length) * 100);
+      const sum = checks.reduce((acc, c) => acc + (Number(c.roll) || 0), 0);
+      const avg = (sum / checks.length).toFixed(1);
+      lines.push(`${checks.length} rolls — ${hits} encounter${hits === 1 ? "" : "s"} (${hitPct}%) · avg d6: ${avg}`);
+      lines.push("");
+      for (const c of checks) {
+        const rollCell = c.hit ? `**${c.roll}**` : `${c.roll}`;
+        const verdict  = c.hit ? "💀 **Encounter**" : "✅ safe";
+        const clock    = c.clockLabel ? ` · Clock ${c.clockLabel}` : "";
+        const time     = c.time ? `${c.time} · ` : "";
+        lines.push(`- ${time}d6=${rollCell} vs ${c.threshold}${clock} · ${verdict}`);
+      }
+      lines.push("");
+    }
+
     // ── Combat ─────────────────────────────────────────────
     if (data.combats.length > 0) {
       lines.push("## Combat");
@@ -629,14 +674,55 @@ export const SessionRecap = {
       }
 
       lines.push("## XP");
+
+      let grandTotal = 0;
       for (const [player, { entries, total }] of Object.entries(byPlayer)) {
+        grandTotal += total;
         lines.push(`### ${player}`);
+
+        // Consolidate every awarded question across all award events for
+        // this player so one "Attendance ×1" entry shows even if XP was
+        // granted over two separate sessions / re-opens of the dialog.
+        // Preserves first-seen order so the output follows the Vagabond
+        // questionnaire layout instead of award timestamps.
+        const consolidated = new Map();  // label → { label, xp, count }
         for (const entry of entries) {
-          for (const q of entry.questions) {
-            lines.push(`- ${q.label} — x${q.count} = ${q.count * q.xp} XP`);
+          for (const q of (entry.questions ?? [])) {
+            const existing = consolidated.get(q.label);
+            if (existing) {
+              existing.count += q.count;
+            } else {
+              consolidated.set(q.label, { label: q.label, xp: q.xp ?? 1, count: q.count });
+            }
           }
         }
+
+        if (consolidated.size > 0) {
+          for (const q of consolidated.values()) {
+            const rateTag = q.xp > 1 ? ` _(${q.xp} XP ea)_` : "";
+            lines.push(`- ${q.label}${rateTag} — ×${q.count} = ${q.count * q.xp} XP`);
+          }
+        } else {
+          // Legacy / manually-set XP without a questionnaire snapshot.
+          lines.push(`- _(breakdown not recorded)_`);
+        }
+
+        // Per-award timestamps when the player received multiple distinct
+        // awards. Helps disambiguate mid-session top-ups.
+        if (entries.length > 1) {
+          const stamps = entries
+            .filter(e => e.time)
+            .map(e => `${e.time} (+${e.totalXp})`)
+            .join(", ");
+          if (stamps) lines.push(`- _Awarded in ${entries.length} events: ${stamps}_`);
+        }
+
         lines.push(`- **Total: ${total} XP**`);
+        lines.push("");
+      }
+
+      if (Object.keys(byPlayer).length > 1) {
+        lines.push(`**Session XP Awarded: ${grandTotal} XP**`);
         lines.push("");
       }
     }
@@ -754,7 +840,8 @@ export const SessionRecap = {
       if (data.sessionState !== "active" && data.sessionState !== "paused") return;
 
       const hasData = data.loot.length > 0 || data.xp.length > 0
-        || data.combats.length > 0 || Object.keys(data.playerStats).length > 0;
+        || data.combats.length > 0 || Object.keys(data.playerStats).length > 0
+        || (Array.isArray(data.encounterChecks) && data.encounterChecks.length > 0);
 
       const buttons = [
         { label: "End & Save", icon: "fas fa-save", value: "save" },

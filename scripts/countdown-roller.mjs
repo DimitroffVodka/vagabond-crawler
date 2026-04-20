@@ -64,6 +64,23 @@ export const CountdownRoller = {
       if (!game.user.isGM) return;
       this._cleanup(combat);
     });
+
+    // Clean up countdowns linked to an NPC when that NPC dies. Burning /
+    // Poisoned / Bleeding dice should not keep ticking on a corpse (and
+    // the status icons shouldn't linger on the token either — the system's
+    // deleteJournalEntry hook removes those as a side effect of delete).
+    // Scope: NPCs only. PCs at 0 HP are downed, not dead, and may be
+    // revived while their conditions are still supposed to matter.
+    Hooks.on("updateActor", (actor, changes) => {
+      if (!game.user.isGM) return;
+      if (actor.type !== "npc") return;
+      const newHP = changes?.system?.health?.value;
+      if (newHP === undefined) return;  // HP didn't change
+      if (newHP > 0) return;
+      this._cleanupForDeadActor(actor).catch(err => {
+        console.warn(`${MODULE_ID} | Countdown death cleanup error:`, err);
+      });
+    });
   },
 
   // ── Round start — auto-roll ──────────────────────────────────────────────
@@ -166,6 +183,37 @@ export const CountdownRoller = {
     await _VagabondChatCard.countdownDiceRoll(
       dice, roll, rollResult, status, currentDiceType, newDiceType, tickData,
     );
+  },
+
+  // ── Actor death — cleanup linked countdowns ─────────────────────────────
+
+  /**
+   * Delete every non-recharge countdown die linked to this actor. Called
+   * from the updateActor hook when an NPC's HP drops to 0. Idempotent —
+   * safe to call again if HP updates further while already dead.
+   */
+  async _cleanupForDeadActor(actor) {
+    await _loadSystemClasses();
+    const actorUuid = actor.uuid;
+
+    const allDice = _CountdownDice.getAll();
+    const toDelete = allDice.filter(d => {
+      const flags = d.flags?.vagabond?.countdownDice;
+      if (!flags) return false;
+      if (flags.linkedRechargeActorUuid) return false;   // recharge cooldowns aren't condition timers
+      return flags.linkedActorUuid === actorUuid;
+    });
+
+    if (!toDelete.length) return;
+    console.log(`${MODULE_ID} | Countdown death cleanup: deleting ${toDelete.length} dice linked to ${actor.name}`);
+
+    for (const d of toDelete) {
+      try {
+        await d.delete();  // system's deleteJournalEntry hook clears linked status icon
+      } catch (err) {
+        console.warn(`${MODULE_ID} | Countdown death cleanup — failed to delete ${d.id}:`, err);
+      }
+    }
   },
 
   // ── Combat end — cleanup ─────────────────────────────────────────────────
