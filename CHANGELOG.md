@@ -1,5 +1,48 @@
 # Changelog
 
+## v1.12.1
+
+Deep bug-fix pass on the Animation FX system — every sheet-level override path was broken in a different way, and several issues compounded (silent save failures, wrong animations playing for the wrong thing, projectiles that never fired). Also adds missing config parity between the sheet and global editors, category-level enable toggles, and asset-module availability checks.
+
+### Sheet Overrides — now actually work
+
+- **Save button was silently failing** — `DialogV2.prompt`'s callback used `dialog.querySelector("form")`, but `dialog` is the DialogV2 **instance**, not an HTMLElement. The returned `undefined` crashed `new FormDataExtended(undefined)` inside the callback, which DialogV2 swallowed as "user cancelled." Every sheet-level override save looked like it worked but wrote nothing. Now uses `button.form` — the canonical v13 pattern — and writes actually land.
+- **Nested `<form>` inside the dialog content** — invalid HTML that caused browsers to misparse checkbox state. The template now uses a `<div>` since DialogV2 already wraps its content in a form.
+- **Weapon sheet overrides had no effect** — the crawler's chat hook explicitly skips weapons (they're played by the Vagabond system's `system.itemFx` pipeline). Saving a per-weapon override only wrote to `flags.animationOverride`, which the system never reads. Now mirrors the preset to `system.itemFx` (and the `disabled` flag to `system.itemFx.enabled`) so sheet overrides take effect during actual weapon rolls.
+- **Unlinked NPC tokens silently discarded the override** — the ⚡ dialog on a token's NPC sheet called `synthActor.setFlag(...)`. Synthetic actors don't propagate flags to their world actor, but `_onChatMessage` reads flags via `game.actors.get(flags.actorId)` (the world actor). Override invisible to playback → global config preset always won. Now redirects `setFlag` to the world actor via `game.actors.get(target.id)`.
+- **Save-and-reopen dropped the disable state** — after checking "Disable animation entirely", saving, and unchecking, the checkbox re-rendered as checked because the DOM `checked` *attribute* stayed after the property flipped. Now every save calls `this.render()` so the template re-applies state from the persisted flag — DOM can't drift.
+- **Dialog replaced with a dedicated ApplicationV2** — the minimalist DialogV2 is gone. New `AnimationFxOverrideApp` mirrors the global editor's preset block: label, disable, type, target, hit (file + picker, scale, duration, offset X, sound + picker, volume), collapsible miss block, **Preview** button (Shift-click for miss preview), **Promote to Global NPC Action** button.
+- **Promote to Global** — on the NPC action editor, a new button copies the sheet preset into `config.npcActions` with an editable regex pattern. Applies automatically to any NPC whose action name matches thereafter.
+
+### Animation Routing
+
+- **Ability clicks fired action animations** — the system reuses `VagabondChatCard.npcAction(actor, <thing>, index)` for both actions (`system.actions[i]`) AND abilities (`system.abilities[i]`). The wrap blindly stamped `actionIndex` into flags → `_resolve` read `actor.system.actions[abilityIndex]` → wrong animation. Clicking Pack Hunter on a Wolf triggered Frost Breath's cone; clicking Pounce triggered Bite. Now verifies `actor.system.actions[actionIndex]` matches the passed-in object by identity or name before installing the stamping hook.
+- **Pack Hunter pre-message swallowed the stamping hook** — the NPC-vs-NPC animation failure. `npc-abilities.mjs` posts a "Pack Hunter: target is Vulnerable..." chat message *before* the action card. My `preCreateChatMessage` listener's `Hooks.off` fired unconditionally on the first message, so the Pack Hunter message consumed the hook and the real action card arrived unstamped. Now the listener persists across non-matching messages and only deregisters after successfully stamping a matching one.
+- **Most-specific pattern wins** — `_resolveNpcAction` iterated presets in insertion order and returned the first regex match, so a generic `breath|exhale|spray|cone of` preset beat a specific `Frost Breath` preset if it was registered first. New `_pickBestPattern` scores by the length of the matched substring: `Frost Breath` (12 chars) beats the generic `breath` match (6 chars). Works across `weapons` and `npcActions` tabs; `alchemical`/`gear` still use whole-name equality.
+- **Generic NPC Action default removed** — an unmatched NPC action used to fall back to a generic sword-slash preset (`_default`), which played on everything the system didn't have a specific entry for. Now unmatched actions play nothing. A migration strips `_default` from existing saved configs.
+
+### Projectile & Cone Targeting
+
+- **`_getTargets` returned empty for NPC actions** — assumed `targetsAtRollTime` was an array of token-ID strings, but the system stores three different shapes depending on caller: raw ID strings, serialized `TokenDocument`s (with `_id`), and summary objects (`{tokenId, sceneId, actorId, actorName, actorImg}` — used by the NPC action path). `canvas.tokens.get({...})` returned undefined for the summary shape, so projectiles had nothing to stretch to. Now normalizes all three into ID strings before lookup.
+- **Zero-distance `stretchTo` warnings** — projectile and cone animations with no distinct target fell back to `sourceToken` as their own target, triggering `Sequencer | stretchTo - You are stretching over a distance of 0`. Now filters out targets that share the source's ID and skips the whole animation with a debug message if no distinct target remains.
+
+### Enable / Disable by Category
+
+- **5 category toggles** — `animationFxCategory{Weapons,Skills,Alchemical,Gear,NpcActions}` registered as world-scoped, `config: true` booleans. They appear in Foundry's module settings panel **and** the Animation FX Configuration → Settings tab, writing to the same keys so edits in either place stay in sync.
+- **Existing settings surfaced** — `animationFxEnabled`, `animationFxScale`, `animationFxTriggerOn`, `animationFxSoundEnabled`, `animationFxMasterVolume` all now appear in module settings with proper names/hints; previously they were `config: false` and only editable via the Animation FX Configuration window.
+- **Resolvers short-circuit** — disabling a category returns `null` from the matching `_resolve*` method. No playback attempt, no console noise, no error.
+
+### Asset Module Checks
+
+- **`_fileReferencesMissingModule`** — pre-flight check at the top of `_play` and `_playSound`. Inspects the file path; if it's `modules/<id>/...` with `<id>` inactive, or `jb2a.<key>` with no JB2A pack active, the animation/sound is silently skipped with a `console.debug` line. `jb2a.xxx` database keys correctly accept either the free or patreon pack (Sequencer's database is shared). `modules/JB2A_DnD5e/...` and `modules/jb2a_patreon/...` are checked strictly against their own module IDs (they ship separate file trees). Same rules for PSFX (`psfx` vs `psfx-patreon`).
+- **Availability panel** in the Settings tab — ✓/✗ next to Sequencer, JB2A (Free + Patreon), and PSFX (Free + Patreon), with path examples showing exactly which prefixes each pack serves.
+- **Defensive `try/catch` around `_playOne`** — even if a preset slips past the availability check (typo, wrong DB key, custom upload missing, etc.), `seq.effect().file(...)` failures land in a console warning instead of bubbling out of the chat-message hook.
+
+### Minor
+
+- **`ui.notifications` confirmation** after each sheet-override save — `[Animation FX] Saved override for action 0: modules/...` toast so you can tell Save actually ran vs. silently failed.
+- **Cleaner normalization** in the override app — optional fields (offsetX, sound, volume, miss block) are only written when set, keeping saved presets compact.
+
 ## v1.12.0
 
 Bug-fix / QA pass on systems exercised during live play — attribution in the session recap, loot visibility, merchant purchases, DPR math, and a pair of new features (unclaimed-loot tracking, auto-pause on encounter, proper Relic: +1 Enchantment Scrolls).

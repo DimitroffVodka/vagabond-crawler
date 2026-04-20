@@ -45,7 +45,14 @@ export class AnimationFxConfigApp extends HandlebarsApplicationMixin(Application
         scale: game.settings.get(MODULE_ID, "animationFxScale"),
         soundEnabled: game.settings.get(MODULE_ID, "animationFxSoundEnabled"),
         masterVolume: game.settings.get(MODULE_ID, "animationFxMasterVolume"),
+        // Category toggles — same keys Foundry's module settings UI writes to.
+        categoryWeapons: game.settings.get(MODULE_ID, "animationFxCategoryWeapons"),
+        categorySkills: game.settings.get(MODULE_ID, "animationFxCategorySkills"),
+        categoryAlchemical: game.settings.get(MODULE_ID, "animationFxCategoryAlchemical"),
+        categoryGear: game.settings.get(MODULE_ID, "animationFxCategoryGear"),
+        categoryNpcActions: game.settings.get(MODULE_ID, "animationFxCategoryNpcActions"),
       },
+      availability: game.vagabondCrawler.animationFx._moduleAvailability(),
     };
   }
 
@@ -58,11 +65,19 @@ export class AnimationFxConfigApp extends HandlebarsApplicationMixin(Application
   static async #onSubmit(event, form, formData) {
     this._saveFormToWorking();
     const data = formData.object;
-    if ("settings.triggerOn" in data) await game.settings.set(MODULE_ID, "animationFxTriggerOn", data["settings.triggerOn"]);
-    if ("settings.enabled" in data) await game.settings.set(MODULE_ID, "animationFxEnabled", !!data["settings.enabled"]);
-    if ("settings.scale" in data) await game.settings.set(MODULE_ID, "animationFxScale", Number(data["settings.scale"]));
-    if ("settings.soundEnabled" in data) await game.settings.set(MODULE_ID, "animationFxSoundEnabled", !!data["settings.soundEnabled"]);
-    if ("settings.masterVolume" in data) await game.settings.set(MODULE_ID, "animationFxMasterVolume", Number(data["settings.masterVolume"]));
+    const setIf = async (key, storeKey, cast = v => v) => {
+      if (key in data) await game.settings.set(MODULE_ID, storeKey, cast(data[key]));
+    };
+    await setIf("settings.triggerOn", "animationFxTriggerOn");
+    await setIf("settings.enabled", "animationFxEnabled", v => !!v);
+    await setIf("settings.scale", "animationFxScale", Number);
+    await setIf("settings.soundEnabled", "animationFxSoundEnabled", v => !!v);
+    await setIf("settings.masterVolume", "animationFxMasterVolume", Number);
+    await setIf("settings.categoryWeapons", "animationFxCategoryWeapons", v => !!v);
+    await setIf("settings.categorySkills", "animationFxCategorySkills", v => !!v);
+    await setIf("settings.categoryAlchemical", "animationFxCategoryAlchemical", v => !!v);
+    await setIf("settings.categoryGear", "animationFxCategoryGear", v => !!v);
+    await setIf("settings.categoryNpcActions", "animationFxCategoryNpcActions", v => !!v);
     await game.settings.set(MODULE_ID, "animationFxConfig", this._workingConfig);
     this._flashSaved();
   }

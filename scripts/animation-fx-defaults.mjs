@@ -1163,19 +1163,10 @@ export function buildDefaultAnimationFxConfig() {
           soundVolume: null
         }
       },
-      "_default": {
-        label: "Generic NPC Action",
-        type: "onToken",
-        target: "target",
-        hit: {
-          file: "modules/jb2a_patreon/Library/Generic/Weapon_Attacks/Melee/GenericSlash01_01_Regular_BluePurple_800x600.webm",
-          scale: 1,
-          duration: 800,
-          sound: "",
-          soundVolume: null
-        },
-        patterns: ""
-      }
+      // Generic NPC Action fallback intentionally removed — unmatched NPC actions
+      // now play nothing rather than a generic sword-slash animation. Use the
+      // sheet override (⚡ on the NPC sheet) or add a named NPC action preset
+      // with a specific `patterns` regex instead.
     }
 
   };

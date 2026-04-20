@@ -173,6 +173,7 @@ Hooks.once("init", () => {
   // Preload templates
   foundry.applications.handlebars.loadTemplates([
     "modules/vagabond-crawler/templates/animation-fx-config.hbs",
+    "modules/vagabond-crawler/templates/animation-fx-override.hbs",
     "modules/vagabond-crawler/templates/light-sources-config.hbs",
   ]);
 

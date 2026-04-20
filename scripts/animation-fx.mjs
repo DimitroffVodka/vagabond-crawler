@@ -1,6 +1,7 @@
 // scripts/animation-fx.mjs
 import { DEFAULT_ANIMATION_FX_CONFIG, buildDefaultAnimationFxConfig } from "./animation-fx-defaults.mjs";
 import { AnimationFxConfigApp } from "./animation-fx-config.mjs";
+import { AnimationFxOverrideApp } from "./animation-fx-override.mjs";
 
 const MODULE_ID = "vagabond-crawler";
 
@@ -18,29 +19,61 @@ export const AnimationFx = {
       default: foundry.utils.deepClone(DEFAULT_ANIMATION_FX_CONFIG),
     });
     game.settings.register(MODULE_ID, "animationFxTriggerOn", {
-      name: "VAGABOND_CRAWLER.AnimationFxTriggerOn",
+      name: "Animation FX: Trigger On",
+      hint: "When to play hit animations for weapon attacks. 'On hit only' skips animations for missed rolls.",
       scope: "world",
-      config: false,
+      config: true,
       type: String,
       choices: { always: "Always", hit: "On Hit Only" },
       default: "always",
     });
     game.settings.register(MODULE_ID, "animationFxEnabled", {
-      scope: "client", config: false, type: Boolean, default: true,
+      name: "Animation FX: Enabled (this client)",
+      hint: "Master toggle for animation playback on this machine. Each player sets their own.",
+      scope: "client", config: true, type: Boolean, default: true,
     });
     game.settings.register(MODULE_ID, "animationFxScale", {
-      scope: "client", config: false, type: Number, default: 1.0,
+      name: "Animation FX: Global Scale",
+      hint: "Multiplier applied to every animation's scale. 1.0 = normal, 0.5 = half size, 2.0 = doubled.",
+      scope: "client", config: true, type: Number, default: 1.0,
+      range: { min: 0.25, max: 3, step: 0.05 },
     });
     game.settings.register(MODULE_ID, "animationFxSoundEnabled", {
-      scope: "client", config: false, type: Boolean, default: true,
+      name: "Animation FX: Sound Enabled",
+      hint: "Master toggle for hit/miss sound effects.",
+      scope: "client", config: true, type: Boolean, default: true,
     });
     game.settings.register(MODULE_ID, "animationFxMasterVolume", {
-      scope: "client", config: false, type: Number, default: 0.8,
+      name: "Animation FX: Master Volume",
+      hint: "Master volume for animation sounds (0 – 1).",
+      scope: "client", config: true, type: Number, default: 0.8,
+      range: { min: 0, max: 1, step: 0.05 },
     });
+
+    // Category toggles — world-scoped so the GM decides for the table.
+    // Each corresponds to one tab of the Animation FX Configuration window.
+    // Edits in either location (module settings or the config window) write to
+    // the same key, so both UIs stay in sync automatically.
+    const registerCat = (key, name, hint) => {
+      game.settings.register(MODULE_ID, key, {
+        name, hint, scope: "world", config: true, type: Boolean, default: true,
+      });
+    };
+    registerCat("animationFxCategoryWeapons", "Animation FX → Weapons",
+      "Play hit/miss animations for weapon attacks (named presets in the Weapons tab).");
+    registerCat("animationFxCategorySkills", "Animation FX → Skill Fallbacks",
+      "Play animations for weapons that have no named preset, based on their weaponSkill (melee/ranged/etc).");
+    registerCat("animationFxCategoryAlchemical", "Animation FX → Alchemical",
+      "Play animations for alchemical item use (bombs, elixirs, etc).");
+    registerCat("animationFxCategoryGear", "Animation FX → Gear",
+      "Play animations for gear item use (torches, instruments, etc — includes persistent effects).");
+    registerCat("animationFxCategoryNpcActions", "Animation FX → NPC Actions",
+      "Play animations for NPC-sheet actions (Bite, Frost Breath, Gust, etc).");
+
     game.settings.registerMenu(MODULE_ID, "animationFxConfigMenu", {
       name: "Animation FX Configuration",
-      label: "Configure",
-      hint: "Centrally configure weapon, NPC action, alchemical, and gear animations.",
+      label: "Configure Animation FX",
+      hint: "Open the full per-preset editor for weapons, NPC actions, alchemical, and gear animations.",
       icon: "fas fa-film",
       type: class extends FormApplication {
         constructor() { super(); game.vagabondCrawler?.animationFx?.open(); }
@@ -49,6 +82,82 @@ export const AnimationFx = {
       },
       restricted: true,
     });
+  },
+
+  /**
+   * Returns the category key (as in the config tabs) a given source belongs to.
+   * Used to short-circuit playback when the GM has disabled that category.
+   */
+  _categoryForItem(item) {
+    if (!item) return null;
+    const eq = item.system?.equipmentType;
+    if (eq === "weapon") return "weapons";
+    if (eq === "alchemical" || item.type === "alchemical") return "alchemical";
+    if (eq === "gear" || item.type === "gear") return "gear";
+    return null;
+  },
+
+  _isCategoryEnabled(category) {
+    if (!category) return true;
+    const key = {
+      weapons:         "animationFxCategoryWeapons",
+      weaponSkillFallbacks: "animationFxCategorySkills",
+      alchemical:      "animationFxCategoryAlchemical",
+      gear:            "animationFxCategoryGear",
+      npcActions:      "animationFxCategoryNpcActions",
+    }[category];
+    if (!key) return true;
+    try { return game.settings.get(MODULE_ID, key) !== false; }
+    catch { return true; }  // setting not registered yet during early init
+  },
+
+  /**
+   * Return the label of a missing-but-required asset module for `file`, or null
+   * if the file is playable. Handles both `modules/<id>/...` paths and the
+   * `jb2a.xxx` database-key format (which Sequencer resolves if either JB2A
+   * pack is active — the database is shared).
+   *
+   * Note: `modules/JB2A_DnD5e/` and `modules/jb2a_patreon/` are NOT aliases at
+   * the file-path level — each module ships its own file tree. Same for
+   * `modules/psfx/` vs `modules/psfx-patreon/`. So a literal `modules/<id>/...`
+   * path requires THAT specific module to be active.
+   */
+  _fileReferencesMissingModule(file) {
+    if (!file || typeof file !== "string") return null;
+    if (file.startsWith("modules/")) {
+      const moduleId = file.split("/")[1];
+      if (moduleId && !game.modules.get(moduleId)?.active) return moduleId;
+      return null;
+    }
+    if (file.startsWith("jb2a.")) {
+      // jb2a.xxx is a Sequencer database key that works with either JB2A pack.
+      const hasJb2a = game.modules.get("JB2A_DnD5e")?.active || game.modules.get("jb2a_patreon")?.active;
+      if (!hasJb2a) return "JB2A (free or patreon)";
+    }
+    return null;
+  },
+
+  /**
+   * Snapshot of which third-party asset modules are installed and active.
+   * Surfaced in the Animation FX Configuration UI so the GM can see at a
+   * glance which libraries are available.
+   */
+  _moduleAvailability() {
+    const mod = id => game.modules.get(id);
+    const jb2aFree = mod("JB2A_DnD5e");
+    const jb2aPat = mod("jb2a_patreon");
+    const psfxFree = mod("psfx");
+    const psfxPat = mod("psfx-patreon");
+    const sequencer = mod("sequencer");
+    return {
+      sequencer: { installed: !!sequencer, active: !!sequencer?.active },
+      jb2aFree:  { installed: !!jb2aFree,  active: !!jb2aFree?.active },
+      jb2aPatreon: { installed: !!jb2aPat, active: !!jb2aPat?.active },
+      anyJb2a: !!jb2aFree?.active || !!jb2aPat?.active,
+      psfxFree: { installed: !!psfxFree, active: !!psfxFree?.active },
+      psfxPatreon: { installed: !!psfxPat, active: !!psfxPat?.active },
+      anyPsfx: !!psfxFree?.active || !!psfxPat?.active,
+    };
   },
 
   async init() {
@@ -110,6 +219,22 @@ export const AnimationFx = {
     if (changed) {
       console.log("[vagabond-crawler] Animation FX scale migration v1 applied.");
     }
+
+    // npcActions._default removal (separate migration — runs independently).
+    await this._migrateRemoveNpcDefault();
+  },
+
+  async _migrateRemoveNpcDefault() {
+    if (!game.user.isGM) return;
+    const MIGRATION_FLAG = "npcDefaultRemoval_v1";
+    const stored = game.settings.get(MODULE_ID, "animationFxConfig") ?? {};
+    if (stored.__migrations?.[MIGRATION_FLAG]) return;
+    if (stored.npcActions?._default) {
+      delete stored.npcActions._default;
+      console.log("[vagabond-crawler] Removed legacy Generic NPC Action fallback.");
+    }
+    stored.__migrations = { ...(stored.__migrations ?? {}), [MIGRATION_FLAG]: true };
+    await game.settings.set(MODULE_ID, "animationFxConfig", stored);
   },
 
   async _wrapNpcAction() {
@@ -126,37 +251,55 @@ export const AnimationFx = {
 
     const original = VCC.npcAction.bind(VCC);
     const wrapped = async function (actor, action, actionIndex, targets, ...rest) {
-      // Stash actionIndex and tokenId on the next preCreateChatMessage that matches this actor
+      // VagabondChatCard.npcAction is reused by the system for both actions
+      // (system.actions[i]) AND abilities (system.abilities[i] — see
+      // _onClickAbilityName at chat-card.mjs:1070). The `actionIndex` in those
+      // two calls belongs to different arrays. If we blindly stamp the flag,
+      // clicking an ability like "Pack Hunter" would make _resolve read
+      // actor.system.actions[0] and play whatever action sits there.
+      //
+      // Only install the stamping hook when the passed `action` is really one
+      // of the actor's actions at the given index.
+      const actual = actor?.system?.actions?.[actionIndex];
+      const isRealAction = !!actual && (actual === action || actual.name === action?.name);
+      if (!isRealAction) {
+        return await original(actor, action, actionIndex, targets, ...rest);
+      }
+
+      // Stash actionIndex and tokenId on the FIRST preCreateChatMessage that matches this actor.
+      // We keep the hook alive across non-matching messages (e.g. Pack Hunter notices posted by
+      // npc-abilities before the action card) and only deregister once we've stamped a message
+      // or when the npcAction call finishes (via the `finally` block).
+      let stamped = false;
       const preHook = Hooks.on("preCreateChatMessage", (msg, data, opts, userId) => {
+        if (stamped) return;
         const flags = foundry.utils.getProperty(data, "flags.vagabond") ?? {};
-        if (flags.actorId === actor?.id) {
-          const update = {};
-          if (typeof flags.actionIndex !== "number") {
-            update["flags.vagabond.actionIndex"] = actionIndex;
-          }
-          if (!flags.tokenId) {
-            // Determine which token fired this NPC action:
-            // 1. Any controlled token matching the actor
-            // 2. First active token of the actor on the current scene
-            let tok = null;
-            const controlled = canvas.tokens?.controlled ?? [];
-            for (const c of controlled) {
-              if (c.actor?.id === actor.id) { tok = c; break; }
-            }
-            if (!tok) {
-              const tokens = actor.getActiveTokens?.(false, false) ?? [];
-              tok = tokens.find(t => t.scene?.id === canvas.scene?.id) ?? tokens[0] ?? null;
-            }
-            if (tok) update["flags.vagabond.tokenId"] = tok.id;
-          }
-          if (Object.keys(update).length > 0) msg.updateSource(update);
+        if (flags.actorId !== actor?.id) return;  // skip non-matching messages
+        const update = {};
+        if (typeof flags.actionIndex !== "number") {
+          update["flags.vagabond.actionIndex"] = actionIndex;
         }
+        if (!flags.tokenId) {
+          let tok = null;
+          const controlled = canvas.tokens?.controlled ?? [];
+          for (const c of controlled) {
+            if (c.actor?.id === actor.id) { tok = c; break; }
+          }
+          if (!tok) {
+            const tokens = actor.getActiveTokens?.(false, false) ?? [];
+            tok = tokens.find(t => t.scene?.id === canvas.scene?.id) ?? tokens[0] ?? null;
+          }
+          if (tok) update["flags.vagabond.tokenId"] = tok.id;
+        }
+        if (Object.keys(update).length > 0) msg.updateSource(update);
+        stamped = true;
         Hooks.off("preCreateChatMessage", preHook);
       });
       try {
         return await original(actor, action, actionIndex, targets, ...rest);
       } finally {
-        Hooks.off("preCreateChatMessage", preHook);
+        // Safety net: if no matching message ever appeared, still clean up the hook.
+        if (!stamped) Hooks.off("preCreateChatMessage", preHook);
       }
     };
     wrapped.__vcAnimFxWrapped = true;
@@ -184,17 +327,57 @@ export const AnimationFx = {
     }
   },
 
+  /**
+   * Return the length of the matched substring for this pattern against `name`,
+   * or 0 if the pattern doesn't match. Used as a specificity score to break
+   * ties when multiple presets match the same action/item name — more specific
+   * patterns (those matching longer substrings) win over generic catch-alls.
+   *
+   * Example: action "Frost Breath"
+   *   - pattern "breath|exhale|spray|cone of"  → matches "Breath"       (6)
+   *   - pattern "Frost Breath"                 → matches "Frost Breath" (12)  ← wins
+   */
+  _patternMatchScore(name, patterns) {
+    if (!patterns || !name) return 0;
+    try {
+      const m = new RegExp(patterns, "i").exec(name);
+      return m ? m[0].length : 0;
+    } catch (e) {
+      return 0;
+    }
+  },
+
+  /**
+   * Pick the most specific preset from a name-keyed preset map, ignoring `_default`.
+   * Returns the preset with the longest matched substring, or null if nothing matches.
+   */
+  _pickBestPattern(name, presetMap) {
+    let best = null;
+    let bestScore = 0;
+    for (const [key, preset] of Object.entries(presetMap ?? {})) {
+      if (key === "_default") continue;
+      const score = this._patternMatchScore(name, preset?.patterns);
+      if (score > bestScore) { best = preset; bestScore = score; }
+    }
+    return best;
+  },
+
   _resolveWeapon(item, config) {
     const name = item.name ?? "";
-    for (const [key, preset] of Object.entries(config.weapons ?? {})) {
-      if (this._matchesPattern(name, preset.patterns)) return preset;
+    if (this._isCategoryEnabled("weapons")) {
+      const best = this._pickBestPattern(name, config.weapons);
+      if (best) return best;
     }
-    const skill = item.system?.weaponSkill;
-    if (skill && config.weaponSkillFallbacks?.[skill]) return config.weaponSkillFallbacks[skill];
-    return config.weaponSkillFallbacks?._default ?? null;
+    if (this._isCategoryEnabled("weaponSkillFallbacks")) {
+      const skill = item.system?.weaponSkill;
+      if (skill && config.weaponSkillFallbacks?.[skill]) return config.weaponSkillFallbacks[skill];
+      return config.weaponSkillFallbacks?._default ?? null;
+    }
+    return null;
   },
 
   _resolveAlchemical(item, config) {
+    if (!this._isCategoryEnabled("alchemical")) return null;
     const name = (item.name ?? "").toLowerCase();
     if (config.alchemical?.[name]) return config.alchemical[name];
     for (const [key, preset] of Object.entries(config.alchemical ?? {})) {
@@ -205,6 +388,7 @@ export const AnimationFx = {
   },
 
   _resolveGear(item, config) {
+    if (!this._isCategoryEnabled("gear")) return null;
     const name = (item.name ?? "").toLowerCase();
     if (config.gear?.[name]) return config.gear[name];
     for (const [key, preset] of Object.entries(config.gear ?? {})) {
@@ -214,13 +398,12 @@ export const AnimationFx = {
   },
 
   _resolveNpcAction(actor, actionIndex, config) {
+    if (!this._isCategoryEnabled("npcActions")) return null;
     const action = actor.system?.actions?.[actionIndex];
     if (!action) return null;
-    for (const [key, preset] of Object.entries(config.npcActions ?? {})) {
-      if (key === "_default") continue;
-      if (this._matchesPattern(action.name, preset.patterns)) return preset;
-    }
-    return config.npcActions?._default ?? null;
+    // Most-specific-pattern wins. `Frost Breath` beats the generic `breath` preset
+    // because its matched substring is longer. Insertion order no longer matters.
+    return this._pickBestPattern(action.name, config.npcActions);
   },
 
   _getSourceToken(actor, preferredTokenId = null) {
@@ -241,9 +424,21 @@ export const AnimationFx = {
   _getTargets(message) {
     const stored = message.flags?.vagabond?.targetsAtRollTime;
     if (Array.isArray(stored) && stored.length > 0) {
-      return stored.map(id => canvas.tokens.get(id)).filter(t => t);
+      // `stored` can take several shapes depending on which system path wrote it:
+      //   - array of token-ID strings
+      //   - array of serialized TokenDocuments (has `_id`)
+      //   - array of `{ tokenId, sceneId, actorId, ... }` summary objects (NPC action path)
+      // Normalize each entry to a token-ID string, then look up the placeable.
+      return stored
+        .map(entry => {
+          if (typeof entry === "string") return entry;
+          return entry?.tokenId ?? entry?._id ?? entry?.id ?? null;
+        })
+        .filter(Boolean)
+        .map(id => canvas.tokens.get(id))
+        .filter(t => t);
     }
-    return Array.from(game.user.targets).map(t => t.document) // ensure TokenDocument
+    return Array.from(game.user.targets).map(t => t.document)
       .map(td => canvas.tokens.get(td.id)).filter(t => t);
   },
 
@@ -298,7 +493,11 @@ export const AnimationFx = {
     // NPC action path
     if (source.actor && typeof source.actionIndex === "number") {
       const actorOverrides = source.actor.getFlag(MODULE_ID, "actionOverrides") ?? {};
-      if (actorOverrides[source.actionIndex]) return actorOverrides[source.actionIndex];
+      const ov = actorOverrides[source.actionIndex];
+      if (ov) {
+        if (ov.disabled) return null;
+        return ov;
+      }
       return this._resolveNpcAction(source.actor, source.actionIndex, config);
     }
 
@@ -334,14 +533,11 @@ export const AnimationFx = {
   async _playSound(block) {
     if (!block?.sound) return;
     if (!game.settings.get(MODULE_ID, "animationFxSoundEnabled")) return;
-    // If the sound references another module's assets, silently skip when that
-    // module is not installed/active (e.g. psfx on machines without it).
-    if (block.sound.startsWith("modules/")) {
-      const moduleId = block.sound.split("/")[1];
-      if (moduleId && !game.modules.get(moduleId)?.active) {
-        console.debug(`[vagabond-crawler] skipping sound — module "${moduleId}" not active`);
-        return;
-      }
+    // Alias-aware module check: psfx ⟷ psfx-patreon, JB2A_DnD5e ⟷ jb2a_patreon.
+    const missing = this._fileReferencesMissingModule(block.sound);
+    if (missing) {
+      console.debug(`[vagabond-crawler] skipping sound — "${missing}" not active (src: ${block.sound})`);
+      return;
     }
     const volume = (block.soundVolume ?? 0.6) * this._getMasterVolume();
     try {
@@ -368,6 +564,15 @@ export const AnimationFx = {
     if (!preset) return;
     if (typeof Sequence === "undefined") return;
     const block = preset[outcome];
+    // Skip animations whose assets live in a module that isn't installed/active.
+    // Prevents Sequencer from throwing on unresolved files / jb2a DB lookups.
+    if (block?.file) {
+      const missing = this._fileReferencesMissingModule(block.file);
+      if (missing) {
+        console.debug(`[vagabond-crawler] skipping "${preset.label ?? "?"}" — "${missing}" not active (file: ${block.file})`);
+        return;
+      }
+    }
     if (!block?.file) return;
 
     const globalScale = this._getClientScale();
@@ -398,8 +603,25 @@ export const AnimationFx = {
       return;
     }
 
-    // Non-persistent: iterate targets with stagger
-    const targetList = (targets && targets.length > 0) ? targets : [sourceToken];
+    // Non-persistent: iterate targets with stagger.
+    // For projectile/cone, we need a target at a different location than the source,
+    // otherwise Sequencer's stretchTo warns about zero distance. Fall back to source
+    // only for onToken animations.
+    const needsDistance = preset.type === "projectile" || preset.type === "cone";
+    let targetList;
+    if (targets && targets.length > 0) {
+      targetList = needsDistance
+        ? targets.filter(t => t && t.id !== sourceToken.id)
+        : targets;
+    } else {
+      targetList = needsDistance ? [] : [sourceToken];
+    }
+    if (targetList.length === 0) {
+      if (needsDistance) {
+        console.debug(`[vagabond-crawler] skipping ${preset.type} for "${preset.label ?? "?"}" — no distinct target`);
+      }
+      return;
+    }
     for (let i = 0; i < targetList.length; i++) {
       const target = targetList[i];
       const delay = i * 150;
@@ -409,6 +631,7 @@ export const AnimationFx = {
   },
 
   async _playOne(preset, block, sourceToken, target, allTargets, globalScale, fadeIn, fadeOut, opacity) {
+    try {
     const seq = new Sequence(MODULE_ID);
     const effect = seq.effect().file(block.file);
 
@@ -474,102 +697,26 @@ export const AnimationFx = {
     } catch (e) {
       console.warn("[vagabond-crawler] animation play failed:", e);
     }
+    } catch (outer) {
+      // Catch-all for synchronous Sequencer failures (invalid file path, JB2A
+      // database lookup miss, etc.). Without this, a bad preset can throw out
+      // of the chat-message hook and derail the action card.
+      console.warn(`[vagabond-crawler] animation setup failed for "${preset?.label ?? "?"}" (${block?.file ?? "?"}):`, outer);
+    }
   },
 
-  // ── Override dialogs ────────────────────────────────────────────────────────
+  // ── Override dialog ──────────────────────────────────────────────────────
 
-  async openOverrideDialog(target, kind, index = null) {
-    // target: Item (kind="item") or Actor (kind="action")
-    const currentOverride = kind === "item"
-      ? (target.getFlag(MODULE_ID, "animationOverride") ?? {})
-      : ((target.getFlag(MODULE_ID, "actionOverrides") ?? {})[index] ?? {});
-    const currentDisabled = kind === "item"
-      ? !!target.getFlag(MODULE_ID, "disabled")
-      : !!(currentOverride.disabled);
-
-    const dialogTitle = kind === "item"
-      ? `Animation FX Override: ${target.name}`
-      : `Action Override${index !== null ? ` (Action ${index})` : ""}`;
-
-    const content = `
-      <form style="display:flex;flex-direction:column;gap:0.4em;padding:0.5em 0">
-        <label style="display:flex;align-items:center;gap:0.4em">
-          <input type="checkbox" name="disabled" ${currentDisabled ? "checked" : ""}/>
-          Disable animation entirely
-        </label>
-        <hr style="margin:0.25em 0"/>
-        <label>Custom file
-          <input type="text" name="file" value="${currentOverride.hit?.file ?? ""}" placeholder="path/to/animation.webm" style="width:100%"/>
-        </label>
-        <label>Type
-          <select name="type">
-            <option value="onToken" ${(currentOverride.type ?? "onToken") === "onToken" ? "selected" : ""}>On Token</option>
-            <option value="projectile" ${currentOverride.type === "projectile" ? "selected" : ""}>Projectile</option>
-            <option value="cone" ${currentOverride.type === "cone" ? "selected" : ""}>Cone</option>
-          </select>
-        </label>
-        <label>Target
-          <select name="target">
-            <option value="target" ${(currentOverride.target ?? "target") === "target" ? "selected" : ""}>Target</option>
-            <option value="self" ${currentOverride.target === "self" ? "selected" : ""}>Self</option>
-          </select>
-        </label>
-        <label>Scale
-          <input type="number" step="0.05" name="scale" value="${currentOverride.hit?.scale ?? 1}"/>
-        </label>
-        <label>Duration (ms)
-          <input type="number" step="50" name="duration" value="${currentOverride.hit?.duration ?? 800}"/>
-        </label>
-      </form>`;
-
-    let result;
-    try {
-      result = await foundry.applications.api.DialogV2.prompt({
-        window: { title: dialogTitle },
-        content,
-        ok: {
-          label: "Save",
-          callback: (ev, btn, dialog) => {
-            const form = dialog.querySelector("form");
-            return new FormDataExtended(form).object;
-          },
-        },
-      });
-    } catch (e) {
-      // User cancelled
-      return;
-    }
-    if (!result) return;
-
-    if (kind === "item") {
-      await target.setFlag(MODULE_ID, "disabled", !!result.disabled);
-      if (result.file) {
-        const preset = {
-          label: `Custom (${target.name})`,
-          type: result.type,
-          target: result.target,
-          hit: { file: result.file, scale: Number(result.scale), duration: Number(result.duration) },
-        };
-        await target.setFlag(MODULE_ID, "animationOverride", preset);
-      } else {
-        await target.unsetFlag(MODULE_ID, "animationOverride");
-      }
-    } else {
-      const overrides = foundry.utils.deepClone(target.getFlag(MODULE_ID, "actionOverrides") ?? {});
-      if (result.disabled) {
-        overrides[index] = { disabled: true };
-      } else if (result.file) {
-        overrides[index] = {
-          label: `Custom action ${index}`,
-          type: result.type,
-          target: result.target,
-          hit: { file: result.file, scale: Number(result.scale), duration: Number(result.duration) },
-        };
-      } else {
-        delete overrides[index];
-      }
-      await target.setFlag(MODULE_ID, "actionOverrides", overrides);
-    }
+  /**
+   * Open the dedicated Animation FX override window.
+   * kind: "item" → target is an Item (weapon / alchemical / gear)
+   * kind: "action" → target is an Actor, index is the action index
+   * Unlinked-token synthetic actors are redirected to the world actor inside
+   * the app constructor.
+   */
+  openOverrideDialog(target, kind, index = null) {
+    const app = new AnimationFxOverrideApp({ kind, target, index });
+    app.render(true);
   },
 
   _registerSheetButtons() {

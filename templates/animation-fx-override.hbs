@@ -1,0 +1,82 @@
+<div class="vcfx-config vcfx-override">
+  <section class="vcfx-body">
+    <fieldset class="vcfx-preset">
+      <legend>
+        {{targetLabel}}
+        {{#if scopeNote}}<em style="opacity:0.7;font-weight:400;"> — {{scopeNote}}</em>{{/if}}
+      </legend>
+
+      <div class="vcfx-row">
+        <label style="flex:1;min-width:200px;">Label
+          <input type="text" name="label" value="{{preset.label}}" placeholder="Custom override"/>
+        </label>
+        <label><input type="checkbox" name="disabled" {{#if preset.disabled}}checked{{/if}}/> Disable animation entirely</label>
+      </div>
+
+      <div class="vcfx-row">
+        <label>Type
+          <select name="type">
+            <option value="onToken" {{#if (eq preset.type 'onToken')}}selected{{/if}}>On Token</option>
+            <option value="projectile" {{#if (eq preset.type 'projectile')}}selected{{/if}}>Projectile</option>
+            <option value="cone" {{#if (eq preset.type 'cone')}}selected{{/if}}>Cone</option>
+          </select>
+        </label>
+        <label>Target
+          <select name="target">
+            <option value="target" {{#if (eq preset.target 'target')}}selected{{/if}}>Target</option>
+            <option value="self" {{#if (eq preset.target 'self')}}selected{{/if}}>Self</option>
+          </select>
+        </label>
+        {{#if showPersist}}
+          <label><input type="checkbox" name="persist" {{#if preset.persist}}checked{{/if}}/> Persist</label>
+        {{/if}}
+      </div>
+
+      <div class="vcfx-block vcfx-hit">
+        <h4>Hit Animation</h4>
+        <div class="vcfx-row">
+          <input type="text" name="hit.file" value="{{preset.hit.file}}" placeholder="file path or jb2a.xxx" style="flex:1;min-width:200px;"/>
+          <button type="button" data-action="pickFile" data-target="hit.file">&#128193;</button>
+          <label>Scale <input type="number" step="0.05" name="hit.scale" value="{{preset.hit.scale}}" style="width:70px;"/></label>
+          <label>Duration <input type="number" step="50" name="hit.duration" value="{{preset.hit.duration}}" style="width:80px;"/></label>
+          <label>Offset X <input type="number" name="hit.offsetX" value="{{preset.hit.offsetX}}" style="width:70px;"/></label>
+        </div>
+        <div class="vcfx-row">
+          <input type="text" name="hit.sound" value="{{preset.hit.sound}}" placeholder="path/to/hit.ogg" style="flex:1;min-width:200px;"/>
+          <button type="button" data-action="pickSound" data-target="hit.sound">&#127925;</button>
+          <label>Volume <input type="number" step="0.05" min="0" max="1" name="hit.soundVolume" value="{{preset.hit.soundVolume}}" style="width:70px;"/></label>
+        </div>
+      </div>
+
+      <details class="vcfx-block vcfx-miss" {{#if hasMissFile}}open{{/if}}>
+        <summary>Miss Animation (optional)</summary>
+        <div class="vcfx-row">
+          <input type="text" name="miss.file" value="{{preset.miss.file}}" placeholder="file path" style="flex:1;min-width:200px;"/>
+          <button type="button" data-action="pickFile" data-target="miss.file">&#128193;</button>
+          <label>Scale <input type="number" step="0.05" name="miss.scale" value="{{preset.miss.scale}}" style="width:70px;"/></label>
+          <label>Duration <input type="number" step="50" name="miss.duration" value="{{preset.miss.duration}}" style="width:80px;"/></label>
+        </div>
+        <div class="vcfx-row">
+          <input type="text" name="miss.sound" value="{{preset.miss.sound}}" placeholder="path/to/miss.ogg" style="flex:1;min-width:200px;"/>
+          <button type="button" data-action="pickSound" data-target="miss.sound">&#127925;</button>
+          <label>Volume <input type="number" step="0.05" min="0" max="1" name="miss.soundVolume" value="{{preset.miss.soundVolume}}" style="width:70px;"/></label>
+        </div>
+      </details>
+
+      <p style="font-size:0.85em;opacity:0.7;margin:0.25em 0 0">
+        Clear the hit file and uncheck "Disable" to remove the override entirely (falls back to the global config).
+      </p>
+    </fieldset>
+  </section>
+
+  <footer class="vcfx-actions">
+    <span class="vcfx-save-flash">Saved!</span>
+    <button type="button" data-action="preview">&#9654; Preview</button>
+    {{#if showPromote}}
+      <button type="button" data-action="promoteToGlobal">&#11014; Promote to Global NPC Action</button>
+    {{/if}}
+    <button type="button" data-action="save">Save</button>
+    <button type="button" data-action="saveAndClose">Save &amp; Close</button>
+    <button type="button" data-action="cancel">Cancel</button>
+  </footer>
+</div>

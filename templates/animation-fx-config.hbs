@@ -12,7 +12,7 @@
     {{#if (eq activeTab 'settings')}}
       <fieldset class="vcfx-settings">
         <legend>Global Settings</legend>
-        <label><input type="checkbox" name="settings.enabled" {{#if settings.enabled}}checked{{/if}}/> Enable animations</label>
+        <label><input type="checkbox" name="settings.enabled" {{#if settings.enabled}}checked{{/if}}/> Enable animations (this client)</label>
         <label>Global scale <input type="number" name="settings.scale" value="{{settings.scale}}" min="0.25" max="3" step="0.05"/></label>
         <label>Trigger on
           <select name="settings.triggerOn">
@@ -22,6 +22,40 @@
         </label>
         <label><input type="checkbox" name="settings.soundEnabled" {{#if settings.soundEnabled}}checked{{/if}}/> Enable sound</label>
         <label>Master volume <input type="number" name="settings.masterVolume" value="{{settings.masterVolume}}" min="0" max="1" step="0.05"/></label>
+      </fieldset>
+
+      <fieldset class="vcfx-settings">
+        <legend>Categories (world — same as module settings)</legend>
+        <p style="font-size:0.85em;opacity:0.7;margin:0 0 0.4em">
+          Disable a category to skip its animations entirely, regardless of the per-preset config.
+          These toggles are shared with the Foundry module settings — edit in either place.
+        </p>
+        <label><input type="checkbox" name="settings.categoryWeapons" {{#if settings.categoryWeapons}}checked{{/if}}/> Weapons</label>
+        <label><input type="checkbox" name="settings.categorySkills" {{#if settings.categorySkills}}checked{{/if}}/> Skill Fallbacks</label>
+        <label><input type="checkbox" name="settings.categoryAlchemical" {{#if settings.categoryAlchemical}}checked{{/if}}/> Alchemical</label>
+        <label><input type="checkbox" name="settings.categoryGear" {{#if settings.categoryGear}}checked{{/if}}/> Gear</label>
+        <label><input type="checkbox" name="settings.categoryNpcActions" {{#if settings.categoryNpcActions}}checked{{/if}}/> NPC Actions</label>
+      </fieldset>
+
+      <fieldset class="vcfx-settings vcfx-availability">
+        <legend>Asset Modules</legend>
+        <p style="font-size:0.85em;opacity:0.7;margin:0 0 0.4em">
+          Animations and sounds that reference assets from a missing module are skipped automatically
+          (with a console message). Install the matching modules to enable those presets.
+        </p>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:0.2em;">
+          <li>{{#if availability.sequencer.active}}&#10003;{{else}}&#10007;{{/if}}
+            <b>Sequencer</b> — required for all animations.
+            {{#unless availability.sequencer.active}}<em style="color:var(--vcfx-miss-accent)"> not installed/active</em>{{/unless}}</li>
+          <li>{{#if availability.anyJb2a}}&#10003;{{else}}&#10007;{{/if}}
+            <b>JB2A</b>
+            ({{#if availability.jb2aFree.active}}Free{{/if}}{{#if availability.jb2aPatreon.active}}{{#if availability.jb2aFree.active}} + {{/if}}Patreon{{/if}}{{#unless availability.anyJb2a}}<em style="color:var(--vcfx-miss-accent)"> not installed/active</em>{{/unless}})
+            — asset library for most presets (<code>modules/JB2A_DnD5e/</code>, <code>modules/jb2a_patreon/</code>, <code>jb2a.xxx</code>).</li>
+          <li>{{#if availability.anyPsfx}}&#10003;{{else}}&#10007;{{/if}}
+            <b>PSFX</b> — Peri's Sound Effects
+            ({{#if availability.psfxFree.active}}Free{{/if}}{{#if availability.psfxPatreon.active}}{{#if availability.psfxFree.active}} + {{/if}}Patreon{{/if}}{{#unless availability.anyPsfx}}<em style="color:var(--vcfx-miss-accent)"> not installed/active — hit/miss sounds will be silent</em>{{/unless}})
+            — used for most hit/miss sounds (<code>modules/psfx/</code>, <code>modules/psfx-patreon/</code>).</li>
+        </ul>
       </fieldset>
     {{else}}
       <div class="vcfx-preset-list">
