@@ -236,7 +236,11 @@ export const CrawlState = {
         type,
         actorId: token.actor.id,
         tokenId: token.id,
-        source:  type === "npc" ? "combat" : undefined,
+        // ALL combat-created members get source:"combat" so orphan-cleanup
+        // removes them when the combatant is deleted. Previously only type
+        // === "npc" got the tag, which meant friendly summons/familiars
+        // (type "player") lingered with stale tokenIds after despawn.
+        source:  "combat",
       });
       added.push(token.name);
       dirty = true;
@@ -253,13 +257,36 @@ export const CrawlState = {
       dirty = true;
     }
 
+    // Defense-in-depth: purge any member whose tokenId no longer resolves
+    // to a real token on any scene. Guards against members left behind from
+    // older flows (pre-source-tag, pre-reconciler) or external token deletes
+    // that didn't fire the usual hooks.
+    for (let i = this._state.members.length - 1; i >= 0; i--) {
+      const m = this._state.members[i];
+      if (m.type === "gm") continue;  // GM placeholder has no token by design
+      if (!m.tokenId) continue;
+      const exists = game.scenes.some(s => s.tokens.get(m.tokenId));
+      if (exists) continue;
+      this._state.members.splice(i, 1);
+      removed.push(`${m.name} (stale token)`);
+      dirty = true;
+    }
+
     if (dirty) await this._save();
 
     // Combat ← Strip: push any hero member missing from the combat tracker.
+    // Only runs once the combat has actually STARTED. Gating on combat.started
+    // prevents a race when a GM right-clicks a token and Foundry's "Toggle
+    // Combat State" creates the combat + its initial combatant in parallel:
+    // createCombat fires before the token's combatant lands in the snapshot,
+    // so the reconciler used to see the hero as "missing" and push a
+    // duplicate combatant. Once the user hits Begin Encounter, combatStart
+    // fires with combat.started = true and this block runs normally.
+    //
     // In v13 a combat doc may be "sceneless" — combat.scene is undefined and
     // each combatant carries its own sceneId. Derive the target scene from
     // (in order) combat.scene, the first existing combatant, or the canvas.
-    if (combat) {
+    if (combat && combat.started) {
       const targetSceneId = combat.scene?.id
         ?? combatants[0]?.sceneId
         ?? canvas.scene?.id;
@@ -270,12 +297,18 @@ export const CrawlState = {
           if (m.type !== "player" || !m.tokenId) continue;
           if (combatantTokenIds.has(m.tokenId)) continue;
           const tokenDoc = targetScene.tokens.get(m.tokenId);
-          if (!tokenDoc) continue;  // hero's token is on a different scene
-          toAdd.push({ tokenId: m.tokenId, sceneId: targetSceneId, actorId: tokenDoc.actorId });
+          if (!tokenDoc) continue;  // hero's token isn't on the combat scene
+          const actorId = tokenDoc.actorId;
+          if (!actorId || !game.actors.get(actorId)) continue;  // stale / deleted actor
+          toAdd.push({ tokenId: m.tokenId, sceneId: targetSceneId, actorId });
           combatantsAdded.push(m.name);
         }
         if (toAdd.length) {
-          await combat.createEmbeddedDocuments("Combatant", toAdd);
+          try {
+            await combat.createEmbeddedDocuments("Combatant", toAdd);
+          } catch (err) {
+            console.warn(`vagabond-crawler | Combat←Strip push failed:`, err, { toAdd });
+          }
         }
       }
     }

@@ -44,7 +44,17 @@ function _getBaseSpeed(actor, tokenDoc = null) {
   // Crawl — exploration speed
   const s = sys.speed;
   if (typeof s === "object") return s.crawl ?? 0;
-  return sys.crawl ?? 0;
+  const crawl = sys.crawl ?? 0;
+  if (crawl > 0) return crawl;
+  // Friendly NPCs (summons, familiars, beast companions, hirelings) have no
+  // explicit crawl-speed field on the NPC sheet — fall back to base × 3 so
+  // they actually keep pace with the party during the crawl phase.
+  const disposition = tokenDoc?.disposition ?? actor.prototypeToken?.disposition;
+  if (actor.type === "npc" && disposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY) {
+    const base = typeof s === "number" ? s : 0;
+    return base * 3;
+  }
+  return 0;
 }
 
 /**

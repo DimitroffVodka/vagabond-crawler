@@ -31,6 +31,7 @@ import { XpCounterPatch }  from "./xp-counter-patch.mjs";
 import { SessionRecap }    from "./session-recap.mjs";
 import { AnimationFx }    from "./animation-fx.mjs";
 import { StackSplit }     from "./stack-split.mjs";
+import { GatherFriendlies } from "./gather-friendlies.mjs";
 import { registerSettingsGroupMenus } from "./settings-group-app.mjs";
 
 export const MODULE_ID = "vagabond-crawler";
@@ -297,6 +298,9 @@ Hooks.once("ready", async () => {
 
   // Stack split/merge gestures on the inventory grid
   StackSplit.init();
+
+  // "Gather Friendlies" button on the Party token HUD
+  GatherFriendlies.init();
 
   // Auto-stack items: when adding an item that already exists, merge quantities.
   // Uses StackSplit.sameStackIdentity so the "what counts as the same stack"

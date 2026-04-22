@@ -338,7 +338,19 @@ export const CrawlStrip = {
       activeSpeed = eff.speed;
       movementMode = eff.mode;
     } else {
-      activeSpeed = typeof s.speed === "object" ? (s.speed?.crawl ?? 0) : (s.crawl ?? 0);
+      let crawl = typeof s.speed === "object" ? (s.speed?.crawl ?? 0) : (s.crawl ?? 0);
+      // Friendly NPCs (summons, familiars, hirelings, beast companions) don't
+      // carry a crawl-speed field — default to base × 3 so they keep up with
+      // the party on the overland/dungeon pace. Matches _getBaseSpeed in
+      // movement-tracker.mjs so display and enforcement agree.
+      if (crawl === 0 && actor.type === "npc") {
+        const disp = tokenDoc?.disposition ?? actor.prototypeToken?.disposition;
+        if (disp === CONST.TOKEN_DISPOSITIONS.FRIENDLY) {
+          const base = typeof s.speed === "number" ? s.speed : 0;
+          crawl = base * 3;
+        }
+      }
+      activeSpeed = crawl;
       movementMode = "walk";
     }
     const rawRemaining  = actor.getFlag(MODULE_ID, "moveRemaining") ?? activeSpeed;
@@ -453,10 +465,22 @@ Hooks.on("updateActor", async (actor) => {
         ? game.combat.combatants.find(c => c.tokenId === tokenId && !c.defeated)
         : game.combat.combatants.find(c => c.actorId === actor.id && !c.defeated);
       if (combatant) {
-        await combatant.update({ defeated: true });
+        try {
+          await combatant.update({ defeated: true });
+        } catch (err) {
+          console.warn(`vagabond-crawler | auto-defeat update failed for ${actor.name}:`, err);
+        }
         const tokenObj = canvas.tokens?.get(combatant.tokenId);
         if (tokenObj?.actor) {
-          await tokenObj.actor.toggleStatusEffect("dead", { active: true, overlay: true });
+          // Wrap toggleStatusEffect — if the token's UUID is stale (deleted,
+          // cross-scene, or the system's own updateActor hook already tried
+          // this and failed), the ActiveEffect create can throw on parent
+          // resolution. We don't want it to crash the whole hook.
+          try {
+            await tokenObj.actor.toggleStatusEffect("dead", { active: true, overlay: true });
+          } catch (err) {
+            console.warn(`vagabond-crawler | dead-status toggle failed for ${actor.name}:`, err);
+          }
         }
       }
     }
@@ -487,15 +511,37 @@ Hooks.on("updateToken", async (tokenDoc, changes) => {
     if (hp !== null && hp <= 0) {
       const combatant = game.combat.combatants.find(c => c.tokenId === tokenDoc.id && !c.defeated);
       if (combatant) {
-        await combatant.update({ defeated: true });
+        try {
+          await combatant.update({ defeated: true });
+        } catch (err) {
+          console.warn(`vagabond-crawler | auto-defeat update failed for ${tokenDoc.name}:`, err);
+        }
         // Apply dead overlay — must use the token document's actor for unlinked tokens
         const tokenObj = canvas.tokens?.get(combatant.tokenId);
         if (tokenObj?.actor) {
-          await tokenObj.actor.toggleStatusEffect("dead", { active: true, overlay: true });
+          try {
+            await tokenObj.actor.toggleStatusEffect("dead", { active: true, overlay: true });
+          } catch (err) {
+            console.warn(`vagabond-crawler | dead-status toggle failed for ${tokenDoc.name}:`, err);
+          }
         }
       }
     }
   }
+});
+
+// Clean up strip members when their underlying token is deleted from ANY
+// scene — prevents orphans from summons despawning, tokens being manually
+// removed, or scene-switch churn. Runs regardless of combat state since the
+// stale entry causes create errors whenever a sync next runs.
+Hooks.on("deleteToken", async (tokenDoc) => {
+  if (!game.user.isGM || !CrawlState.active) return;
+  const memberId = `token-${tokenDoc.id}`;
+  const idx = CrawlState.members.findIndex(m => m.id === memberId);
+  if (idx === -1) return;
+  CrawlState._state.members.splice(idx, 1);
+  await CrawlState._save();
+  CrawlStrip.queueRender();
 });
 
 // Sync combatant.hidden → token.hidden for the reverse direction (e.g. the GM

@@ -8,6 +8,19 @@
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
 
+/**
+ * Morale only applies to ENEMY (hostile/neutral) NPCs — the party's summons,
+ * familiars, beast companions, and hirelings are all FRIENDLY dispositions
+ * and must not count toward initialNPCCount, solo detection, or morale-trigger
+ * events. A dying summon is sad, not a morale problem for the enemy squad.
+ */
+function _isEnemyNpc(combatant) {
+  if (combatant?.actor?.type !== "npc") return false;
+  const disposition = combatant.token?.disposition
+    ?? combatant.actor?.prototypeToken?.disposition;
+  return disposition !== CONST.TOKEN_DISPOSITIONS.FRIENDLY;
+}
+
 let _state = {
   initialNPCCount: 0,
   isSolo:          false,
@@ -20,7 +33,7 @@ export const MoraleChecker = {
 
   init() {
     const initState = (combat) => {
-      const npcCount = combat.combatants.filter(c => c.actor?.type === "npc").length;
+      const npcCount = combat.combatants.filter(_isEnemyNpc).length;
       _state = {
         initialNPCCount: npcCount,
         isSolo:          npcCount === 1,
@@ -28,7 +41,7 @@ export const MoraleChecker = {
         halfGroupFired:  false,
         halfHPFired:     false,
       };
-      console.log(`${MODULE_ID} | Morale init: ${npcCount} NPCs, solo=${npcCount === 1}`);
+      console.log(`${MODULE_ID} | Morale init: ${npcCount} enemy NPCs, solo=${npcCount === 1}`);
     };
 
     // combatStart fires when GM clicks Start Combat in the tracker UI
@@ -48,11 +61,11 @@ export const MoraleChecker = {
       clearTimeout(this._moraleInitTimer);
       this._moraleInitTimer = setTimeout(() => {
         if (!game.combat) return;
-        const npcCount = game.combat.combatants.filter(c => c.actor?.type === "npc").length;
+        const npcCount = game.combat.combatants.filter(_isEnemyNpc).length;
         if (npcCount > 0 && _state.initialNPCCount === 0) {
           _state.initialNPCCount = npcCount;
           _state.isSolo = npcCount === 1;
-          console.log(`${MODULE_ID} | Morale init (createCombatant): ${npcCount} NPCs, solo=${_state.isSolo}`);
+          console.log(`${MODULE_ID} | Morale init (createCombatant): ${npcCount} enemy NPCs, solo=${_state.isSolo}`);
         }
       }, 300);
     });
@@ -60,11 +73,11 @@ export const MoraleChecker = {
     // Group morale — exact pattern from vagabond-extras
     Hooks.on("updateCombatant", async (combatant, changes) => {
       if (!game.user.isGM || !game.combat) return;
-      if (combatant.actor?.type !== "npc") return;
+      if (!_isEnemyNpc(combatant)) return;  // friendly NPC deaths don't trigger morale
       if (changes.defeated !== true) return;   // exact match, no extras
       if (_state.isSolo) return;
 
-      const allNPC   = game.combat.combatants.filter(c => c.actor?.type === "npc");
+      const allNPC   = game.combat.combatants.filter(_isEnemyNpc);
       const defeated = allNPC.filter(c => c.defeated).length;
 
       if (!_state.firstDeathFired && defeated >= 1) {
@@ -83,6 +96,11 @@ export const MoraleChecker = {
       if (!_state.isSolo) return;
       if (_state.halfHPFired) return;
 
+      // Friendly NPC (summon/familiar/hireling) hitting half-HP is not a
+      // morale trigger — enemy morale only cares about enemy health.
+      const combatant = game.combat.combatants.find(c => c.actor?.id === actor.id);
+      if (combatant && !_isEnemyNpc(combatant)) return;
+
       const newHP = changes?.system?.health?.value;
       if (newHP === undefined) return;
       const maxHP = actor.system.health.max;
@@ -97,7 +115,7 @@ export const MoraleChecker = {
     const combat = game.combat;
     if (!combat) return;
 
-    const npcAlive = combat.combatants.filter(c => c.actor?.type === "npc" && !c.defeated);
+    const npcAlive = combat.combatants.filter(c => _isEnemyNpc(c) && !c.defeated);
     if (!npcAlive.length) return;
 
     // Highest threat level NPC leads — exact field from vagabond-extras
