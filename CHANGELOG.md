@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### NPC Action Riders — Fatigue Payload
+
+- **`fatigueOnFail` and `fatigueOnTick` on the rider schema.** The Vagabond system's `causedStatuses` entries (per-NPC-action save-or-status riders) now carry two optional numeric fields. On a failed save, any entry with `fatigueOnFail > 0` adds that much fatigue to the target (capped at 5). While a status with a `fatigueOnTick > 0` is active, every roll of its linked countdown die applies that much additional fatigue per tick. Covers the common *"pass [Endure] or +1 Fatigue"* (Pseudopod, Shadow Life Drain) and *"Sickened (Cd4, +1 Fatigue each Round)"* (Ettercap, Spider, Tarantella) patterns the bestiary has been carrying as `extraInfo` text only.
+- **Monster Creator UI.** Two new `+Fat` / `+Fat/tick` number inputs (0–5) appear on every rider row in the On-Hit Effects and Crit On-Hit Effects editors. Existing riders stay at 0; editing populates and persists through save/reload.
+- **`_patchCreateStatusCountdown` runtime wrap.** The system's `StatusHelper._createStatusCountdown` doesn't natively persist `fatigueOnTick` to the countdown die's flags (literal `// TODO` comment at `status-helper.mjs:246`). Crawler's `countdown-roller` wraps `_createStatusCountdown` and `CountdownDice.create` at init so the rider entry's `fatigueOnTick` is stamped onto `flags.vagabond.countdownDice.fatigueOnTick`. Then `_rollDie` reads the flag and applies the fatigue on each roll, alongside the existing tick-damage flow.
+- **Bestiary migration — parser only, no application yet.** New `scripts/audit/migrate-riders.mjs` parses every NPC action's `extraInfo` in `monsters.json` and proposes structured `causedStatuses` entries matching the canonical *"pass [Save] or become Status (CdN unit[, +K Fatigue each Round])"* shapes. Dry-run only — writes `docs/audit/riders-migration-proposed.json` (12 proposed entries across 12 monsters) and `docs/audit/riders-migration-unmatched.md` (8 genuinely bespoke cases like Basilisk petrification, Mummy curses, Pit Fiend aura). No actor data is modified. Applying to world actors or shipping a `preCreateActor` patcher for compendium imports is deferred pending play review of the proposals.
+
 ## v1.13.0
 
 Inventory stack split/merge, a complete settings-panel reorganization (28 scattered settings → 7 grouped submenu buttons), crawl-strip ↔ combat-tracker reconciliation, and a batch of friendly-NPC fixes (summons, familiars, beast companions, hirelings). Plus the context-menu structural fix and the strip HP-bar anchoring fix.

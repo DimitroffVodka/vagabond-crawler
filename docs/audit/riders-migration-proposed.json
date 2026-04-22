@@ -1,0 +1,289 @@
+{
+  "generatedAt": "2026-04-22T20:49:21.955Z",
+  "summary": {
+    "proposedCount": 12,
+    "unmatchedCount": 8,
+    "skippedAlreadyPopulated": 29
+  },
+  "proposed": [
+    {
+      "monster": "Byakhee",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.PSNF8mdWgMS4hZ2E",
+      "actionIndex": 1,
+      "actionName": "Bite",
+      "extraInfo": "and pass [Endure] or Sickened (Cd6 per Round, Dazed for Cd4 after the Status ends).",
+      "existingCausedStatuses": [],
+      "proposedEntry": {
+        "statusId": "sickened",
+        "saveType": "endure",
+        "duration": "d6",
+        "tickDamageEnabled": false,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 0,
+        "fatigueOnTick": 0
+      }
+    },
+    {
+      "monster": "Ooze, Ectoplasmic",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.1w5VfFT6iJ7890ac",
+      "actionIndex": 0,
+      "actionName": "Pseudopod",
+      "extraInfo": "and pass [Endure] or +1 Fatigue",
+      "existingCausedStatuses": [],
+      "proposedEntry": {
+        "statusId": "",
+        "saveType": "endure",
+        "duration": "",
+        "tickDamageEnabled": false,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 1,
+        "fatigueOnTick": 0
+      }
+    },
+    {
+      "monster": "Pit Fiend",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.tox2rxTF7WFaqSJk",
+      "actionIndex": 3,
+      "actionName": "Bite",
+      "extraInfo": "and pass [Endure] with a -1 penalty or become Sickened (Cd6 damage)",
+      "existingCausedStatuses": [
+        {
+          "statusId": "sickened",
+          "requiresDamage": true,
+          "saveType": "any",
+          "duration": "d6",
+          "tickDamageEnabled": true,
+          "damageOnTick": "",
+          "damageType": "poison"
+        }
+      ],
+      "proposedEntry": {
+        "statusId": "sickened",
+        "saveType": "endure",
+        "duration": "d6",
+        "tickDamageEnabled": true,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 0,
+        "fatigueOnTick": 0,
+        "_saveModifierText": "-1"
+      }
+    },
+    {
+      "monster": "Pseudodragon",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.GC7oKXEGCyiVXrxw",
+      "actionIndex": 0,
+      "actionName": "Stinger",
+      "extraInfo": "and pass [Endure] or become Sickened (Cd4, Unconscious)",
+      "existingCausedStatuses": [
+        {
+          "statusId": "sickened",
+          "requiresDamage": true,
+          "saveType": "any",
+          "duration": "d4",
+          "tickDamageEnabled": false,
+          "damageOnTick": "",
+          "damageType": "-"
+        },
+        {
+          "statusId": "unconscious",
+          "requiresDamage": true,
+          "saveType": "any",
+          "duration": "",
+          "tickDamageEnabled": false,
+          "damageOnTick": "",
+          "damageType": "-"
+        }
+      ],
+      "proposedEntry": {
+        "statusId": "sickened",
+        "saveType": "endure",
+        "duration": "d4",
+        "tickDamageEnabled": false,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 0,
+        "fatigueOnTick": 0
+      }
+    },
+    {
+      "monster": "Shadow",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.zJTSUTgRHCA1233u",
+      "actionIndex": 0,
+      "actionName": "Life Drain",
+      "extraInfo": "and pass [Endure] or +1 Fatigue. If this kills it, it rises as a Shadow.",
+      "existingCausedStatuses": [],
+      "proposedEntry": {
+        "statusId": "",
+        "saveType": "endure",
+        "duration": "",
+        "tickDamageEnabled": false,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 1,
+        "fatigueOnTick": 0
+      }
+    },
+    {
+      "monster": "Spider, Giant Black Widow",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.KiEAtgHOGTguu2SW",
+      "actionIndex": 0,
+      "actionName": "Bite",
+      "extraInfo": "and pass [Endure] or become Sickened (Cd4, +1 Fatigue each Round).",
+      "existingCausedStatuses": [
+        {
+          "statusId": "sickened",
+          "requiresDamage": true,
+          "saveType": "any",
+          "duration": "d4",
+          "tickDamageEnabled": false,
+          "damageOnTick": "",
+          "damageType": "-"
+        }
+      ],
+      "proposedEntry": {
+        "statusId": "sickened",
+        "saveType": "endure",
+        "duration": "d4",
+        "tickDamageEnabled": false,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 0,
+        "fatigueOnTick": 1
+      }
+    },
+    {
+      "monster": "Spider, Giant Crab",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.SZpO5yGzoB9FI2cM",
+      "actionIndex": 0,
+      "actionName": "Bite",
+      "extraInfo": "and pass [Endure] with a +2 bonus or become Sickened (Cd4, +1 Fatigue each Round).",
+      "existingCausedStatuses": [
+        {
+          "statusId": "sickened",
+          "requiresDamage": true,
+          "saveType": "any",
+          "duration": "d4",
+          "tickDamageEnabled": false,
+          "damageOnTick": "",
+          "damageType": "-"
+        }
+      ],
+      "proposedEntry": {
+        "statusId": "sickened",
+        "saveType": "endure",
+        "duration": "d4",
+        "tickDamageEnabled": false,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 0,
+        "fatigueOnTick": 1,
+        "_saveModifierText": "+2"
+      }
+    },
+    {
+      "monster": "Vampire",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.UGMhE8UODeuZf3Ms",
+      "actionIndex": 2,
+      "actionName": "Bite",
+      "extraInfo": "and this Being is healed for the damage dealt. A Being that takes damage from this attack must pass [Endure] or be Cursed with Vampirism.",
+      "existingCausedStatuses": [],
+      "proposedEntry": {
+        "statusId": "cursed",
+        "saveType": "endure",
+        "duration": "",
+        "tickDamageEnabled": false,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 0,
+        "fatigueOnTick": 0
+      }
+    },
+    {
+      "monster": "Wererat",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.niDTL17izgqngzej",
+      "actionIndex": 1,
+      "actionName": "Bite",
+      "extraInfo": "and pass [Will] or be cursed with Wererat Lycanthropy.",
+      "existingCausedStatuses": [],
+      "proposedEntry": {
+        "statusId": "cursed",
+        "saveType": "will",
+        "duration": "",
+        "tickDamageEnabled": false,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 0,
+        "fatigueOnTick": 0
+      }
+    },
+    {
+      "monster": "Werewolf",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.klRBWjiNUz7GlVAb",
+      "actionIndex": 1,
+      "actionName": "Bite",
+      "extraInfo": "and pass [Will] or be cursed with Werewolf Lycanthropy.",
+      "existingCausedStatuses": [],
+      "proposedEntry": {
+        "statusId": "cursed",
+        "saveType": "will",
+        "duration": "",
+        "tickDamageEnabled": false,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 0,
+        "fatigueOnTick": 0
+      }
+    },
+    {
+      "monster": "Werewolf, Dire",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.COZgPuEHq67Lhcjd",
+      "actionIndex": 1,
+      "actionName": "Bite",
+      "extraInfo": "and pass [Will] or be cursed with Werewolf Lycanthropy.",
+      "existingCausedStatuses": [],
+      "proposedEntry": {
+        "statusId": "cursed",
+        "saveType": "will",
+        "duration": "",
+        "tickDamageEnabled": false,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 0,
+        "fatigueOnTick": 0
+      }
+    },
+    {
+      "monster": "Zombie, Boomer",
+      "monsterUuid": "Compendium.vagabond.bestiary.Actor.hLO69Zjvz7WaJAmO",
+      "actionIndex": 0,
+      "actionName": "Boom",
+      "extraInfo": "and pass [Endure] or Sickened (Cd4 damage). This Being dies.",
+      "existingCausedStatuses": [],
+      "proposedEntry": {
+        "statusId": "sickened",
+        "saveType": "endure",
+        "duration": "d4",
+        "tickDamageEnabled": true,
+        "damageOnTick": "",
+        "damageType": "-",
+        "requiresDamage": true,
+        "fatigueOnFail": 0,
+        "fatigueOnTick": 0
+      }
+    }
+  ]
+}

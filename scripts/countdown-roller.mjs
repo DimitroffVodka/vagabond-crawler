@@ -18,6 +18,10 @@ const DICE_ANIM_DELAY = 2500;
 // ── Helpers (lazy-loaded system imports) ────────────────────────────────────
 
 let _CountdownDice, _StatusHelper, _VagabondChatCard;
+// Captured during _createStatusCountdown so the CountdownDice.create wrapper
+// can pull fatigueOnTick off the rider entry without threading an extra arg
+// through the system's call chain.
+let _pendingRiderEntry = null;
 
 async function _loadSystemClasses() {
   if (!_CountdownDice) {
@@ -54,6 +58,12 @@ export const CountdownRoller = {
   // ── Init ──────────────────────────────────────────────────────────────────
 
   init() {
+    // Patch the system's _createStatusCountdown so the rider schema's
+    // `fatigueOnTick` field is persisted onto the countdown die's flags.
+    // The system's status-helper has a TODO comment at the same spot; we
+    // restore the feature here (Crawler-owned) rather than forking the system.
+    this._patchCreateStatusCountdown();
+
     Hooks.on("updateCombat", (combat, changes) => {
       if (!game.user.isGM) return;
       if (changes.round === undefined) return;       // round change only
@@ -112,6 +122,59 @@ export const CountdownRoller = {
     }
   },
 
+  // ── Patch system's _createStatusCountdown to persist fatigueOnTick ──────
+
+  /**
+   * Wrap `StatusHelper._createStatusCountdown` so the per-rider `fatigueOnTick`
+   * field is carried into the CountdownDice document's flags. The system's
+   * code has a literal `// TODO: fatigueOnTick — restore when re-enabling`
+   * comment in this spot; rather than fork the system, intercept the
+   * CountdownDice.create call the system makes and inject the flag.
+   */
+  async _patchCreateStatusCountdown() {
+    await _loadSystemClasses();
+    if (this._createStatusCountdownPatched) return;
+    this._createStatusCountdownPatched = true;
+
+    // The helper calls CountdownDice.create() with a shallow object. Wrap
+    // the static create so any call with a truthy `fatigueOnTick` on the
+    // caller's scope picks up the flag. Since the system strips unknown
+    // fields in its call site, we need to smuggle the value through a
+    // sibling patch: patch the helper itself by capturing the caller-scope
+    // `entry` before create.
+    const original = _StatusHelper._createStatusCountdown;
+    if (!original || original.__vcbPatchedFatigueOnTick) return;
+    _StatusHelper._createStatusCountdown = async function (actor, entry, sourceName = "", sourceActorName = "") {
+      // Temporarily stash the entry so the CountdownDice.create wrapper below
+      // can pick up fatigueOnTick from it. Using a module-scope ref avoids a
+      // prototype patch on CountdownDice.
+      _pendingRiderEntry = entry;
+      try {
+        return await original.call(this, actor, entry, sourceName, sourceActorName);
+      } finally {
+        _pendingRiderEntry = null;
+      }
+    };
+    _StatusHelper._createStatusCountdown.__vcbPatchedFatigueOnTick = true;
+
+    // Wrap CountdownDice.create — system's create doesn't persist the
+    // fatigueOnTick field (there's a literal TODO in the system code), so
+    // after the journal is created, stamp the flag directly if the pending
+    // rider entry has fatigueOnTick > 0.
+    const createOrig = _CountdownDice.create;
+    if (createOrig && !createOrig.__vcbPatchedFatigueOnTick) {
+      _CountdownDice.create = async function (data = {}) {
+        const fot = Number(_pendingRiderEntry?.fatigueOnTick) || 0;
+        const journal = await createOrig.call(this, data);
+        if (journal && fot > 0) {
+          await journal.update({ "flags.vagabond.countdownDice.fatigueOnTick": fot });
+        }
+        return journal;
+      };
+      _CountdownDice.create.__vcbPatchedFatigueOnTick = true;
+    }
+  },
+
   // ── Roll a single countdown die ──────────────────────────────────────────
 
   async _rollDie(diceJournal) {
@@ -157,6 +220,37 @@ export const CountdownRoller = {
         }
       } catch (err) {
         console.warn(`${MODULE_ID} | Countdown auto-roll tick damage error:`, err);
+      }
+    }
+
+    // Per-tick fatigue — the "+1 Fatigue each Round while Sickened" pattern
+    // (Ettercap, Giant Spider, Tarantella, Violet Fungus, etc). Reads the
+    // fatigueOnTick flag we stamp in _patchCreateStatusCountdown. Independent
+    // of tickDamageEnabled — a rider can have one, the other, or both.
+    const fatigueOnTick = Number(flags.fatigueOnTick) || 0;
+    if (fatigueOnTick > 0 && flags.linkedActorUuid) {
+      try {
+        const actor = await fromUuid(flags.linkedActorUuid);
+        if (actor?.system?.fatigue !== undefined) {
+          const autoApply = game.settings.get("vagabond", "autoApplySaveDamage");
+          if (autoApply) {
+            const current = actor.system.fatigue ?? 0;
+            const max = actor.system.fatigueMax ?? 5;
+            await actor.update({ "system.fatigue": Math.min(max, current + fatigueOnTick) });
+            ChatMessage.create({
+              content: `<div class="vagabond-chat-card-v2" data-card-type="apply-result">
+                <div class="card-body"><section class="content-body">
+                  <div class="card-description" style="text-align:center;">
+                    <strong>${actor.name}</strong> gains <strong>+${fatigueOnTick} Fatigue</strong> (${flags.linkedStatusId || "ongoing effect"} tick).
+                  </div>
+                </section></div>
+              </div>`,
+              speaker: ChatMessage.getSpeaker({ actor })
+            });
+          }
+        }
+      } catch (err) {
+        console.warn(`${MODULE_ID} | Countdown fatigue tick error:`, err);
       }
     }
 

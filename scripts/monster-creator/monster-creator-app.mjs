@@ -484,6 +484,8 @@ function _blankRider() {
     damageOnTick:      "",
     damageType:        "-",
     requiresDamage:    true, // "If Hit" — status only lands if the attack actually dealt damage
+    fatigueOnFail:     0,    // +N Fatigue applied to the target on save fail (0 = none)
+    fatigueOnTick:     0,    // +N Fatigue applied per countdown-die tick while the status persists
   };
 }
 
@@ -1182,6 +1184,8 @@ class MonsterCreatorApp extends HandlebarsApplicationMixin(ApplicationV2) {
           damageOnTick: r.damageOnTick ?? "",
           damageType: r.damageType ?? "-",
           requiresDamage: r.requiresDamage !== false,
+          fatigueOnFail: Number(r.fatigueOnFail) || 0,
+          fatigueOnTick: Number(r.fatigueOnTick) || 0,
           permanent: !(r.duration && r.duration.trim()),
           statusOptions: [{ value: "", label: "— Select Status —", selected: !r.statusId }]
             .concat(RIDER_STATUS_IDS.map((id) => ({

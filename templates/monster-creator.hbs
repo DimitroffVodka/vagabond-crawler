@@ -369,6 +369,8 @@
               <input type="text" class="mc-rider-tick" data-rider-field="damageOnTick" value="{{damageOnTick}}" placeholder="1d4" />
               <select class="mc-rider-dtype" data-rider-field="damageType">{{#each damageTypeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select>
               {{/if}}
+              <label class="mc-cb-row" title="Fatigue applied to target on failed save"><span>+Fat</span><input type="number" class="mc-rider-fat" data-rider-field="fatigueOnFail" value="{{fatigueOnFail}}" min="0" max="5" step="1" /></label>
+              <label class="mc-cb-row" title="Fatigue applied to target on each countdown-die tick while status persists"><span>+Fat/tick</span><input type="number" class="mc-rider-fat" data-rider-field="fatigueOnTick" value="{{fatigueOnTick}}" min="0" max="5" step="1" /></label>
               <button type="button" class="mc-rider-delete" data-action="deleteRider" data-rider-list="causedStatuses" aria-label="Remove on-hit effect" title="Remove"><i class="fas fa-times" aria-hidden="true"></i></button>
             </div>
             {{/each}}
@@ -392,6 +394,8 @@
               <input type="text" class="mc-rider-tick" data-rider-field="damageOnTick" value="{{damageOnTick}}" placeholder="1d4" />
               <select class="mc-rider-dtype" data-rider-field="damageType">{{#each damageTypeOptions}}<option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>{{/each}}</select>
               {{/if}}
+              <label class="mc-cb-row" title="Fatigue applied to target on failed save"><span>+Fat</span><input type="number" class="mc-rider-fat" data-rider-field="fatigueOnFail" value="{{fatigueOnFail}}" min="0" max="5" step="1" /></label>
+              <label class="mc-cb-row" title="Fatigue applied to target on each countdown-die tick while status persists"><span>+Fat/tick</span><input type="number" class="mc-rider-fat" data-rider-field="fatigueOnTick" value="{{fatigueOnTick}}" min="0" max="5" step="1" /></label>
               <button type="button" class="mc-rider-delete" data-action="deleteRider" data-rider-list="critCausedStatuses" aria-label="Remove crit on-hit effect" title="Remove"><i class="fas fa-times" aria-hidden="true"></i></button>
             </div>
             {{/each}}
