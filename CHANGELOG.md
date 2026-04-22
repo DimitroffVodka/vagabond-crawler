@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.14.0
 
 ### NPC Action Riders — Fatigue Payload
 
