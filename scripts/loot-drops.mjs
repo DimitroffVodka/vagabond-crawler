@@ -59,13 +59,13 @@ export const LootDrops = {
     game.settings.register(MODULE_ID, "lootDropEnabled", {
       name: "Loot Drops",
       hint: "Automatically generate loot bags from defeated NPCs when combat ends.",
-      scope: "world", config: true, type: Boolean, default: false,
+      scope: "world", config: false, type: Boolean, default: false,
     });
 
     game.settings.register(MODULE_ID, "lootDropChance", {
       name: "Loot Drop Chance (%)",
       hint: "Default percentage chance (0-100) for an NPC to drop loot. Individual NPCs can override this.",
-      scope: "world", config: true, type: Number, default: 50,
+      scope: "world", config: false, type: Number, default: 50,
     });
   },
 

@@ -604,6 +604,7 @@ export const CrawlBar = {
     const selected = canvas.tokens?.controlled ?? [];
     if (!selected.length) { ui.notifications.warn("Select tokens first."); return; }
     let added = 0;
+    const addedTokenDocs = [];
     for (const token of selected) {
       if (!token.actor) continue;
       const type = (token.document ?? token).disposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY ? "player" : "npc";
@@ -620,8 +621,21 @@ export const CrawlBar = {
       // a token joins the roster (e.g. mid-combat reinforcements or summons).
       await MovementTracker.resetActor(token.actor, token.document);
       MovementTracker.snapshotPosition(token.id);
+      addedTokenDocs.push(token.document);
       added++;
     }
+
+    // If we're in combat, also add the tokens to the encounter tracker — a
+    // mid-combat reinforcement or summon needs to be in the turn order, not
+    // just the strip. Uses the same API the Start Combat button uses.
+    if (added && CrawlState.paused && game.combat) {
+      const existingTokenIds = new Set(game.combat.combatants.map(c => c.tokenId));
+      const newInCombat = addedTokenDocs.filter(td => !existingTokenIds.has(td.id));
+      if (newInCombat.length) {
+        await TokenDocument.implementation.createCombatants(newInCombat);
+      }
+    }
+
     if (added) {
       ui.notifications.info(`Added ${added} token(s).`);
       this.render();
@@ -720,6 +734,18 @@ export const CrawlBar = {
   },
 };
 
+// Shared reconciler — keeps the strip in sync with the combat tracker regardless
+// of how combatants get added/removed (drop, encounter roller, dead-token cleanup,
+// manual add, etc). Called on every combat-related hook so no add/remove can slip
+// through a timing gap where CrawlState wasn't yet active.
+async function _syncCombatToStrip() {
+  if (!game.user.isGM || !CrawlState.active) return;
+  const { added, removed } = await CrawlState.syncCombatMembers();
+  if (!added.length && !removed.length) return;
+  const { CrawlStrip } = await import("./crawl-strip.mjs");
+  CrawlStrip.render();
+}
+
 // When a combat is created (e.g. right-click Toggle Combat State), auto-pause crawl
 Hooks.on("createCombat", async () => {
   if (!game.user.isGM || !CrawlState.active) return;
@@ -727,13 +753,16 @@ Hooks.on("createCombat", async () => {
   if (CrawlClock.available) await CrawlClock.hide();
   await CrawlState.pause();
   CrawlBar.render();
+  await _syncCombatToStrip();
   const { CrawlStrip } = await import("./crawl-strip.mjs");
   CrawlStrip.render();
 });
 
-// Re-render bar when combat starts (Begin Encounter from sidebar) so button swaps
-Hooks.on("combatStart", () => {
+// Re-render bar when combat starts (Begin Encounter from sidebar) so button swaps.
+// Also reconcile — if combatants were added before the crawl was active, catch them now.
+Hooks.on("combatStart", async () => {
   if (game.user.isGM && CrawlState.paused) CrawlBar.render();
+  await _syncCombatToStrip();
 });
 
 // Re-render bar on combat turn/round changes (keeps bar in sync with sidebar)
@@ -741,25 +770,27 @@ Hooks.on("updateCombat", (combat, changes) => {
   if (game.user.isGM && CrawlState.paused && changes.round !== undefined) CrawlBar.render();
 });
 
-// Auto-add any token dropped onto the combat tracker into the crawl strip
-Hooks.on("createCombatant", async (combatant) => {
+// Auto-add any token added to the combat tracker into the crawl strip
+Hooks.on("createCombatant", _syncCombatToStrip);
+
+// When a combatant is removed from the tracker (right-click Remove Participant,
+// etc.), also drop any matching strip member — strip removal goes first so
+// _syncCombatToStrip's Combat←Strip re-push won't immediately re-add heroes.
+Hooks.on("deleteCombatant", async (combatant) => {
   if (!game.user.isGM || !CrawlState.active) return;
-  const token = combatant.token;
-  if (!token?.actor) return;
-  const memberId = `token-${token.id}`;
-  if (CrawlState.members.some(m => m.id === memberId)) return;
-  const type = (token.document ?? token).disposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY ? "player" : "npc";
-  await CrawlState.addMember({
-    id:      memberId,
-    name:    token.name,
-    img:     token.texture?.src ?? token.actor.img,
-    type,
-    actorId: token.actor.id,
-    tokenId: token.id,
-    source:  type === "npc" ? "combat" : undefined,
-  });
-  const { CrawlStrip } = await import("./crawl-strip.mjs");
-  CrawlStrip.render();
+  if (combatant?.tokenId) {
+    const member = CrawlState.members.find(m => m.tokenId === combatant.tokenId);
+    // Use the internal splice path — not removeMember — because removeMember
+    // cascades back to combat, but this combatant is already being deleted.
+    if (member) {
+      const idx = CrawlState.members.findIndex(m => m.id === member.id);
+      if (idx !== -1) {
+        CrawlState._state.members.splice(idx, 1);
+        await CrawlState._save();
+      }
+    }
+  }
+  await _syncCombatToStrip();
 });
 
 // Resume prompt when combat ends

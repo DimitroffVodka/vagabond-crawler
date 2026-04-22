@@ -47,7 +47,7 @@ export const CountdownRoller = {
     game.settings.register(MODULE_ID, "countdownAutoRoll", {
       name: "Auto-Roll Countdown Dice",
       hint: "Automatically roll all combat-linked countdown dice at the start of each round.",
-      scope: "world", config: true, type: Boolean, default: true,
+      scope: "world", config: false, type: Boolean, default: true,
     });
   },
 

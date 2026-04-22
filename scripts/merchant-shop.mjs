@@ -71,7 +71,7 @@ export const MerchantShop = {
     game.settings.register(MODULE_ID, "shopSellRatio", {
       name: "Merchant Sell Ratio (%)",
       hint: "Percentage of an item's value players receive when selling back to the shop.",
-      scope: "world", config: true, type: Number, default: 50,
+      scope: "world", config: false, type: Number, default: 50,
       range: { min: 0, max: 100, step: 5 },
     });
     game.settings.register(MODULE_ID, "shopLog", {
@@ -94,7 +94,7 @@ export const MerchantShop = {
     game.settings.register(MODULE_ID, "shopName", {
       name: "Merchant Shop Name",
       hint: "Display name shown on the shop window.",
-      scope: "world", config: true, type: String, default: "The Merchant",
+      scope: "world", config: false, type: String, default: "The Merchant",
     });
     game.settings.register(MODULE_ID, "savedShopConfigs", {
       scope: "world", config: false, type: Object, default: {},

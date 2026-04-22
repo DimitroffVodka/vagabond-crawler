@@ -555,12 +555,11 @@ body.theme-light .vcb-phase-badge {
   align-items: stretch;
   background: linear-gradient(180deg, var(--vcb-surface-2) 0%, var(--vcb-surface-1) 100%);
   width: max-content;
-  /* Cap at viewport and allow horizontal scroll when the party is wider
-   * than the screen (tablet portrait / 5+ member party). Scrollbar only
-   * appears when content overflows; no visual change on wide screens. */
-  max-width: 100vw;
-  overflow-x: auto;
-  overflow-y: visible;
+  /* overflow: visible is REQUIRED — the .vcs-action-tabs dropdown is
+   * position:absolute below the card. Setting overflow-x:auto here (as an
+   * older tablet-scroll attempt did) triggers a CSS gotcha where browsers
+   * compute overflow-y as auto, which clips the dropdown AND adds a stray
+   * vertical scrollbar whenever the hover menu appears. */
   box-shadow: 0 2px 8px var(--vcb-shadow-md);
   border-bottom: 2px solid var(--vcb-accent-dim);
   border-radius: 0 0 var(--vcb-radius) var(--vcb-radius);
@@ -816,6 +815,12 @@ body.theme-light .vcb-phase-badge {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  /* Always anchor to the bottom of .vcs-overlay. The overlay uses
+   * justify-content: space-between, which only distributes between ≥2 children.
+   * When name is hidden AND effects row is empty, .vcs-bottom would be the
+   * only child and get parked at the top — margin-top:auto forces it back
+   * to the bottom regardless of siblings. */
+  margin-top: auto;
 }
 
 .vcs-hp-bar-wrap {
@@ -5451,5 +5456,55 @@ body.theme-light {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SETTINGS GROUP CONFIG WINDOW — submenus registered via registerMenu
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.vcb-settings-group-body {
+  padding: 12px 4px 4px;
+}
+
+.vcb-settings-group-hint {
+  color: var(--vcb-text-muted, #8a8a8a);
+  font-style: italic;
+  margin: 0 0 14px 0;
+  font-size: 12px;
+}
+
+.vcb-settings-row {
+  margin-bottom: 14px;
+}
+
+.vcb-settings-label {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.vcb-settings-scope-tag {
+  color: var(--vcb-text-muted, #8a8a8a);
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.vcb-settings-hint {
+  font-size: 11px;
+  color: var(--vcb-text-muted, #8a8a8a);
+  margin: 4px 0 0 0;
+  line-height: 1.35;
+}
+
+.vcb-field-readonly {
+  opacity: 0.65;
+}
+
+.vcb-settings-footer {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--vcb-border, rgba(255,255,255,0.08));
+  text-align: right;
 }
 

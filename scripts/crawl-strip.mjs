@@ -95,7 +95,7 @@ export const CrawlStrip = {
 
     const isHeroes   = state.isHeroesPhase;
     const inCombat   = state.paused;
-    const hideNames  = game.settings.get(MODULE_ID, "hideNpcNames");
+    const hideNames  = game.settings.get(MODULE_ID, "hideNpcNames") && !game.user.isGM;
     const hideNpcHp  = game.settings.get(MODULE_ID, "hideNpcHpBar") && !game.user.isGM;
     const autoRemove = game.settings.get(MODULE_ID, "autoRemoveDefeated");
 
@@ -148,6 +148,17 @@ export const CrawlStrip = {
 
       // Skip defeated if auto-remove enabled
       if (isDefeated && autoRemove) return "";
+
+      // Visibility rules:
+      //   • Hidden in BOTH tracker and scene → drop the card for everyone
+      //     (GM is already tracking them on the canvas and tracker; no need
+      //     for a strip duplicate of an enemy the party hasn't spotted).
+      //   • Hidden on only one side → only hide from non-GM players; GM
+      //     keeps the card so the partial-hidden state stays visible.
+      const combatantHidden = combatant?.hidden === true;
+      const tokenHidden     = tokenDoc?.hidden === true;
+      if (combatantHidden && tokenHidden) return "";
+      if ((combatantHidden || tokenHidden) && !game.user.isGM) return "";
 
       const activations  = combatant?.flags?.vagabond?.activations;
       const hasActed     = activations ? activations.value === 0 : false;
@@ -212,9 +223,7 @@ export const CrawlStrip = {
 
       // Action menu tab strip — only during combat, below the card
       const isNPC = actor?.type === "npc" || m.type === "gm";
-      const showMenu = inCombat
-        && actor?.isOwner
-        && game.settings.get(MODULE_ID, "npcActionMenu");
+      const showMenu = inCombat && actor?.isOwner;
       const tabStrip = showMenu ? buildTabStripHTML(actor, isNPC) : "";
       const hasMenu  = showMenu && !!tabStrip;
 
@@ -454,13 +463,26 @@ Hooks.on("updateActor", async (actor) => {
   }
 });
 
-// Catch HP changes on unlinked tokens (synthetic actors — NPCs in combat)
+// Catch HP/hidden changes on tokens (unlinked NPC HP + visibility sync)
 Hooks.on("updateToken", async (tokenDoc, changes) => {
   if (!CrawlState.active) return;
-  if (!changes.actorData && !changes.delta && !changes.system) return;
+  const hpChanged     = changes.actorData || changes.delta || changes.system;
+  const hiddenChanged = "hidden" in changes;
+  if (!hpChanged && !hiddenChanged) return;
   CrawlStrip.queueRender();
+
+  // Sync token.hidden → combatant.hidden so the tracker's eye icon matches
+  // the token's visibility state. Guard: only act if they actually differ
+  // (prevents loops with the reverse updateCombatant sync below).
+  if (hiddenChanged && game.user.isGM && game.combat) {
+    const combatant = game.combat.combatants.find(c => c.tokenId === tokenDoc.id);
+    if (combatant && combatant.hidden !== changes.hidden) {
+      await combatant.update({ hidden: changes.hidden });
+    }
+  }
+
   // Auto-defeat unlinked tokens at 0 HP
-  if (game.user.isGM && game.combat) {
+  if (hpChanged && game.user.isGM && game.combat) {
     const hp = tokenDoc.actor?.system?.health?.value ?? null;
     if (hp !== null && hp <= 0) {
       const combatant = game.combat.combatants.find(c => c.tokenId === tokenDoc.id && !c.defeated);
@@ -474,6 +496,17 @@ Hooks.on("updateToken", async (tokenDoc, changes) => {
       }
     }
   }
+});
+
+// Sync combatant.hidden → token.hidden for the reverse direction (e.g. the GM
+// toggles hidden in the combat tracker; the canvas token should update too).
+Hooks.on("updateCombatant", async (combatant, changes) => {
+  if (!game.user.isGM) return;
+  if (!("hidden" in changes)) return;
+  const tokenDoc = combatant.token;
+  if (!tokenDoc) return;
+  if (tokenDoc.hidden === changes.hidden) return;  // already in sync
+  await tokenDoc.update({ hidden: changes.hidden });
 });
 
 Hooks.on("updateItem", () => { if (CrawlState.active) CrawlStrip.queueRender(); });

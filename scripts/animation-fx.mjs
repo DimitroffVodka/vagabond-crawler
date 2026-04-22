@@ -22,30 +22,34 @@ export const AnimationFx = {
       name: "Animation FX: Trigger On",
       hint: "When to play hit animations for weapon attacks. 'On hit only' skips animations for missed rolls.",
       scope: "world",
-      config: true,
+      config: false,
       type: String,
       choices: { always: "Always", hit: "On Hit Only" },
       default: "always",
     });
+    // Per-client animation toggles — shown directly in the main Foundry module
+    // settings panel so every user (players + GM) can tweak their own playback.
+    // Global Scale stays config:false — it's advanced and still editable inside
+    // the GM-only Animation FX Config window's Settings tab.
     game.settings.register(MODULE_ID, "animationFxEnabled", {
-      name: "Animation FX: Enabled (this client)",
-      hint: "Master toggle for animation playback on this machine. Each player sets their own.",
+      name: "Animation FX",
+      hint: "Play hit/miss animations for weapon attacks, alchemy, gear, and NPC actions. Affects only your machine.",
       scope: "client", config: true, type: Boolean, default: true,
     });
     game.settings.register(MODULE_ID, "animationFxScale", {
       name: "Animation FX: Global Scale",
       hint: "Multiplier applied to every animation's scale. 1.0 = normal, 0.5 = half size, 2.0 = doubled.",
-      scope: "client", config: true, type: Number, default: 1.0,
+      scope: "client", config: false, type: Number, default: 1.0,
       range: { min: 0.25, max: 3, step: 0.05 },
     });
     game.settings.register(MODULE_ID, "animationFxSoundEnabled", {
-      name: "Animation FX: Sound Enabled",
-      hint: "Master toggle for hit/miss sound effects.",
+      name: "Animation FX: Sound",
+      hint: "Play hit/miss sound effects alongside animations. Affects only your machine.",
       scope: "client", config: true, type: Boolean, default: true,
     });
     game.settings.register(MODULE_ID, "animationFxMasterVolume", {
       name: "Animation FX: Master Volume",
-      hint: "Master volume for animation sounds (0 – 1).",
+      hint: "Master volume for animation sounds (0 – 1). Affects only your machine.",
       scope: "client", config: true, type: Number, default: 0.8,
       range: { min: 0, max: 1, step: 0.05 },
     });
@@ -56,7 +60,7 @@ export const AnimationFx = {
     // the same key, so both UIs stay in sync automatically.
     const registerCat = (key, name, hint) => {
       game.settings.register(MODULE_ID, key, {
-        name, hint, scope: "world", config: true, type: Boolean, default: true,
+        name, hint, scope: "world", config: false, type: Boolean, default: true,
       });
     };
     registerCat("animationFxCategoryWeapons", "Animation FX → Weapons",

@@ -37,7 +37,7 @@ export const ItemDrops = {
       name: "Item Drops",
       hint: "Allow players to drag items from inventory onto the canvas as pickup-able tokens.",
       scope: "world",
-      config: true,
+      config: false,
       type: Boolean,
       default: true,
     });

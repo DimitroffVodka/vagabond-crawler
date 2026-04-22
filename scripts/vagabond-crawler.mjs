@@ -31,6 +31,7 @@ import { XpCounterPatch }  from "./xp-counter-patch.mjs";
 import { SessionRecap }    from "./session-recap.mjs";
 import { AnimationFx }    from "./animation-fx.mjs";
 import { StackSplit }     from "./stack-split.mjs";
+import { registerSettingsGroupMenus } from "./settings-group-app.mjs";
 
 export const MODULE_ID = "vagabond-crawler";
 
@@ -55,7 +56,7 @@ Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "timePassesMinutes", {
     name: "Default Time Passes (minutes)",
     hint: "How many minutes advance when the Time Passes button is clicked.",
-    scope: "world", config: true, type: Number, default: 10
+    scope: "world", config: false, type: Number, default: 10
   });
 
   // Crawl state persistence
@@ -74,7 +75,7 @@ Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "encounterRollGMOnly", {
     name: "Encounter Roll: GM Only",
     hint: "If enabled, encounter check results are whispered to the GM only.",
-    scope: "world", config: true, type: Boolean, default: true
+    scope: "world", config: false, type: Boolean, default: true
   });
 
   // Auto-pause on rolled encounter — gives the GM a beat to prep before the
@@ -83,7 +84,7 @@ Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "pauseOnEncounter", {
     name: "Pause Game on Encounter Hit",
     hint: "When an encounter check rolls a hit, automatically pause the game so the GM can set up.",
-    scope: "world", config: true, type: Boolean, default: true
+    scope: "world", config: false, type: Boolean, default: true
   });
 
   // Encounter threshold (1-in-6 through 5-in-6) — UI via right-click popover
@@ -101,11 +102,11 @@ Hooks.once("init", () => {
     scope: "world", config: false, type: String, default: "[]"
   });
 
-  // Hide NPC names in the strip
+  // Hide NPC names in the strip (players only; GM always sees names)
   game.settings.register(MODULE_ID, "hideNpcNames", {
-    name: "Hide NPC Names in Strip",
-    hint: "Remove NPC names from the top bar entirely.",
-    scope: "world", config: true, type: Boolean, default: false,
+    name: "Hide NPC Names from Players",
+    hint: "Players won't see NPC names on the crawl strip. The GM always sees them.",
+    scope: "world", config: false, type: Boolean, default: false,
     onChange: () => { game.vagabondCrawler?.strip?.render(); },
   });
 
@@ -113,7 +114,7 @@ Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "hideNpcHpBar", {
     name: "Hide NPC Health Bar from Players",
     hint: "Players won't see HP bars or values on NPC cards in the crawl strip. The GM still sees them.",
-    scope: "world", config: true, type: Boolean, default: false,
+    scope: "world", config: false, type: Boolean, default: false,
     onChange: () => { game.vagabondCrawler?.strip?.render(); },
   });
 
@@ -121,22 +122,19 @@ Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "autoRemoveDefeated", {
     name: "Auto-Hide Defeated Tokens",
     hint: "Defeated tokens are hidden from the strip instead of showing a skull.",
-    scope: "world", config: true, type: Boolean, default: false,
+    scope: "world", config: false, type: Boolean, default: false,
     onChange: () => { game.vagabondCrawler?.strip?.render(); },
   });
 
-  game.settings.register(MODULE_ID, "npcActionMenu", {
-    name: "NPC Action Menu",
-    hint: "Show a hover dropdown on NPC cards during combat with their Actions and Abilities. Players can only use actions on actors they own.",
-    scope: "world", config: true, type: Boolean, default: true,
-    onChange: () => { game.vagabondCrawler?.strip?.render(); },
-  });
+  // NPC Action Menu is always on — removed the per-world toggle. The hover
+  // dropdown on NPC cards during combat is core UX; players can still only
+  // trigger actions on actors they own (owner check inside the menu handler).
 
   // Flanking
   game.settings.register(MODULE_ID, "flankingEnabled", {
     name: "Flanking",
     hint: "Automatically apply Vulnerable when 2+ allies are Close to a foe that is no more than one size larger.",
-    scope: "world", config: true, type: Boolean, default: true,
+    scope: "world", config: false, type: Boolean, default: true,
   });
 
   // Register all sub-module settings
@@ -155,13 +153,18 @@ Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "realtimeTracking", {
     name: "Real-Time Light Burn",
     hint: "Burn light sources in real time (1 real second = 1 game second). Pauses when Foundry is paused. If disabled, light only burns when Time Passes is clicked.",
-    scope: "world", config: true, type: Boolean, default: false,
+    scope: "world", config: false, type: Boolean, default: false,
     onChange: (val) => {
       const { LightTracker } = game.vagabondCrawler ?? {};
       if (!LightTracker) return;
       val ? LightTracker.startRealTime() : LightTracker.stopRealTime();
     },
   });
+
+  // Register the 7 submenu buttons (Light, Encounter, Crawl Strip, Combat,
+  // Movement, Loot & Merchant, Animation FX) — must be after all settings
+  // are registered.
+  registerSettingsGroupMenus();
 
   // Register Handlebars helpers for template conditionals
   if (!Handlebars.helpers.eq) {

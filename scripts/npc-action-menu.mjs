@@ -931,7 +931,6 @@ async function _fireAction(actor, type, indexStr, itemId) {
  */
 export function bindActionMenuEvents(stripEl) {
   if (!stripEl) return;
-  if (!game.settings.get(MODULE_ID, "npcActionMenu")) return;
 
   stripEl.querySelectorAll(".vcs-card-wrap[data-has-menu]").forEach(wrap => {
     const actorId = wrap.dataset.actorId;

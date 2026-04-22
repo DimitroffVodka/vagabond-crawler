@@ -197,17 +197,17 @@ export const MovementTracker = {
     game.settings.register(MODULE_ID, "enforceCrawlMovement", {
       name: "Enforce Crawl Movement",
       hint: "Block tokens from moving beyond their crawl speed during the Heroes phase.",
-      scope: "world", config: true, type: Boolean, default: true,
+      scope: "world", config: false, type: Boolean, default: true,
     });
     game.settings.register(MODULE_ID, "enforceCombatMovement", {
       name: "Enforce Combat Movement",
       hint: "Block tokens from moving beyond their base speed (+ Rush) during combat.",
-      scope: "world", config: true, type: Boolean, default: true,
+      scope: "world", config: false, type: Boolean, default: true,
     });
     game.settings.register(MODULE_ID, "enforceNpcMovement", {
       name: "Enforce NPC Movement",
       hint: "Block NPC tokens from exceeding their movement budget in combat. When off, only player tokens are enforced.",
-      scope: "world", config: true, type: Boolean, default: false,
+      scope: "world", config: false, type: Boolean, default: false,
     });
   },
 

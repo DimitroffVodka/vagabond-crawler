@@ -167,8 +167,120 @@ export const CrawlState = {
   async removeMember(id) {
     if (!this._state) return;
     const idx = this._state.members.findIndex(m => m.id === id);
-    if (idx !== -1) this._state.members.splice(idx, 1);
+    if (idx === -1) return;
+    const removed = this._state.members[idx];
+    this._state.members.splice(idx, 1);
     await this._save();
+
+    // Cascade to the combat tracker — a manual remove on the strip means
+    // "this actor is leaving the encounter too." Strip removal happens first
+    // so the reconciler (fired by deleteCombatant) won't immediately re-push
+    // the hero back into combat from stale strip state.
+    if (removed.tokenId && game.combat) {
+      const combatant = game.combat.combatants.find(c => c.tokenId === removed.tokenId);
+      if (combatant) {
+        await game.combat.deleteEmbeddedDocuments("Combatant", [combatant.id]);
+      }
+    }
+  },
+
+  /**
+   * Reconcile the crawl strip's members list with the active combat tracker,
+   * both directions:
+   *   • Any combatant missing from members gets added to the strip.
+   *   • Any combat-sourced member whose combatant is gone gets removed.
+   *   • Any hero (type:"player") in members without a combatant gets added
+   *     to the tracker (so the party always joins the encounter turn order).
+   *
+   * Safe to call any time. Returns { added, removed, combatantsAdded } for
+   * logging/debug.
+   */
+  async syncCombatMembers() {
+    if (!this._state || !game.user?.isGM) {
+      return { added: [], removed: [], combatantsAdded: [] };
+    }
+    // Reentrancy guard — `createEmbeddedDocuments("Combatant")` fires a
+    // createCombatant hook for each newly-created combatant, which re-enters
+    // this function before the prior create has landed in the combatants
+    // snapshot. Without the guard, each re-entry sees heroes still "missing"
+    // and pushes duplicates.
+    if (this._syncing) return { added: [], removed: [], combatantsAdded: [] };
+    this._syncing = true;
+    try {
+      return await this._syncCombatMembersImpl();
+    } finally {
+      this._syncing = false;
+    }
+  },
+
+  async _syncCombatMembersImpl() {
+    const combat = game.combat;
+    const combatants = combat?.combatants?.contents ?? [];
+    const added = [];
+    const removed = [];
+    const combatantsAdded = [];
+    let dirty = false;
+
+    // Strip ← Combat: add any combatant missing from members
+    for (const c of combatants) {
+      const token = c.token;
+      if (!token?.actor) continue;
+      const memberId = `token-${token.id}`;
+      if (this._state.members.some(m => m.id === memberId)) continue;
+      const type = (token.document ?? token).disposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY
+        ? "player" : "npc";
+      this._state.members.push({
+        id:      memberId,
+        name:    token.name,
+        img:     token.texture?.src ?? token.actor.img,
+        type,
+        actorId: token.actor.id,
+        tokenId: token.id,
+        source:  type === "npc" ? "combat" : undefined,
+      });
+      added.push(token.name);
+      dirty = true;
+    }
+
+    // Strip ← Combat: remove any combat-sourced member whose combatant is gone
+    const combatantTokenIds = new Set(combatants.map(c => c.tokenId));
+    for (let i = this._state.members.length - 1; i >= 0; i--) {
+      const m = this._state.members[i];
+      if (m.source !== "combat") continue;
+      if (combatantTokenIds.has(m.tokenId)) continue;
+      this._state.members.splice(i, 1);
+      removed.push(m.name);
+      dirty = true;
+    }
+
+    if (dirty) await this._save();
+
+    // Combat ← Strip: push any hero member missing from the combat tracker.
+    // In v13 a combat doc may be "sceneless" — combat.scene is undefined and
+    // each combatant carries its own sceneId. Derive the target scene from
+    // (in order) combat.scene, the first existing combatant, or the canvas.
+    if (combat) {
+      const targetSceneId = combat.scene?.id
+        ?? combatants[0]?.sceneId
+        ?? canvas.scene?.id;
+      const targetScene = targetSceneId ? game.scenes.get(targetSceneId) : null;
+      if (targetScene) {
+        const toAdd = [];
+        for (const m of this._state.members) {
+          if (m.type !== "player" || !m.tokenId) continue;
+          if (combatantTokenIds.has(m.tokenId)) continue;
+          const tokenDoc = targetScene.tokens.get(m.tokenId);
+          if (!tokenDoc) continue;  // hero's token is on a different scene
+          toAdd.push({ tokenId: m.tokenId, sceneId: targetSceneId, actorId: tokenDoc.actorId });
+          combatantsAdded.push(m.name);
+        }
+        if (toAdd.length) {
+          await combat.createEmbeddedDocuments("Combatant", toAdd);
+        }
+      }
+    }
+
+    return { added, removed, combatantsAdded };
   },
 
   // ── Time ──────────────────────────────────────────────────────────────────────

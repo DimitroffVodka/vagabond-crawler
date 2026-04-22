@@ -1,0 +1,37 @@
+{{!-- Vagabond Crawler — Settings group form (single root element required by ApplicationV2) --}}
+<div class="vcb-settings-group-root">
+  <div class="vcb-settings-group-body">
+    {{#if groupHint}}<p class="vcb-settings-group-hint">{{groupHint}}</p>{{/if}}
+
+    {{#each fields}}
+      <div class="form-group vcb-settings-row {{#unless canEdit}}vcb-field-readonly{{/unless}}">
+        <label class="vcb-settings-label">
+          <span class="vcb-settings-name">{{name}}</span>
+          <span class="vcb-settings-scope-tag">({{scopeTag}})</span>
+        </label>
+        <div class="form-fields vcb-settings-input">
+          {{#if isCheckbox}}
+            <input type="checkbox" name="{{key}}" {{checked value}} {{#unless canEdit}}disabled{{/unless}}>
+          {{else if isNumber}}
+            <input type="number" name="{{key}}" value="{{value}}" step="any" {{#unless canEdit}}disabled{{/unless}}>
+          {{else if isSelect}}
+            <select name="{{key}}" {{#unless canEdit}}disabled{{/unless}}>
+              {{#each choices}}
+                <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+              {{/each}}
+            </select>
+          {{else}}
+            <input type="text" name="{{key}}" value="{{value}}" {{#unless canEdit}}disabled{{/unless}}>
+          {{/if}}
+        </div>
+        {{#if hint}}<p class="hint vcb-settings-hint">{{hint}}</p>{{/if}}
+      </div>
+    {{/each}}
+  </div>
+
+  <footer class="form-footer vcb-settings-footer">
+    <button type="submit" class="vcb-btn vcb-btn-primary">
+      <i class="fa-solid fa-floppy-disk"></i> Save
+    </button>
+  </footer>
+</div>
