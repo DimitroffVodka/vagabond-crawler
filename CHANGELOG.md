@@ -49,6 +49,19 @@ Deep bug-fix pass on the Animation FX system — every sheet-level override path
 - **Encounter check logging in the recap** — every random-encounter d6 is now logged to the session recap (not just hits), with roll, threshold, hit/miss, clock label, and timestamp. The new `## Encounter Checks` section shows rolls/hits/hit-rate/avg d6 plus a chronological list.
 - **XP breakdown consolidation in the recap** — multiple XP awards to the same player over a session now merge into one list instead of repeating per-award. Preserves questionnaire order, shows `(3 XP ea)` rate tags for multi-point entries, and adds a per-event audit line when a player received awards in more than one sitting. Grand-total across all players still computed.
 
+### Inventory Stack Split / Merge
+
+- **Drag a stacked item onto an empty slot → peels one off.** Source quantity drops by 1, a new qty-1 item lands in the first empty slot. The new piece is a full clone (flags, effects, custom fields preserved) and is created with `skipStack: true` so the auto-stack hook doesn't immediately merge it back.
+- **Right-click → "Split Stack…"** on any stacked item opens a dialog with a number input (1 to qty−1, default half). Splits off the chosen amount in one action.
+- **Drag one stack onto another of the same identity → merges.** The dragged item is absorbed into the target (target quantity += source quantity; source deleted). "Same identity" means name + type + matching lit/junk flags — lit torches stay separate from unlit, junk-marked stacks stay separate from clean ones, with a warning toast if the drop is blocked by an identity mismatch the user clearly intended as a merge.
+- **Drop interception is scoped.** Plain drag-to-reorder on the grid still works unchanged — only drops that target empty slots (for stacks with qty > 1) or same-identity cards trigger the split/merge path. Everything else falls through to the system's reorder handler.
+- **Owner-gated, no socket needed.** Any actor owner (players on their own sheet, GM on any sheet) can split and merge. All mutations go through direct `updateEmbeddedDocuments` / `createEmbeddedDocuments` — Foundry handles the client sync.
+- **Shared identity helper.** The auto-stack `preCreateItem` hook now delegates to `StackSplit.sameStackIdentity` instead of its old inline name+type+lit check, so the "what counts as the same stack" rule lives in one place.
+
+### Context Menu Cleanup
+
+- **Module-injected inventory entries now match the system's layout exactly.** Mark as Junk, Split Stack…, Use Scroll, and Use Enchantment Scroll were being injected as `<li>` elements, but the Vagabond system builds its context menu from `<div class="context-menu-item"><i/><span/></div>`. The mismatched element type meant our entries rendered with wrong height, wrong kerning, and a hand-rolled amber tint that didn't match anything else. All four now use the system's structure and inherit its CSS verbatim — indistinguishable from native entries except by position.
+
 ## v1.12.0
 
 Bug-fix / QA pass on systems exercised during live play — attribution in the session recap, loot visibility, merchant purchases, DPR math, and a pair of new features (unclaimed-loot tracking, auto-pause on encounter, proper Relic: +1 Enchantment Scrolls).

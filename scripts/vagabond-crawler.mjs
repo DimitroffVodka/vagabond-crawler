@@ -30,6 +30,7 @@ import { MonsterCreator }  from "./monster-creator/monster-creator-app.mjs";
 import { XpCounterPatch }  from "./xp-counter-patch.mjs";
 import { SessionRecap }    from "./session-recap.mjs";
 import { AnimationFx }    from "./animation-fx.mjs";
+import { StackSplit }     from "./stack-split.mjs";
 
 export const MODULE_ID = "vagabond-crawler";
 
@@ -211,6 +212,7 @@ Hooks.once("ready", async () => {
     monsterCreator: MonsterCreator,
     recap: SessionRecap,
     animationFx: AnimationFx,
+    stackSplit: StackSplit,
     debugCombat: () => {
       const combat = game.combat;
       if (!combat) return "No active combat";
@@ -290,22 +292,23 @@ Hooks.once("ready", async () => {
     LightTracker.startRealTime();
   }
 
-  // Auto-stack items: when adding an item that already exists, merge quantities
+  // Stack split/merge gestures on the inventory grid
+  StackSplit.init();
+
+  // Auto-stack items: when adding an item that already exists, merge quantities.
+  // Uses StackSplit.sameStackIdentity so the "what counts as the same stack"
+  // rule lives in one place (shared with the drag-onto merge gesture).
   Hooks.on("preCreateItem", (item, data, options, userId) => {
     if (userId !== game.userId) return;
     if (options?.skipStack) return;       // bypass when splitting stacks
     const actor = item.parent;
     if (!actor || actor.documentName !== "Actor") return;
     if (!item.system?.quantity) return;   // no quantity field (non-equipment)
-    // Don't stack lit light sources — they need to stay separate
-    if (item.flags?.["vagabond-crawler"]?.lit) return;
 
-    // Find existing item with same name and type
     const existing = actor.items.find(i =>
       i.id !== item.id
-      && i.name === item.name
-      && i.type === item.type
       && i.system?.quantity != null
+      && StackSplit.sameStackIdentity(i, item)
     );
     if (!existing) return;
 
@@ -393,15 +396,15 @@ Hooks.once("ready", async () => {
           if (menu) {
             clearInterval(poll);
             if (menu.querySelector(".vcscr-ctx-item")) return;
-            const li = document.createElement("li");
-            li.className = "vcscr-ctx-item";
-            li.innerHTML = `<i class="fas fa-scroll"></i> Use Scroll`;
-            li.addEventListener("click", async ev => {
+            const entry = document.createElement("div");
+            entry.className = "context-menu-item vcscr-ctx-item";
+            entry.innerHTML = `<i class="fas fa-scroll"></i><span>Use Scroll</span>`;
+            entry.addEventListener("click", async ev => {
               ev.stopPropagation();
               menu.remove();
               await ScrollForge.useScroll(item);
             });
-            menu.insertBefore(li, menu.firstChild);
+            menu.insertBefore(entry, menu.firstChild);
           } else if (++attempts >= 10) {
             clearInterval(poll);
           }
@@ -431,15 +434,15 @@ Hooks.once("ready", async () => {
           if (menu) {
             clearInterval(poll);
             if (menu.querySelector(".vc-ench-ctx-item")) return;
-            const li = document.createElement("li");
-            li.className = "vc-ench-ctx-item";
-            li.innerHTML = `<i class="fas fa-wand-magic-sparkles"></i> Use Enchantment Scroll`;
-            li.addEventListener("click", async ev => {
+            const entry = document.createElement("div");
+            entry.className = "context-menu-item vc-ench-ctx-item";
+            entry.innerHTML = `<i class="fas fa-wand-magic-sparkles"></i><span>Use Enchantment Scroll</span>`;
+            entry.addEventListener("click", async ev => {
               ev.stopPropagation();
               menu.remove();
               await EnchantmentScroll.useScroll(item);
             });
-            menu.insertBefore(li, menu.firstChild);
+            menu.insertBefore(entry, menu.firstChild);
           } else if (++attempts >= 10) {
             clearInterval(poll);
           }
@@ -477,12 +480,12 @@ Hooks.once("ready", async () => {
             clearInterval(poll);
             if (menu.querySelector(".vc-junk-ctx-item")) return;
             const isJunk = !!item.getFlag(MODULE_ID, "junk");
-            const li = document.createElement("li");
-            li.className = "vc-junk-ctx-item";
-            li.innerHTML = isJunk
-              ? `<i class="fas fa-recycle"></i> Unmark Junk`
-              : `<i class="fas fa-trash-can"></i> Mark as Junk`;
-            li.addEventListener("click", async ev => {
+            const entry = document.createElement("div");
+            entry.className = "context-menu-item vc-junk-ctx-item";
+            entry.innerHTML = isJunk
+              ? `<i class="fas fa-recycle"></i><span>Unmark Junk</span>`
+              : `<i class="fas fa-trash-can"></i><span>Mark as Junk</span>`;
+            entry.addEventListener("click", async ev => {
               ev.stopPropagation();
               menu.remove();
               if (isJunk) {
@@ -491,7 +494,7 @@ Hooks.once("ready", async () => {
                 await item.setFlag(MODULE_ID, "junk", true);
               }
             });
-            menu.insertBefore(li, menu.firstChild);
+            menu.insertBefore(entry, menu.firstChild);
           } else if (++attempts >= 10) {
             clearInterval(poll);
           }
