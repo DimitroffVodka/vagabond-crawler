@@ -299,8 +299,14 @@ Hooks.once("ready", async () => {
   // Stack split/merge gestures on the inventory grid
   StackSplit.init();
 
-  // "Gather Friendlies" button on the Party token HUD
-  GatherFriendlies.init();
+  // "Gather Friendlies" — DEPRECATED. Replaced by VCE's GatherCompanions
+  // (scripts/companion/gather-companions.mjs in vagabond-character-enhancer).
+  // The VCE version uses the Party-Token snapshot pattern (compress/release)
+  // scoped to VCE-flagged companions. Only init the crawler version if VCE
+  // isn't active, so standalone crawler installs still get the legacy feature.
+  if (!game.modules.get("vagabond-character-enhancer")?.active) {
+    GatherFriendlies.init();
+  }
 
   // Auto-stack items: when adding an item that already exists, merge quantities.
   // Uses StackSplit.sameStackIdentity so the "what counts as the same stack"
