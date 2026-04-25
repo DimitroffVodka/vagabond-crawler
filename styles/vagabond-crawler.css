@@ -1343,6 +1343,15 @@ body.theme-light .vcb-phase-badge {
 }
 .vcs-panel-item:hover { background: var(--vcb-bg-hover); color: var(--vcb-text-bright); }
 
+/* Focused-state indicator — used by Psychic buff Talents to show the toggle
+   is currently ON. Subtle accent stripe on the leading edge. */
+.vcs-panel-item-focused {
+  background: var(--vcb-bg-hover);
+  color: var(--vcb-text-bright);
+  box-shadow: inset 3px 0 0 0 var(--vcb-accent);
+}
+.vcs-panel-item-focused:hover { background: var(--vcb-bg-hover); }
+
 .vcs-panel-name {
   flex: 1;
   white-space: nowrap;

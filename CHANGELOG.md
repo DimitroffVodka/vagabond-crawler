@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.15.0
+
+### Crawl Strip — Psychic Talents Tab
+
+- **New "Talents" tab on the per-card combat dropdown for Psychic actors.** When a player hovers their portrait during combat, the Talents tab now sits alongside Weapons / Spells / Craft / etc. Click a damage or effect Talent → Vagabond Character Enhancer's TalentCastDialog opens with the full RAW configurability (damage dice, delivery, effect toggle). Click a buff Talent (Absence, Evade, Shield, Transvection) → Focus toggles directly; an accent stripe on the row marks the currently-focused state. No more bouncing back to the character sheet just to cast.
+- **Slot priority follows the existing C/D overflow chain** used by Craft / Step Up / Virtuoso / Summon / Gold Sink. Vanilla Psychic gets `[Weapons] [Talents]`. Magical-Secret-multiclass Psychic with a real spell gets `[Weapons] [Spells] [Talents]`. Same auto-hide-when-empty behavior as every other tab.
+- **Detection is "actor has talent items," not class name.** Multiclass-friendly without any extra logic.
+- **Graceful no-op when VCE is missing or older than the matching API release.** The Talents tab simply doesn't appear; the rest of the strip is untouched. Requires a VCE build that exposes `getTalentData`, `castTalent`, and `toggleTalentFocus` on `game.vagabondCharacterEnhancer` — wait for the matching VCE release before expecting the tab to appear.
+
 ## v1.14.0
 
 ### NPC Action Riders — Fatigue Payload

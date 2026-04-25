@@ -597,6 +597,27 @@ function _buildMenuData(actor, isNPC) {
       }
     }
 
+    // Psychic Talents — clicking a damage/effect Talent opens VCE's
+    // TalentCastDialog; clicking a buff Talent toggles Focus directly.
+    // Uses vagabond-character-enhancer API (gracefully degrades if not installed)
+    const talentData = game.vagabondCharacterEnhancer?.getTalentData?.(actor);
+    if (talentData?.hasTalents) {
+      const talentItems = talentData.talents.map(t => ({
+        label: t.name,
+        dmg: t.dmgLabel ? `<span class="vcs-menu-dmg">${t.dmgLabel}</span>` : "",
+        type: t.isBuff ? "talentBuff" : "talent",
+        itemId: t.id,
+        isFocused: t.isFocused,
+      }));
+      if (!result.tabC) {
+        result.tabC = "Talents";
+        result.itemsC = talentItems;
+      } else if (!result.tabD) {
+        result.tabD = "Talents";
+        result.itemsD = talentItems;
+      }
+    }
+
     return result;
   }
 }
@@ -676,7 +697,8 @@ function _showPanel(stripEl, cardWrap, actor, isNPC, activeTab) {
           : it.goldSinkUuid
           ? `data-goldsink-uuid="${it.goldSinkUuid}"`
           : `data-index="${it.index ?? ""}"`;
-        return `<button type="button" class="vcs-panel-item" data-type="${it.type}" ${dataAttrs}>
+        const focusedClass = it.isFocused ? " vcs-panel-item-focused" : "";
+        return `<button type="button" class="vcs-panel-item${focusedClass}" data-type="${it.type}" ${dataAttrs}>
           <span class="vcs-panel-name">${it.label}</span>${it.dmg}
         </button>`;
       }).join("")
@@ -916,6 +938,14 @@ async function _fireAction(actor, type, indexStr, itemId) {
       if (gsData?.buyItem) {
         await gsData.buyItem(itemId); // itemId holds the UUID here
       }
+
+    } else if (type === "talent") {
+      // Psychic Talent — open VCE's TalentCastDialog and execute the cast.
+      await game.vagabondCharacterEnhancer?.castTalent?.(actor, itemId);
+
+    } else if (type === "talentBuff") {
+      // Psychic buff Talent — toggle Focus directly (applies/removes focusBuffAE).
+      await game.vagabondCharacterEnhancer?.toggleTalentFocus?.(actor, itemId);
     }
   } catch (err) {
     console.error(`Vagabond Crawler | Action fire error (${type}):`, err);
