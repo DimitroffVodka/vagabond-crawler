@@ -1,0 +1,61 @@
+{
+  "planPath": "docs/superpowers/plans/2026-04-25-monster-creator-hit-die-config.md",
+  "tasks": [
+    {
+      "id": 1,
+      "subject": "Task 1: Extend calculateHP and add dieAvg helper",
+      "status": "pending",
+      "description": "**Goal:** Make `calculateHP` aware of an arbitrary hit die without changing any existing call site's behavior.\n\n**Files:**\n- Modify: scripts/monster-mutator.mjs:23-28\n\n**Acceptance Criteria:**\n- 2-arg calls behavior-identical\n- 3-arg with explicit die uses dieAvg\n- 'fromSize' resolves via game.settings hitDieSizeMap with d8 fallback\n- dieAvg returns d8 (4.5) for unparseable input, never throws\n- Both functions exported\n\n**Verify:** Foundry MCP evaluate returns [22, 17, 5, 5.5] for the canonical sample.\n\n```json:metadata\n{\"files\": [\"scripts/monster-mutator.mjs\"], \"verifyCommand\": \"mcp__foundry-vtt__evaluate canonical sample\", \"acceptanceCriteria\": [\"legacy 2-arg behavior preserved\", \"3-arg with die uses dieAvg\", \"fromSize resolves from settings\", \"dieAvg defaults to 4.5 on bad input\"]}\n```"
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Register hitDieSizeMap and bestiaryHitDieFallback world settings",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "**Goal:** Persist size→die map and bestiary fallback toggle. No UI yet.\n\n**Files:**\n- Modify: scripts/vagabond-crawler.mjs (settings registration block)\n\n**Acceptance Criteria:**\n- hitDieSizeMap default { medium:d6, large:d8, huge:d10, giant:d12, colossal:d14 }\n- bestiaryHitDieFallback default false\n- Both world-scope, config:false (surfaced via registerMenu in Task 4)\n\n**Verify:** Foundry MCP evaluate returns the defaults after a reload.\n\n```json:metadata\n{\"files\": [\"scripts/vagabond-crawler.mjs\"], \"verifyCommand\": \"mcp__foundry-vtt__evaluate game.settings.get for both keys\", \"acceptanceCriteria\": [\"hitDieSizeMap default registered\", \"bestiaryHitDieFallback default false\", \"config:false on both\"]}\n```"
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Build HitDieConfigApp window (config UI + Handlebars template)",
+      "status": "pending",
+      "blockedBy": [2],
+      "description": "**Goal:** Standalone GM-only ApplicationV2 window — size→die table + bestiary fallback checkbox + Reset/Save/Save&Close/Cancel.\n\n**Files:**\n- Create: scripts/hit-die-config.mjs\n- Create: templates/hit-die-config.hbs\n- Modify: styles/vagabond-crawler.css (append new section, --vcb-* tokens only)\n- Modify: languages/en.json (HitDieConfig keys)\n\n**Acceptance Criteria:**\n- 6 rows (Small read-only, Medium..Colossal editable)\n- AVG cell live-updates on dropdown change\n- Save persists, Cancel discards, Reset repopulates working copy without persisting\n- No hex colors in new CSS\n\n**Verify:** Open via new HitDieConfigApp().render(true), edit Medium → d10, Save, reload, reopen — Medium is d10.\n\n```json:metadata\n{\"files\": [\"scripts/hit-die-config.mjs\", \"templates/hit-die-config.hbs\", \"styles/vagabond-crawler.css\", \"languages/en.json\"], \"verifyCommand\": \"manual round-trip via Foundry MCP\", \"acceptanceCriteria\": [\"window renders 6 rows\", \"AVG live-updates\", \"Save persists\", \"Cancel discards\", \"Reset repopulates without persisting\", \"--vcb-* tokens only\"]}\n```"
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Wire HitDieConfig into game.vagabondCrawler, registerMenu, Crawl Bar entry",
+      "status": "pending",
+      "blockedBy": [3],
+      "description": "**Goal:** Three discoverability paths — game.vagabondCrawler.hitDieConfig.open(), Module Settings menu, Forge & Loot right-click menu.\n\n**Files:**\n- Modify: scripts/vagabond-crawler.mjs (import, ready hook expose, registerMenu)\n- Modify: scripts/crawl-bar.mjs (right-click menu around lines 461-520)\n- Modify: languages/en.json (OpenButton, MenuHint)\n\n**Acceptance Criteria:**\n- All three paths open the window\n- Forge & Loot menu shows the new item between Animation FX and the divider\n\n**Verify:** Live test of all three entry points after reload.\n\n```json:metadata\n{\"files\": [\"scripts/vagabond-crawler.mjs\", \"scripts/crawl-bar.mjs\", \"languages/en.json\"], \"verifyCommand\": \"manual: console + settings menu + Crawl Bar right-click\", \"acceptanceCriteria\": [\"game.vagabondCrawler.hitDieConfig.open works\", \"settings menu button works\", \"Crawl Bar context menu item works\"]}\n```"
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Monster Creator — new hitDie and rollHpOnSpawn fields",
+      "status": "pending",
+      "blockedBy": [4],
+      "description": "**Goal:** Two new editable fields in Monster Creator Stats section, live HP preview, persist as actor flags, restore on bestiary load, configure-link to HitDieConfigApp.\n\n**Files:**\n- Modify: scripts/monster-creator/monster-creator-app.mjs (default _data, _dataToActorShape, _actorShapeToData, _computePreview, save handler, _prepareContext)\n- Modify: templates/monster-creator.hbs (after line 112)\n- Modify: languages/en.json (MonsterCreator.HitDie keys)\n\n**Acceptance Criteria:**\n- New defaults: hitDie='fromSize', rollHpOnSpawn=false\n- Preview line updates live with die / roll-on-spawn changes\n- Save stamps flags.vagabond-crawler.{hitDie,rollHpOnSpawn} on the world actor\n- Configure link opens HitDieConfigApp\n\n**Verify:** Save 'Test HD Goblin' with d12 + roll-ON, MCP evaluate returns hitDie:'d12', roll:true, hp.max=floor(5*6.5)=32 for HD 5.\n\n```json:metadata\n{\"files\": [\"scripts/monster-creator/monster-creator-app.mjs\", \"templates/monster-creator.hbs\", \"languages/en.json\"], \"verifyCommand\": \"save monster + MCP evaluate flags + system.health\", \"acceptanceCriteria\": [\"defaults set\", \"preview live-updates\", \"save persists flags\", \"bestiary load reads flags\", \"configure link opens window\"]}\n```"
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: preCreateToken hook — roll HP on unlinked NPC token spawn",
+      "status": "pending",
+      "blockedBy": [5],
+      "description": "**Goal:** Roll fresh HP on unlinked NPC spawn when opted in. Whisper roll to GM. Skip linked tokens, PCs, and small monsters' rolls (Small uses HP=HD).\n\n**Files:**\n- Modify: scripts/monster-mutator.mjs (export resolveHitDieConfig)\n- Modify: scripts/vagabond-crawler.mjs (Hooks.on('preCreateToken', …) inside ready)\n\n**Acceptance Criteria:**\n- Authored monster + roll-ON + unlinked → token HP = rolled total in [hd, hd*sides]\n- GM whisper with formula and per-die results\n- Linked → no roll\n- Authored + roll-OFF → no roll\n- Legacy bestiary + fallback OFF → no roll, behavior unchanged\n- Legacy bestiary + fallback ON → rolls\n- Small + roll-ON → no roll, HP = max(1,HD)\n- PCs untouched\n- Hook GM-only\n\n**Verify:** Six-case live matrix via MCP evaluate.\n\n```json:metadata\n{\"files\": [\"scripts/monster-mutator.mjs\", \"scripts/vagabond-crawler.mjs\"], \"verifyCommand\": \"6-case live matrix via Foundry MCP\", \"acceptanceCriteria\": [\"unlinked rolls\", \"linked skipped\", \"opt-out skipped\", \"legacy fallback OFF unchanged\", \"legacy fallback ON rolls\", \"Small skips roll\", \"PCs untouched\", \"GM-only hook\"]}\n```"
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: Encounter Roller display — pass die through, show (rolled) suffix",
+      "status": "pending",
+      "blockedBy": [6],
+      "description": "**Goal:** Encounter Roller HP column reflects configured die's average and appends '(rolled)' for actors that will roll on spawn.\n\n**Files:**\n- Modify: scripts/encounter-tools.mjs:883 and :919\n- Modify: templates/encounter-roller.hbs (swap {{hp}} → {{hpDisplay}} for the relevant cell)\n\n**Acceptance Criteria:**\n- Both calculateHP calls now 3-arg\n- hp stays numeric; new sibling hpDisplay carries the (rolled) suffix\n- Stock pre-existing compendium NPC with no flags + fallback OFF shows the exact previous HP value\n\n**Verify:** Open Encounter Roller, see (rolled) on flagged monster, none on vanilla. Toggle fallback ON and re-open — vanilla also gets (rolled).\n\n```json:metadata\n{\"files\": [\"scripts/encounter-tools.mjs\", \"templates/encounter-roller.hbs\"], \"verifyCommand\": \"open Encounter Roller and inspect HP column\", \"acceptanceCriteria\": [\"both calculateHP calls 3-arg\", \"hpDisplay used in template\", \"legacy stock NPC HP unchanged when fallback OFF\"]}\n```"
+    },
+    {
+      "id": 8,
+      "subject": "Task 8: Docs + CHANGELOG + version bump",
+      "status": "pending",
+      "blockedBy": [7],
+      "description": "**Goal:** Sync user-facing guide and contributor reference per CLAUDE.md, update CHANGELOG, bump module.json + README badge.\n\n**Files:**\n- Modify: docs/exploration.md (or matching guide that already mentions Monster Creator)\n- Modify: docs/dev/utilities.md (or matching dev ref with Monster Creator settings)\n- Modify: CHANGELOG.md\n- Modify: module.json (minor bump)\n- Modify: README.md (badge bump to match)\n\n**Acceptance Criteria:**\n- User guide section 'Hit Die Configuration' covers all three knobs + fallback\n- Dev ref lists hitDieSizeMap, bestiaryHitDieFallback, hitDie flag, rollHpOnSpawn flag\n- CHANGELOG entry under new dated section\n- module.json version bumped (minor)\n- README badge bumped to match\n\n**Verify:** Grep for 'Hit Die Configuration' in docs/, 'hitDieSizeMap' in docs/dev/, version in module.json.\n\n```json:metadata\n{\"files\": [\"docs/exploration.md\", \"docs/dev/utilities.md\", \"CHANGELOG.md\", \"module.json\", \"README.md\"], \"verifyCommand\": \"grep checks + module.json version inspection\", \"acceptanceCriteria\": [\"user-guide section present\", \"dev-ref settings + flags present\", \"CHANGELOG entry present\", \"module.json bumped\", \"README badge bumped\"]}\n```"
+    }
+  ],
+  "lastUpdated": "2026-04-25T00:00:00Z"
+}
