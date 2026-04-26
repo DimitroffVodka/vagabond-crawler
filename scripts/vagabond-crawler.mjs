@@ -138,6 +138,30 @@ Hooks.once("init", () => {
     scope: "world", config: false, type: Boolean, default: true,
   });
 
+  game.settings.register(MODULE_ID, "hitDieSizeMap", {
+    name: "Hit Die Size Map",
+    hint: "Default hit die per creature size. Edited via the Hit Die Configuration window.",
+    scope: "world",
+    config: false,
+    type: Object,
+    default: {
+      medium:   "d6",
+      large:    "d8",
+      huge:     "d10",
+      giant:    "d12",
+      colossal: "d14",
+    },
+  });
+
+  game.settings.register(MODULE_ID, "bestiaryHitDieFallback", {
+    name: "Apply Hit Die Map to Bestiary NPCs",
+    hint: "When ON, compendium NPCs without authored hit-die flags use the size→die map and roll fresh HP per spawn. When OFF, legacy bestiary drops keep the deterministic HD × 4.5 formula.",
+    scope: "world",
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
   // Register all sub-module settings
   AnimationFx.registerSettings();
   MovementTracker.registerSettings();
