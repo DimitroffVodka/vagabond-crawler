@@ -538,8 +538,16 @@ function _fromCompendiumActor(actor) {
       name: ab?.name ?? "", description: ab?.description ?? "",
     })) : [],
     portraitImg:      actor.img || DEFAULT_PORTRAIT,
-    // prototypeToken.texture.src may be a wildcard path like ".../*". Keep as-is.
-    tokenImg:         actor.prototypeToken?.texture?.src || actor.img || DEFAULT_PORTRAIT,
+    // prototypeToken.texture.src can be a wildcard like ".../*" (used by bestiary
+    // entries that randomize across a folder of variant images via `randomImg`).
+    // The browser can't render a literal `*` as an `<img src>`, so we fall back
+    // to the portrait when the path contains a wildcard. The user can pick a
+    // specific image manually if they want.
+    tokenImg:         (() => {
+      const src = actor.prototypeToken?.texture?.src;
+      if (!src || src.includes("*")) return actor.img || DEFAULT_PORTRAIT;
+      return src;
+    })(),
     ..._visionFromCompendiumSource(actor, s),
   };
 }
