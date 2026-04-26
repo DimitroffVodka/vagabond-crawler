@@ -71,6 +71,34 @@ Each has a reroll button. Plus:
 
 ---
 
+## Hit Die Configuration
+
+Per-monster Hit Die selector authored in the Monster Creator (Stats section), plus a global size→die map and a bestiary-fallback toggle that lets compendium NPCs without authored flags follow the same rules. A `preCreateToken` hook writes the configured-die HP into the token's actor delta on drop — necessary because the system recomputes `system.health.max` from `HD × 4.5` on every load, so the delta override is what makes a `d12` monster actually have d12-based HP on the canvas.
+
+`HitDieConfigApp` is a HandlebarsApplicationMixin(ApplicationV2) window opened from the Forge & Loot right-click menu OR Module Settings → Vagabond Crawler.
+
+### Settings
+
+| Setting | Default | Description |
+|---|---|---|
+| `hitDieSizeMap` | `{ medium:"d6", large:"d8", huge:"d10", giant:"d12", colossal:"d14" }` | Default hit die per creature size. Used when an actor's `flags.vagabond-crawler.hitDie` is `"fromSize"`. Edited via `HitDieConfigApp`. |
+| `bestiaryHitDieFallback` | `false` | When `true`, compendium NPCs without authored hit-die flags also use the size→die map and roll fresh HP per spawn. |
+
+### Actor Flags (`flags.vagabond-crawler`)
+
+| Flag | Type | Values | Purpose |
+|---|---|---|---|
+| `hitDie` | string | `"d4"`–`"d14"`, or `"fromSize"` | Per-actor hit die used by `calculateHP` and the spawn override hook. |
+| `rollHpOnSpawn` | boolean | `true` / `false` | When `true`, the `preCreateToken` hook rolls fresh HP for unlinked tokens; when `false` with a non-default die, the hook still overrides via delta to apply the configured die's deterministic average. |
+
+### Notes
+
+- Small monsters always use `HP = max(1, HD)` regardless of die.
+- `calculateHP(hd, size, die = "d8")` keeps full back-compat — the new `die` argument defaults to `d8`.
+- Linked tokens are skipped by the spawn-roll path; they share HP with the world actor.
+
+---
+
 ## Light Tracker
 
 ### Light Sources

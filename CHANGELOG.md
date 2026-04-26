@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.16.0
+
+### Monster Creator — Hit Die Configuration
+
+- **Per-monster Hit Die selector.** Monster Creator → Stats. Pick `d4`–`d14`, or leave on `From Size` to follow the global size→die map.
+- **Roll HP on spawn.** Per-monster checkbox. Every unlinked token rolls fresh HP (`HD × 1die`) at drop time; the GM sees a whispered roll. Linked tokens still share HP with the world actor.
+- **Hit Die Configuration window.** New ApplicationV2 window — opens from the Forge & Loot right-click menu and from Module Settings. Edits the size→die map (Small special: HP = HD; Medium = d6, Large = d8, Huge = d10, Giant = d12, Colossal = d14 by default) and a bestiary-fallback toggle. When the fallback is ON, compendium NPCs without authored flags also use the size→die map and roll on spawn.
+- **Token-side HP override.** A `preCreateToken` hook writes the configured-die HP into the token's actor delta even when not rolling. This is necessary because the Vagabond system recomputes `system.health.max` from `HD × 4.5` on every load — the delta override is what makes a `d12` monster actually have d12-based HP on the canvas.
+- **Back-compat.** Every existing call to `calculateHP(hd, size)` keeps its current behavior — the new die argument defaults to `d8`. Existing world actors and bestiary monsters with no flags are unchanged when the bestiary fallback is OFF (which is the default).
+
 ## v1.15.0
 
 ### Crawl Strip — Psychic Talents Tab

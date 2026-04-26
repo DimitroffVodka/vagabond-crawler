@@ -78,6 +78,19 @@ No user-facing settings — the Creator uses per-session UI state for open/close
 
 ---
 
+## Hit Die Configuration
+
+Vagabond's default HP formula is `HD × 4.5`. The Crawler lets you swap that out per monster:
+
+- **Hit Die selector** (Monster Creator → Stats): pick `d4`–`d14`, or leave on `From Size` to follow the global size→die map.
+- **Roll on spawn**: when checked, every unlinked token of that monster rolls fresh HP (`HD × 1die`) at drop time. The GM gets a whispered roll. Linked tokens are skipped (they share HP with the world actor).
+- **Hit Die Configuration window**: open from the Forge & Loot button (right-click) or Module Settings → Vagabond Crawler. The size→die map controls the default die for every monster set to `From Size` — change it to update everyone using "From Size" automatically.
+- **Bestiary fallback** (in the config window): when ON, compendium NPCs without authored flags also follow the size→die map and roll on spawn. OFF by default — legacy bestiary drops keep the deterministic `HD × 4.5` formula.
+
+Small monsters always use `HP = max(1, HD)` regardless of die — small things are fragile.
+
+---
+
 ## Light Tracker
 
 <!-- gif: docs/assets/light-tracker.gif -->
