@@ -2418,7 +2418,13 @@ class MonsterCreatorApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const created = await Actor.create(actorData);
       if (created) {
         ui.notifications.info(`Created world actor: ${created.name}`);
-        this.close();
+        // Window mode: close the form. Panel mode: stay mounted — calling
+        // close() would abort the AbortController and kill every input /
+        // button listener while the DOM stays visible (because the panel
+        // container is owned by the parent app), making a second save
+        // silently no-op. Leave the form alive so the user can keep
+        // editing, save again, or use the parent's tab controls.
+        if (!this._isPanel) this.close();
       }
     } catch (err) {
       console.error(`${MODULE_ID} | Monster Creator: save failed`, err);
