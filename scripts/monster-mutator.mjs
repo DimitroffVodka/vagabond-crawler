@@ -20,11 +20,40 @@ export function calculateTL(hp, armor, dpr) {
 }
 
 /**
- * Calculate HP from HD (Vagabond formula: HD * 4.5 for medium+, HD * 1 for small).
+ * Average roll value for a die expression like "d4", "d8", "d20".
+ * Defaults to d8's 4.5 for any unparseable input — keeps callers tolerant
+ * of legacy data and free-form strings.
  */
-export function calculateHP(hd, size = "medium") {
-  if (size === "small") return Math.max(1, hd);
-  return Math.floor(hd * 4.5);
+export function dieAvg(die) {
+  const m = String(die ?? "").match(/^d(\d+)$/i);
+  if (!m) return 4.5;
+  const sides = parseInt(m[1], 10);
+  if (!Number.isFinite(sides) || sides < 2) return 4.5;
+  return (sides + 1) / 2;
+}
+
+/**
+ * Calculate HP from HD.
+ *
+ * Vagabond rule: Small = max(1, HD); medium+ = floor(HD * dieAvg).
+ * `die` defaults to "d8" so every legacy 2-arg call stays at HD * 4.5.
+ *
+ * `die === "fromSize"` resolves the die at call time from the world
+ * setting `hitDieSizeMap` — this lets monsters declare "follow the size
+ * map" once and pick up live edits to the map.
+ */
+export function calculateHP(hd, size = "medium", die = "d8") {
+  if (size === "small") return Math.max(1, Number(hd) || 0);
+
+  let resolved = die;
+  if (die === "fromSize") {
+    let map;
+    try { map = game?.settings?.get?.("vagabond-crawler", "hitDieSizeMap"); }
+    catch (_) { map = null; }
+    resolved = map?.[size] ?? "d8";
+  }
+
+  return Math.floor((Number(hd) || 0) * dieAvg(resolved));
 }
 
 /**
