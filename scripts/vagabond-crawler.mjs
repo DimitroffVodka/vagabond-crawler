@@ -84,8 +84,16 @@ function _wrapNpcMaxHpForHitDie() {
         resolved = map[this.size] ?? "d8";
       }
 
+      // If a token rolled fresh HP at spawn, the per-token total is parked
+      // on `flags.vagabond-crawler.rolledMaxHp` — use it verbatim so Max HP
+      // matches the rolled value (otherwise the user would see e.g. 36/32
+      // instead of 36/36). World actors don't carry this flag, so they fall
+      // through to the configured die's average.
+      const rolled = Number(actor?.flags?.[MODULE_ID]?.rolledMaxHp);
       const sysBase = Math.floor(this.hd * 4.5);
-      const ourBase = Math.floor(this.hd * dieAvg(resolved));
+      const ourBase = (Number.isFinite(rolled) && rolled > 0)
+        ? rolled
+        : Math.floor(this.hd * dieAvg(resolved));
       // The system added sysBase on top of any AE contributions. Swap it for
       // ours so AEs compose correctly: max = (max - sysBase) + ourBase.
       this.health.max = (this.health.max ?? 0) - sysBase + ourBase;
@@ -371,9 +379,16 @@ Hooks.once("ready", async () => {
           if (!Number.isFinite(total) || total <= 0) return;
         }
 
+        // Stamp the resolved total into the token's actor delta. We also
+        // park it on a flag — the system's prepareBaseData zeroes
+        // health.max every load and prepareDerivedData rebuilds it from HD,
+        // so a delta on system.health.max wouldn't survive. The wrap in
+        // setup reads `flags.vagabond-crawler.rolledMaxHp` and uses it
+        // verbatim instead of recomputing the avg.
         tokenDoc.updateSource({
           "delta.system.health.value": total,
           "delta.system.health.max":   total,
+          [`delta.flags.${MODULE_ID}.rolledMaxHp`]: total,
         });
 
         if (rollOnSpawn && formula) {
