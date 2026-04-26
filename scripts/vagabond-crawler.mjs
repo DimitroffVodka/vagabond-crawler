@@ -34,6 +34,7 @@ import { HitDieConfig, HitDieConfigApp } from "./hit-die-config.mjs";
 import { StackSplit }     from "./stack-split.mjs";
 import { GatherFriendlies } from "./gather-friendlies.mjs";
 import { registerSettingsGroupMenus } from "./settings-group-app.mjs";
+import { resolveHitDieConfig, calculateHP } from "./monster-mutator.mjs";
 
 export const MODULE_ID = "vagabond-crawler";
 
@@ -272,6 +273,73 @@ Hooks.once("ready", async () => {
       return { actorName: token.actor.name, speed: s, allSpeedKeys: Object.keys(s ?? {}) };
     },
   };
+
+  // Token HP override on spawn — the system's prepareDerivedData clobbers
+  // actor.system.health.max using HD * 4.5, so we must override the token's
+  // delta on creation to make the configured hit-die actually stick at runtime.
+  // The hook runs synchronously: preCreateToken's updateSource() must land
+  // before the document is finalized, so we roll manually rather than via
+  // Roll.evaluate() (which is async and finalizes too late). The chat-message
+  // whisper is fired-and-forgotten after the source update lands.
+  if (game.user.isGM) {
+    Hooks.on("preCreateToken", (tokenDoc, _data, _options, _userId) => {
+      try {
+        const actor = tokenDoc.actor;
+        if (!actor) return;
+        if (actor.type === "character") return;
+        if (tokenDoc.actorLink === true) return; // shared HP — never override
+
+        const { hasOverride, rollOnSpawn, die } = resolveHitDieConfig(actor);
+        if (!hasOverride) return;
+
+        const hd   = Number(actor.system?.hd) || 0;
+        const size = actor.system?.size ?? "medium";
+
+        let total;
+        let formula = null;
+        let resultsText = "";
+
+        if (size === "small") {
+          // Small never rolls — HP = max(1, HD) regardless of die or roll flag
+          total = Math.max(1, hd);
+        } else if (rollOnSpawn) {
+          if (hd <= 0) return;
+          const m = String(die).match(/^d(\d+)$/i);
+          const sides = m ? parseInt(m[1], 10) : 8;
+          if (!Number.isFinite(sides) || sides < 2) return;
+          formula = `${hd}${die}`;
+          const dice = [];
+          let sum = 0;
+          for (let i = 0; i < hd; i++) {
+            const v = Math.floor(Math.random() * sides) + 1;
+            dice.push(v);
+            sum += v;
+          }
+          total = sum;
+          if (dice.length) resultsText = ` [${dice.join(", ")}]`;
+        } else {
+          // Static deterministic — override max so the configured die's
+          // average wins over the system's HD * 4.5 recompute.
+          total = Math.round(calculateHP(hd, size, die) ?? 0);
+          if (!Number.isFinite(total) || total <= 0) return;
+        }
+
+        tokenDoc.updateSource({
+          "delta.system.health.value": total,
+          "delta.system.health.max":   total,
+        });
+
+        if (rollOnSpawn && formula) {
+          ChatMessage.create({
+            whisper: ChatMessage.getWhisperRecipients("GM").map(u => u.id),
+            content: `<i>${actor.name}</i> spawned with <b>${total} HP</b> (rolled ${formula}${resultsText}).`,
+          });
+        }
+      } catch (err) {
+        console.warn("[vagabond-crawler] preCreateToken HP override failed:", err);
+      }
+    });
+  }
 
   // Restore crawl state if it was active when the world was last closed
   await CrawlState.restore();

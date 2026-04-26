@@ -360,3 +360,49 @@ export async function createMutatedActor(baseUuid, mutationIds, customName = nul
 
   return newActor;
 }
+
+/**
+ * Resolve an actor's effective hit-die configuration.
+ *
+ * Returns { hasOverride, rollOnSpawn, die } where:
+ *   - hasOverride: true when the token's HP should be overridden via delta
+ *                  (because the actor opts in via flags, or the bestiary
+ *                  fallback applies). When false, no token-side override
+ *                  should occur and the system's default behavior stands.
+ *   - rollOnSpawn: when true, roll fresh `${hd}${die}` per spawn; when
+ *                  false, use the deterministic `calculateHP` average.
+ *   - die:         a concrete die expression like "d6", never "fromSize".
+ */
+export function resolveHitDieConfig(actor) {
+  if (!actor) return { hasOverride: false, rollOnSpawn: false, die: "d8" };
+
+  const moduleId = "vagabond-crawler";
+  const flagDie  = actor.getFlag?.(moduleId, "hitDie")        ?? null;
+  const flagRoll = actor.getFlag?.(moduleId, "rollHpOnSpawn") ?? null;
+
+  let hasOverride;
+  let rollOnSpawn;
+  let die;
+
+  if (flagDie != null || flagRoll != null) {
+    hasOverride = true;
+    rollOnSpawn = flagRoll === true;
+    die         = flagDie ?? "fromSize";
+  } else {
+    let fallback = false;
+    try { fallback = !!game.settings.get(moduleId, "bestiaryHitDieFallback"); } catch (_) {}
+    hasOverride = fallback;
+    rollOnSpawn = fallback;          // fallback always rolls (matches user spec)
+    die         = "fromSize";
+  }
+
+  if (die === "fromSize") {
+    const size = actor.system?.size ?? "medium";
+    let map = {};
+    try { map = game.settings.get(moduleId, "hitDieSizeMap") ?? {}; } catch (_) {}
+    die = map[size] ?? "d8";
+  }
+
+  return { hasOverride, rollOnSpawn, die };
+}
+
