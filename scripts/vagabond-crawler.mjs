@@ -34,7 +34,7 @@ import { HitDieConfig, HitDieConfigApp } from "./hit-die-config.mjs";
 import { StackSplit }     from "./stack-split.mjs";
 import { GatherFriendlies } from "./gather-friendlies.mjs";
 import { registerSettingsGroupMenus } from "./settings-group-app.mjs";
-import { resolveHitDieConfig, calculateHP } from "./monster-mutator.mjs";
+import { resolveHitDieConfig, calculateHP, dieAvg } from "./monster-mutator.mjs";
 
 export const MODULE_ID = "vagabond-crawler";
 
@@ -47,7 +47,54 @@ export const MODULE_ID = "vagabond-crawler";
 // applied its `_rangeFavorHinder` combine.
 Hooks.once("setup", () => {
   registerEarlyRollBuilderWrap();
+  _wrapNpcMaxHpForHitDie();
 });
+
+/**
+ * Wrap `VagabondNPC.prototype.prepareDerivedData` so that an actor's
+ * `flags.vagabond-crawler.hitDie` overrides the system's hardcoded
+ * `Math.floor(hd * 4.5)` Max-HP rule. Without this wrap the actor sheet (and
+ * any non-token consumer) shows the legacy max regardless of the configured
+ * die. The token-side `preCreateToken` override stays as the per-spawn rolled
+ * path; this wrap covers the static / sheet-display path.
+ *
+ * Wrapped in `setup` (not `ready`) so the wrap is the innermost layer — if
+ * other modules also wrap `prepareDerivedData` in `ready`, our recompute will
+ * have already adjusted `health.max` by the time they run.
+ */
+function _wrapNpcMaxHpForHitDie() {
+  const NpcCls = CONFIG?.Actor?.dataModels?.npc;
+  if (!NpcCls?.prototype?.prepareDerivedData) {
+    console.warn(`[${MODULE_ID}] NPC data model not found at setup — Max HP wrap skipped`);
+    return;
+  }
+  const orig = NpcCls.prototype.prepareDerivedData;
+  NpcCls.prototype.prepareDerivedData = function (...args) {
+    const result = orig.apply(this, args);
+    try {
+      const actor = this.parent;
+      const hitDie = actor?.flags?.[MODULE_ID]?.hitDie;
+      if (hitDie == null) return result;          // no flag → leave system's value
+      if (this.size === "small") return result;   // Small special-case unchanged
+
+      // Resolve "fromSize" against the world setting at compute time.
+      let resolved = hitDie;
+      if (hitDie === "fromSize") {
+        const map = game.settings.get(MODULE_ID, "hitDieSizeMap") ?? {};
+        resolved = map[this.size] ?? "d8";
+      }
+
+      const sysBase = Math.floor(this.hd * 4.5);
+      const ourBase = Math.floor(this.hd * dieAvg(resolved));
+      // The system added sysBase on top of any AE contributions. Swap it for
+      // ours so AEs compose correctly: max = (max - sysBase) + ourBase.
+      this.health.max = (this.health.max ?? 0) - sysBase + ourBase;
+    } catch (err) {
+      console.warn(`[${MODULE_ID}] Max HP wrap failed:`, err);
+    }
+    return result;
+  };
+}
 
 Hooks.once("init", () => {
   // Encounter table UUID
