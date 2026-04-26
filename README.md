@@ -17,6 +17,7 @@ A comprehensive dungeon crawl management module for the **Vagabond RPG** system 
 - **[Crawl Strip](docs/crawl-loop.md#crawl-strip)** — Top-of-screen HUD for all players. Portraits, HP, status, one-click actions, movement budgets, combat dropdown.
 - **[Encounter System](docs/exploration.md#encounter-system)** — Random checks, Roll Table builder, NPC browser with filters, inline Monster Creator.
 - **[Monster Creator](docs/exploration.md#monster-creator)** — Build or mutate NPCs in a dedicated window with automation-status badges on abilities.
+- **[Hit Die Configuration](docs/exploration.md#hit-die-configuration)** — Per-monster Hit Die (`d4`–`d14`), optional roll-on-spawn for fresh HP each token drop, and a size→die config window with bestiary fallback.
 - **[Light Tracker](docs/exploration.md#light-tracker)** — 12 light sources, lantern fuel, real-time burn, canvas drop/pickup, party token transfer.
 - **[Loot Generator](docs/crafting-loot.md#loot-generator)** — Roll on core Vagabond Level 1-10 tables; "Give to Player" chat buttons; auto-drop on NPC defeat.
 - **[Relic Forge](docs/crafting-loot.md#relic-forge)** — Craft custom equipment with relic powers, auto-generated names, equip-gated effects.
