@@ -429,6 +429,8 @@ function _blankMonster() {
     size:             "medium",
     zone:             "frontline",
     hd:               3,
+    hitDie:           "fromSize",
+    rollHpOnSpawn:    false,
     armor:            0,
     armorDescription: "as Unarmored",
     speed:            30,
@@ -498,6 +500,8 @@ function _fromCompendiumActor(actor) {
     size:             s.size ?? "medium",
     zone:             s.zone ?? "frontline",
     hd:               Number(s.hd ?? 1),
+    hitDie:           actor.getFlag?.("vagabond-crawler", "hitDie")        ?? "fromSize",
+    rollHpOnSpawn:    actor.getFlag?.("vagabond-crawler", "rollHpOnSpawn") ?? false,
     armor:            Number(s.armor ?? 0),
     armorDescription: s.armorDescription ?? "",
     speed:            Number(s.speed ?? 30),
@@ -589,7 +593,7 @@ function _parseCsvList(str) {
 }
 
 function _computePreview(data) {
-  const hp  = Math.round(calculateHP(data.hd, data.size) ?? 0);
+  const hp  = Math.round(calculateHP(data.hd, data.size, data.hitDie ?? "fromSize") ?? 0);
   const dpr = Math.round(((calculateDPR(data.actions) ?? 0)) * 10) / 10;
   const tl  = Math.round((calculateTL(hp, data.armor, dpr) ?? 0) * 10) / 10;
   return { hp, tl, dpr };
@@ -627,8 +631,15 @@ function _damageDisplay(rollDamage, flatDamage, damageType) {
  * mutation logic without reimplementing it.
  */
 function _dataToActorShape(data) {
+  const hpVal = Math.round(calculateHP(data.hd, data.size, data.hitDie ?? "fromSize") ?? 0);
   return {
     name: data.name,
+    flags: {
+      "vagabond-crawler": {
+        hitDie:        data.hitDie        ?? "fromSize",
+        rollHpOnSpawn: data.rollHpOnSpawn ?? false,
+      },
+    },
     system: {
       hd:               data.hd,
       cr:               data.hd,
@@ -645,7 +656,7 @@ function _dataToActorShape(data) {
       weaknesses:       [...data.weaknesses],
       statusImmunities: [...data.statusImmunities],
       zone:             data.zone,
-      health:           { value: Math.round(calculateHP(data.hd, data.size) ?? 0), max: Math.round(calculateHP(data.hd, data.size) ?? 0), bonus: [] },
+      health:           { value: hpVal, max: hpVal, bonus: [] },
       actions:   data.actions.map((a) => ({ ...a })),
       abilities: data.abilities.map((a) => ({ ...a })),
     },
@@ -661,6 +672,8 @@ function _actorShapeToData(actorObj, prevData) {
     size:             s.size ?? prevData.size,
     zone:             s.zone ?? prevData.zone,
     hd:               Number(s.hd ?? prevData.hd),
+    hitDie:           actorObj.flags?.["vagabond-crawler"]?.hitDie        ?? prevData?.hitDie        ?? "fromSize",
+    rollHpOnSpawn:    actorObj.flags?.["vagabond-crawler"]?.rollHpOnSpawn ?? prevData?.rollHpOnSpawn ?? false,
     armor:            Number(s.armor ?? prevData.armor),
     armorDescription: s.armorDescription ?? prevData.armorDescription,
     speed:            Number(s.speed ?? prevData.speed),
@@ -687,7 +700,7 @@ function _mutationPreview(data, selectedIds) {
   const baseShape  = _dataToActorShape(data);
   const baseSys    = baseShape.system;
   const basePreview = {
-    hp:    Math.round(calculateHP(data.hd, data.size) ?? 0),
+    hp:    Math.round(calculateHP(data.hd, data.size, data.hitDie ?? "fromSize") ?? 0),
     armor: data.armor,
     speed: data.speed,
     abilityCount: data.abilities.length,
@@ -700,8 +713,9 @@ function _mutationPreview(data, selectedIds) {
   const clone = foundry.utils.deepClone(baseShape);
   const { prefixes, suffixes } = applyMutations(clone, [...selectedIds]);
   const mSys = clone.system;
+  const mDie = clone.flags?.["vagabond-crawler"]?.hitDie ?? "fromSize";
   const mutated = {
-    hp:    Math.round(calculateHP(mSys.hd, mSys.size) ?? 0),
+    hp:    Math.round(calculateHP(mSys.hd, mSys.size, mDie) ?? 0),
     armor: mSys.armor,
     speed: mSys.speed,
     abilityCount: (mSys.abilities ?? []).length,
@@ -866,6 +880,8 @@ function _buildActorData(data) {
           .filter((a) => a.combo)
           .map((a) => a.name)
           .filter((n) => !!n),
+        hitDie:        data.hitDie        ?? "fromSize",
+        rollHpOnSpawn: data.rollHpOnSpawn ?? false,
       },
     },
   };
@@ -1069,6 +1085,24 @@ class MonsterCreatorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     return {
       data:        this._data,
       preview:     _computePreview(this._data),
+      hitDieIsFromSize: (this._data.hitDie ?? "fromSize") === "fromSize",
+      hitDieOptions:    ["d4","d6","d8","d10","d12","d14"].map((d) => ({
+                          value:    d,
+                          label:    d,
+                          selected: this._data.hitDie === d,
+                        })),
+      hpPreviewFormula: (() => {
+        const die       = this._data.hitDie ?? "fromSize";
+        const size      = this._data.size ?? "medium";
+        const hd        = Number(this._data.hd) || 0;
+        const hp        = Math.round(calculateHP(hd, size, die) ?? 0);
+        if (size === "small") return `${hp} HP — small (HP = HD)`;
+        const resolved  = die === "fromSize"
+          ? (game.settings.get(MODULE_ID, "hitDieSizeMap")?.[size] ?? "d8")
+          : die;
+        const suffix = die === "fromSize" ? " (from size)" : "";
+        return `${hp} HP — ${hd}${resolved} avg${suffix}`;
+      })(),
       beingTypes:  markSelected(BEING_TYPES, this._data.beingType),
       sizes:       markSelected(SIZES,       this._data.size),
       zones:       markSelected(ZONES,       this._data.zone),
@@ -1971,15 +2005,59 @@ class MonsterCreatorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     el.querySelector('[data-action="reset"]') ?.addEventListener("click", () => this._reset(),  { signal });
     el.querySelector('[data-action="cancel"]')?.addEventListener("click", () => this.close(),   { signal });
     el.querySelector('[data-action="save"]')  ?.addEventListener("click", () => this._save(),   { signal });
+    el.querySelector('[data-action="openHitDieConfig"]')?.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      game.vagabondCrawler?.hitDieConfig?.open();
+    }, { signal });
   }
 
   _onFieldChange(input) {
     const name = input.name;
     let value = input.value;
-    if (input.type === "number") value = Number(value);
+    if (input.type === "number")   value = Number(value);
+    if (input.type === "checkbox") value = !!input.checked;
     this._data[name] = value;
     this._refreshPreviewLine();
+    this._refreshHpPreviewBlock();
     this._refreshHeaderSummaries();
+  }
+
+  /** In-place update of the new "HP — XdY avg" line that lives under the
+   *  Stats row. Computes the same string as _prepareContext so changing
+   *  hitDie / size / hd / rollHpOnSpawn updates the preview without a full
+   *  re-render (which would steal focus from text inputs). */
+  _refreshHpPreviewBlock() {
+    const root = this.element;
+    if (!root) return;
+    const formulaEl = root.querySelector(".mc-hp-preview-formula");
+    if (!formulaEl) return;
+    const die  = this._data.hitDie ?? "fromSize";
+    const size = this._data.size ?? "medium";
+    const hd   = Number(this._data.hd) || 0;
+    const hp   = Math.round(calculateHP(hd, size, die) ?? 0);
+    let text;
+    if (size === "small") {
+      text = `${hp} HP — small (HP = HD)`;
+    } else {
+      const resolved = die === "fromSize"
+        ? (game.settings.get(MODULE_ID, "hitDieSizeMap")?.[size] ?? "d8")
+        : die;
+      const suffix = die === "fromSize" ? " (from size)" : "";
+      text = `${hp} HP — ${hd}${resolved} avg${suffix}`;
+    }
+    formulaEl.textContent = text;
+    // Toggle the "rolled at spawn" suffix in place.
+    const rolledEl = root.querySelector(".mc-hp-preview-rolled");
+    if (this._data.rollHpOnSpawn) {
+      if (!rolledEl) {
+        const span = document.createElement("span");
+        span.className = "mc-hp-preview-rolled";
+        span.textContent = " — rolled at spawn";
+        formulaEl.parentElement?.appendChild(span);
+      }
+    } else if (rolledEl) {
+      rolledEl.remove();
+    }
   }
 
   /** Update the Identity / Stats / Description collapsed-header previews

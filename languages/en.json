@@ -32,6 +32,16 @@
       "Saved":           "Hit die configuration saved.",
       "OpenButton":      "Open Configuration",
       "MenuHint":        "Edit the size→die map and bestiary fallback used for HP rolling."
+    },
+    "MonsterCreator": {
+      "HitDie": {
+        "Label":          "Hit Die",
+        "FromSize":       "From Size (uses config)",
+        "RollOnSpawn":    "Roll on spawn",
+        "PreviewLabel":   "HP",
+        "RolledAtSpawn":  "rolled at spawn",
+        "ConfigureLink":  "Configure size→die map"
+      }
     }
   }
 }

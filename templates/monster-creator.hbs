@@ -110,6 +110,23 @@
     </summary>
     <div class="mc-row">
       <div class="mc-field mc-num"><label for="mc-field-hd">HD</label><input id="mc-field-hd" type="number" name="hd" min="1" max="30" value="{{data.hd}}" /></div>
+      <div class="mc-field">
+        <label for="mc-field-hitDie">{{localize "VAGABOND_CRAWLER.MonsterCreator.HitDie.Label"}}</label>
+        <select id="mc-field-hitDie" name="hitDie">
+          <option value="fromSize" {{#if hitDieIsFromSize}}selected{{/if}}>
+            {{localize "VAGABOND_CRAWLER.MonsterCreator.HitDie.FromSize"}}
+          </option>
+          {{#each hitDieOptions}}
+            <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+          {{/each}}
+        </select>
+      </div>
+      <div class="mc-field mc-checkbox">
+        <label for="mc-field-rollHpOnSpawn" class="mc-cb-row">
+          <input id="mc-field-rollHpOnSpawn" type="checkbox" name="rollHpOnSpawn" {{#if data.rollHpOnSpawn}}checked{{/if}}>
+          <span>{{localize "VAGABOND_CRAWLER.MonsterCreator.HitDie.RollOnSpawn"}}</span>
+        </label>
+      </div>
       <div class="mc-field mc-num"><label for="mc-field-armor">Armor</label><input id="mc-field-armor" type="number" name="armor" min="0" max="10" value="{{data.armor}}" /></div>
       <div class="mc-field mc-wide">
         <label for="mc-field-armorDescription">Armor Description</label>
@@ -119,6 +136,17 @@
         </select>
       </div>
       <div class="mc-field mc-num"><label for="mc-field-morale">Morale</label><input id="mc-field-morale" type="number" name="morale" min="2" max="12" value="{{data.morale}}" /></div>
+    </div>
+    <div class="mc-row mc-hp-preview-row">
+      <div class="mc-hp-preview">
+        {{localize "VAGABOND_CRAWLER.MonsterCreator.HitDie.PreviewLabel"}}: <span class="mc-hp-preview-formula">{{hpPreviewFormula}}</span>
+        {{#if data.rollHpOnSpawn}}
+          <span class="mc-hp-preview-rolled"> — {{localize "VAGABOND_CRAWLER.MonsterCreator.HitDie.RolledAtSpawn"}}</span>
+        {{/if}}
+      </div>
+      <a class="mc-hp-config-link" data-action="openHitDieConfig">
+        <i class="fas fa-cog"></i> {{localize "VAGABOND_CRAWLER.MonsterCreator.HitDie.ConfigureLink"}}
+      </a>
     </div>
     <div class="mc-row">
       <div class="mc-field mc-num"><label for="mc-field-speed">Speed (walk)</label><input id="mc-field-speed" type="number" name="speed" min="0" step="5" value="{{data.speed}}" /></div>
