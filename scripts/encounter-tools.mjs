@@ -873,6 +873,18 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
   async _getBrowseNPCs(sourceId) {
     const mapActor = (a, uuid) => {
       const s = a.system ?? {};
+      const die = (
+        a.flags?.["vagabond-crawler"]?.hitDie
+        ?? (game.settings.get("vagabond-crawler", "bestiaryHitDieFallback") ? "fromSize" : "d8")
+      );
+      const rolled = (
+        a.flags?.["vagabond-crawler"]?.rollHpOnSpawn === true
+        || (
+          game.settings.get("vagabond-crawler", "bestiaryHitDieFallback")
+          && !a.flags?.["vagabond-crawler"]?.hitDie
+        )
+      );
+      const hp = calculateHP(s.hd ?? 1, s.size ?? "medium", die);
       return {
         id: a.id || a._id, name: a.name, img: a.img,
         uuid: uuid || a.uuid,
@@ -880,7 +892,8 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
         threatLevel: s.threatLevel ?? 0,
         threatLevelDisplay: s.threatLevelFormatted ?? s.threatLevel ?? "—",
         appearing: s.appearing || s.appearingFormatted || "1",
-        hp:  calculateHP(s.hd ?? 1, s.size ?? "medium"),
+        hp,
+        hpDisplay: rolled ? `${hp} (rolled)` : String(hp),
         dpr: calculateDPR(s.actions ?? []),
       };
     };
@@ -908,17 +921,32 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const pack = game.packs.get(sourceId);
       if (!pack) return [];
       const docs = await pack.getDocuments();
-      this._browseCache[sourceId] = docs.map((d) => ({
-        id: d.id, name: d.name,
-        img: d.img || "icons/svg/mystery-man.svg",
-        uuid: d.uuid,
-        beingType: d.system?.beingType || "—",
-        threatLevel: d.system?.threatLevel ?? 0,
-        threatLevelDisplay: d.system?.threatLevelFormatted ?? d.system?.threatLevel ?? "—",
-        appearing: d.system?.appearing || "1",
-        hp:  calculateHP(d.system?.hd ?? 1, d.system?.size ?? "medium"),
-        dpr: calculateDPR(d.system?.actions ?? []),
-      }));
+      this._browseCache[sourceId] = docs.map((d) => {
+        const die = (
+          d.flags?.["vagabond-crawler"]?.hitDie
+          ?? (game.settings.get("vagabond-crawler", "bestiaryHitDieFallback") ? "fromSize" : "d8")
+        );
+        const rolled = (
+          d.flags?.["vagabond-crawler"]?.rollHpOnSpawn === true
+          || (
+            game.settings.get("vagabond-crawler", "bestiaryHitDieFallback")
+            && !d.flags?.["vagabond-crawler"]?.hitDie
+          )
+        );
+        const hp = calculateHP(d.system?.hd ?? 1, d.system?.size ?? "medium", die);
+        return {
+          id: d.id, name: d.name,
+          img: d.img || "icons/svg/mystery-man.svg",
+          uuid: d.uuid,
+          beingType: d.system?.beingType || "—",
+          threatLevel: d.system?.threatLevel ?? 0,
+          threatLevelDisplay: d.system?.threatLevelFormatted ?? d.system?.threatLevel ?? "—",
+          appearing: d.system?.appearing || "1",
+          hp,
+          hpDisplay: rolled ? `${hp} (rolled)` : String(hp),
+          dpr: calculateDPR(d.system?.actions ?? []),
+        };
+      });
     }
     return [...this._browseCache[sourceId]];
   }
