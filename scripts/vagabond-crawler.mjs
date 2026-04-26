@@ -30,6 +30,7 @@ import { MonsterCreator }  from "./monster-creator/monster-creator-app.mjs";
 import { XpCounterPatch }  from "./xp-counter-patch.mjs";
 import { SessionRecap }    from "./session-recap.mjs";
 import { AnimationFx }    from "./animation-fx.mjs";
+import { HitDieConfig, HitDieConfigApp } from "./hit-die-config.mjs";
 import { StackSplit }     from "./stack-split.mjs";
 import { GatherFriendlies } from "./gather-friendlies.mjs";
 import { registerSettingsGroupMenus } from "./settings-group-app.mjs";
@@ -162,6 +163,15 @@ Hooks.once("init", () => {
     default: false,
   });
 
+  game.settings.registerMenu(MODULE_ID, "hitDieConfigMenu", {
+    name:    "VAGABOND_CRAWLER.HitDieConfig.Title",
+    label:   "VAGABOND_CRAWLER.HitDieConfig.OpenButton",
+    hint:    "VAGABOND_CRAWLER.HitDieConfig.MenuHint",
+    icon:    "fas fa-dice",
+    type:    HitDieConfigApp,
+    restricted: true,
+  });
+
   // Register all sub-module settings
   AnimationFx.registerSettings();
   MovementTracker.registerSettings();
@@ -225,6 +235,7 @@ Hooks.once("ready", async () => {
     lightTracker: LightTracker,
     clock:     CrawlClock,
     flanking:  FlankingChecker,
+    hitDieConfig: HitDieConfig,
     itemDrops: ItemDrops,
     lootDrops: LootDrops,
     relicForge: RelicForge,

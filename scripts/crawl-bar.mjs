@@ -495,6 +495,9 @@ export const CrawlBar = {
       <div class="vcb-clock-menu-item" data-fl="animationFx">
         <i class="fas fa-film"></i> Animation FX
       </div>
+      <div class="vcb-clock-menu-item" data-fl="hitDieConfig">
+        <i class="fas fa-dice"></i> Hit Die Configuration
+      </div>
       <div class="vcb-enc-menu-divider"></div>
       <div class="vcb-clock-menu-item" data-fl="toggleLoot">
         <i class="fas fa-${lootEnabled ? "toggle-on" : "toggle-off"}" style="color:${lootEnabled ? "#4caf50" : "#888"};"></i>
@@ -562,6 +565,12 @@ export const CrawlBar = {
     menu.querySelector('[data-fl="animationFx"]')?.addEventListener("click", () => {
       this._dismissForgeLootMenu();
       AnimationFx.open();
+    });
+
+    // Hit Die Configuration
+    menu.querySelector('[data-fl="hitDieConfig"]')?.addEventListener("click", () => {
+      this._dismissForgeLootMenu();
+      game.vagabondCrawler?.hitDieConfig?.open();
     });
 
     // Toggle loot drops

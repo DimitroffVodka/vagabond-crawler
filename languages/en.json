@@ -29,7 +29,9 @@
       "Save":            "Save",
       "SaveAndClose":    "Save & Close",
       "Cancel":          "Cancel",
-      "Saved":           "Hit die configuration saved."
+      "Saved":           "Hit die configuration saved.",
+      "OpenButton":      "Open Configuration",
+      "MenuHint":        "Edit the size→die map and bestiary fallback used for HP rolling."
     }
   }
 }
