@@ -1,0 +1,61 @@
+<form class="vcb-hitdie-config" autocomplete="off">
+
+  <section class="vcb-hitdie-section">
+    <h3>{{localize "VAGABOND_CRAWLER.HitDieConfig.SizeMapHeader"}}</h3>
+    <p class="vcb-hitdie-help">{{localize "VAGABOND_CRAWLER.HitDieConfig.SizeMapHelp"}}</p>
+
+    <table class="vcb-hitdie-table">
+      <thead>
+        <tr>
+          <th>{{localize "VAGABOND_CRAWLER.HitDieConfig.ColSize"}}</th>
+          <th>{{localize "VAGABOND_CRAWLER.HitDieConfig.ColDie"}}</th>
+          <th>{{localize "VAGABOND_CRAWLER.HitDieConfig.ColAvg"}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each rows}}
+          <tr class="vcb-hitdie-row {{#if readonly}}vcb-hitdie-readonly{{/if}}">
+            <td class="vcb-hitdie-size">{{label}}</td>
+            <td class="vcb-hitdie-die">
+              {{#if readonly}}
+                <span class="vcb-hitdie-readonly-note">{{localize "VAGABOND_CRAWLER.HitDieConfig.SmallNote"}}</span>
+              {{else}}
+                <select name="die.{{key}}">
+                  {{#each dieOptions}}
+                    <option value="{{value}}" {{#if selected}}selected{{/if}}>{{label}}</option>
+                  {{/each}}
+                </select>
+              {{/if}}
+            </td>
+            <td class="vcb-hitdie-avg">{{#if avg}}{{avg}}{{else}}—{{/if}}</td>
+          </tr>
+        {{/each}}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="vcb-hitdie-section">
+    <h3>{{localize "VAGABOND_CRAWLER.HitDieConfig.FallbackHeader"}}</h3>
+    <label class="vcb-hitdie-checkbox-row">
+      <input type="checkbox" name="fallback" {{#if fallback}}checked{{/if}}>
+      <span>{{localize "VAGABOND_CRAWLER.HitDieConfig.FallbackLabel"}}</span>
+    </label>
+    <p class="vcb-hitdie-help">{{localize "VAGABOND_CRAWLER.HitDieConfig.FallbackHelp"}}</p>
+  </section>
+
+  <footer class="vcb-hitdie-footer">
+    <button type="button" data-action="resetDefaults">
+      <i class="fas fa-rotate-left"></i> {{localize "VAGABOND_CRAWLER.HitDieConfig.Reset"}}
+    </button>
+    <span class="vcb-hitdie-spacer"></span>
+    <button type="button" data-action="save">
+      <i class="fas fa-floppy-disk"></i> {{localize "VAGABOND_CRAWLER.HitDieConfig.Save"}}
+    </button>
+    <button type="button" data-action="saveAndClose">
+      <i class="fas fa-floppy-disk"></i> {{localize "VAGABOND_CRAWLER.HitDieConfig.SaveAndClose"}}
+    </button>
+    <button type="button" data-action="cancel">
+      {{localize "VAGABOND_CRAWLER.HitDieConfig.Cancel"}}
+    </button>
+  </footer>
+</form>

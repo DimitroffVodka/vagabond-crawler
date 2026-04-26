@@ -13,6 +13,23 @@
     "StartCombat":       "Combat",
     "RestBreather":      "Rest",
     "LightTracker":      "Lights",
-    "DropTable":         "Drop Table"
+    "DropTable":         "Drop Table",
+    "HitDieConfig": {
+      "Title":           "Hit Die Configuration",
+      "SizeMapHeader":   "Size → Hit Die",
+      "SizeMapHelp":     "Default hit die used by monsters set to \"From Size\". Changes apply to existing monsters using \"From Size\" automatically.",
+      "ColSize":         "Size",
+      "ColDie":          "Die",
+      "ColAvg":          "Avg",
+      "SmallNote":       "Special: HP = HD (min 1)",
+      "FallbackHeader":  "Bestiary Fallback",
+      "FallbackLabel":   "Apply size→die map to bestiary NPCs without authored flags",
+      "FallbackHelp":    "When ON, dragging a compendium NPC onto the scene rolls HP using the size→die map. When OFF (default), bestiary NPCs use the legacy HD × 4.5 formula.",
+      "Reset":           "Reset to Defaults",
+      "Save":            "Save",
+      "SaveAndClose":    "Save & Close",
+      "Cancel":          "Cancel",
+      "Saved":           "Hit die configuration saved."
+    }
   }
 }

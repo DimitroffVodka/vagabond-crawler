@@ -5517,3 +5517,88 @@ body.theme-light {
   text-align: right;
 }
 
+/* ──────────────────────────────────────────────────────────────────────
+   Hit Die Configuration  (HitDieConfigApp)
+   ────────────────────────────────────────────────────────────────────── */
+
+.vcb-hitdie-config {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px 12px 12px;
+  color: var(--vcb-text);
+}
+
+.vcb-hitdie-section h3 {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--vcb-border);
+  padding-bottom: 4px;
+}
+
+.vcb-hitdie-help {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.vcb-hitdie-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--vcb-surface-1);
+  border: 1px solid var(--vcb-border);
+}
+
+.vcb-hitdie-table th,
+.vcb-hitdie-table td {
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--vcb-border);
+}
+
+.vcb-hitdie-table th {
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.vcb-hitdie-readonly {
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.vcb-hitdie-readonly-note {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.vcb-hitdie-die select {
+  background: var(--vcb-input-bg);
+  color: var(--vcb-text);
+  border: 1px solid var(--vcb-border);
+  padding: 2px 6px;
+}
+
+.vcb-hitdie-avg {
+  font-variant-numeric: tabular-nums;
+}
+
+.vcb-hitdie-checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.vcb-hitdie-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--vcb-border);
+}
+
+.vcb-hitdie-spacer { flex: 1; }
+
