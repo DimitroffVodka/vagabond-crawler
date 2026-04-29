@@ -25,7 +25,8 @@ export const RELIC_POWER_CATEGORIES = {
   resistance: { label: 'Resistance', icon: 'fas fa-shield-halved' },
   senses:     { label: 'Senses',     icon: 'fas fa-eye' },
   strike:     { label: 'Strike',     icon: 'fas fa-sword' },
-  utility:    { label: 'Utility',    icon: 'fas fa-gear' }
+  utility:    { label: 'Utility',    icon: 'fas fa-gear' },
+  custom:     { label: 'Custom',     icon: 'fas fa-wand-magic-sparkles' }
 };
 
 export const RELIC_POWERS = [
@@ -1347,16 +1348,35 @@ export const METAL_DISPLAY_NAMES = {
 };
 
 /**
- * Get a power by ID
+ * Read the world's saved custom relic powers from settings. Returns an array
+ * of power objects in the same shape as RELIC_POWERS entries. Safe to call
+ * before settings are registered (returns []).
  */
-export function getRelicPower(id) {
-  return RELIC_POWERS.find(p => p.id === id);
+export function getCustomRelicPowers() {
+  try {
+    const arr = game.settings.get('vagabond-crawler', 'customRelicPowers');
+    return Array.isArray(arr) ? arr : [];
+  } catch (_) {
+    return [];
+  }
 }
 
 /**
- * Get all powers in a category
+ * Get a power by ID — checks built-ins first, then custom-saved powers.
+ */
+export function getRelicPower(id) {
+  return RELIC_POWERS.find(p => p.id === id)
+      ?? getCustomRelicPowers().find(p => p.id === id)
+      ?? null;
+}
+
+/**
+ * Get all powers in a category. Custom-saved powers are appended to "all"
+ * and are the only entries returned for "custom".
  */
 export function getPowersByCategory(category) {
-  if (category === 'all') return RELIC_POWERS;
+  const customs = getCustomRelicPowers();
+  if (category === 'all')    return [...RELIC_POWERS, ...customs];
+  if (category === 'custom') return customs;
   return RELIC_POWERS.filter(p => p.category === category);
 }

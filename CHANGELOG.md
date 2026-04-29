@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.16.1
+
+### Relic Forge — Power Database Search, Custom Library, Quick-fill
+
+- **Search box** above the Power Database list — live, focus-preserving filter on name + description, composes with the category tabs. Empty-state placeholder when nothing matches.
+- **Custom category** — saved-custom powers get their own tab next to the built-ins.
+- **Save Custom** button alongside the existing **Add Once**. Description input added to the builder. "Save" persists the power to a world setting (`customRelicPowers`) and auto-selects it on the current relic; saving by id replaces the previous version so iterating doesn't require deleting first.
+- **Quick-fill targets** — pick from a Stat / Skill / Save dropdown and a +/- value, the raw key/mode/value fields auto-populate (path = `system.stats.<key>.bonus` etc., mode = Add since bonus is an array, value preserves sign). The Effect Name + Relic Name Word also pre-fill from the chosen label so a one-click save is the path of least resistance. Targets are read live from `CONFIG.VAGABOND.stats` / `homebrew.skills` / `homebrew.saves` so per-world homebrew lists are respected.
+- **Delete saved customs** — hover any saved custom-power card to reveal a trash icon on the right. Click it, confirm, and the entry is dropped from the world setting and from any active selection. Built-in powers never get the icon.
+
+### Relic Forge — Bug fixes
+
+- **Compendium-cloned base item.** The inline weapons-and-equipment search (and drag/drop from a compendium) used to call `update()` on the locked compendium document and throw `"You may not update documents in the locked compendium"`. Forging now clones the loaded item data into `game.items` at forge time (not load time, so cancelling leaves no clutter) and applies the relic to the world copy. The compendium document is never touched.
+- **Search past the 200-row cap.** The browser cache held all 400+ pack entries but the rendered list was sliced to 200, then live-search only toggled rows already in the DOM — items past position 200 (Light Armor at 210, Medium Armor at 241, late-alphabet weapons, much of the gear pack) were unreachable. The list now rebuilds on every keystroke against the full cache (cap 500) and clicks are delegated on the list root so newly-inserted rows still work.
+
 ## v1.16.0
 
 ### Monster Creator — Hit Die Configuration

@@ -18,6 +18,7 @@ import { ItemDrops }        from "./item-drops.mjs";
 import { LootDrops }        from "./loot-drops.mjs";
 import { RelicForge }       from "./relic-forge.mjs";
 import { RelicEffects }     from "./relic-effects.mjs";
+import { RELIC_POWERS, getRelicPower, getPowersByCategory, METAL_DISPLAY_NAMES } from "./relic-powers.mjs";
 import { LootManager }      from "./loot-manager.mjs";
 import { LootTracker }      from "./loot-tracker.mjs";
 import { LootGenerator }    from "./loot-generator.mjs";
@@ -219,6 +220,16 @@ Hooks.once("init", () => {
     default: false,
   });
 
+  // Saved custom relic powers — populated via the Relic Forge's "Save"
+  // button on the Custom Power builder. Surfaced in the Power Database
+  // under the "Custom" category for reuse on future relics.
+  game.settings.register(MODULE_ID, "customRelicPowers", {
+    scope: "world",
+    config: false,
+    type: Array,
+    default: [],
+  });
+
   game.settings.registerMenu(MODULE_ID, "hitDieConfigMenu", {
     name:    "VAGABOND_CRAWLER.HitDieConfig.Title",
     label:   "VAGABOND_CRAWLER.HitDieConfig.OpenButton",
@@ -328,6 +339,20 @@ Hooks.once("ready", async () => {
       return { actorName: token.actor.name, speed: s, allSpeedKeys: Object.keys(s ?? {}) };
     },
   };
+
+  // Public API for cross-module integration (vgbnd-importer, etc.). Stable
+  // surface — change here only with a version bump and changelog note.
+  const mod = game.modules.get(MODULE_ID);
+  if (mod) {
+    mod.api = {
+      forgeItem:        RelicForge.forgeItem.bind(RelicForge),
+      computeRelicName: RelicForge.computeRelicName.bind(RelicForge),
+      getRelicPower,
+      getPowersByCategory,
+      RELIC_POWERS,
+      METAL_DISPLAY_NAMES,
+    };
+  }
 
   // Token HP override on spawn — the system's prepareDerivedData clobbers
   // actor.system.health.max using HD * 4.5, so we must override the token's
