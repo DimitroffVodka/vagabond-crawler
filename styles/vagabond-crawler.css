@@ -1666,6 +1666,26 @@ body.theme-light .vcb-phase-badge {
 .power-input-row input::placeholder { color: var(--vcb-text-muted); }
 .power-input-row select option { background: var(--vcb-forge-bg-1); color: var(--vcb-text-bright); }
 .power-check { width: 20px; color: var(--vcb-action-buy); }
+.power-delete-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  margin-left: 4px;
+  background: transparent;
+  border: 1px solid rgba(244, 67, 54, 0.35);
+  color: rgba(244, 67, 54, 0.75);
+  border-radius: 3px;
+  cursor: pointer;
+  flex: 0 0 auto;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.power-card:hover .power-delete-btn { opacity: 1; }
+.power-delete-btn:hover {
+  background: rgba(244, 67, 54, 0.18);
+  color: rgba(244, 67, 54, 1);
+  border-color: rgba(244, 67, 54, 0.6);
+}
 
 /* Config (center) */
 .forge-config { flex: 0.9; }
@@ -1698,7 +1718,8 @@ body.theme-light .vcb-phase-badge {
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.18);
 }
-.forge-browser-search {
+.forge-browser-search,
+.power-browser-search {
   width: 100%;
   padding: 4px 8px;
   margin-bottom: 6px;
@@ -1708,6 +1729,13 @@ body.theme-light .vcb-phase-badge {
   color: var(--vcb-text, #e7e1d4);
   font-family: var(--vcb-font);
   font-size: 0.9em;
+}
+.power-browser-empty-dynamic {
+  padding: 8px;
+  color: var(--vcb-text-muted, #c5c3b8aa);
+  font-style: italic;
+  text-align: center;
+  font-size: 0.85em;
 }
 .forge-browser-list {
   display: flex;
@@ -1797,16 +1825,29 @@ body.theme-light .vcb-phase-badge {
   border-radius: 3px;
   color: var(--vcb-text-bright);
 }
-.add-custom-btn {
+.custom-row-actions {
+  gap: 6px;
+}
+.add-custom-btn,
+.save-custom-btn {
+  flex: 1;
   padding: 6px 10px;
   font-size: 0.9rem;
-  background: rgba(76,175,80,0.2);
-  border: 1px solid rgba(76,175,80,0.4);
-  color: var(--vcb-action-buy);
   border-radius: 3px;
   cursor: pointer;
 }
+.add-custom-btn {
+  background: rgba(76,175,80,0.2);
+  border: 1px solid rgba(76,175,80,0.4);
+  color: var(--vcb-action-buy);
+}
 .add-custom-btn:hover { background: rgba(76,175,80,0.35); }
+.save-custom-btn {
+  background: rgba(80, 130, 200, 0.2);
+  border: 1px solid rgba(80, 130, 200, 0.45);
+  color: var(--vcb-text-bright);
+}
+.save-custom-btn:hover { background: rgba(80, 130, 200, 0.35); }
 
 /* Forge Button */
 .forge-btn {

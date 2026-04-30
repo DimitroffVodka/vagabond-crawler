@@ -28,6 +28,11 @@
         {{/each}}
       </div>
 
+      {{!-- Search box (filters by name + description, composes with category) --}}
+      <input type="text" class="power-browser-search"
+             placeholder="🔎 Search powers…"
+             value="{{powerSearchQuery}}" />
+
       {{!-- Scrollable Power List --}}
       <div class="power-browser-list">
         {{#each powers}}
@@ -43,6 +48,12 @@
           <div class="power-check">
             {{#if selected}}<i class="fas fa-check-circle"></i>{{/if}}
           </div>
+          {{#if isUserCustom}}
+          <button type="button" class="power-delete-btn" data-power-id="{{id}}"
+                  title="Delete this saved custom power">
+            <i class="fas fa-trash"></i>
+          </button>
+          {{/if}}
         </div>
         {{/each}}
       </div>
@@ -104,6 +115,24 @@
           <input type="text" class="custom-power-name" placeholder="Effect Name" />
           <input type="text" class="custom-power-namelabel" placeholder="Relic Name Word" />
         </div>
+
+        {{!-- Quick-fill: pick a stat / skill / save and a +/- value, and the
+              raw fields below populate automatically. The raw row is still
+              editable so power users can tweak anything afterwards. --}}
+        <div class="custom-row custom-row-quickfill">
+          <select class="custom-power-quickfill-target" title="Pick a stat, skill, or save to auto-fill the path">
+            <option value="">— Quick fill: pick stat / skill / save —</option>
+            {{#each quickFillGroups}}
+              <optgroup label="{{label}}">
+                {{#each targets}}
+                  <option value="{{path}}" data-label="{{label}}">{{label}}</option>
+                {{/each}}
+              </optgroup>
+            {{/each}}
+          </select>
+          <input type="number" class="custom-power-quickfill-value" placeholder="±N" step="1" title="Modifier — fills the Value field below (negative numbers OK)" />
+        </div>
+
         <div class="custom-row">
           <input type="text" class="custom-power-key" placeholder="system.stats.might.bonus" />
           <select class="custom-power-mode">
@@ -113,9 +142,17 @@
           </select>
           <input type="text" class="custom-power-value" placeholder="Value" />
         </div>
-        <button type="button" class="add-custom-btn">
-          <i class="fas fa-plus"></i> Add Custom
-        </button>
+        <div class="custom-row">
+          <input type="text" class="custom-power-description" placeholder="Description (shown on the power card)" />
+        </div>
+        <div class="custom-row custom-row-actions">
+          <button type="button" class="add-custom-btn" title="Add to this relic only — not saved for reuse">
+            <i class="fas fa-plus"></i> Add Once
+          </button>
+          <button type="button" class="save-custom-btn" title="Save to the Custom category so you can reuse it on other relics">
+            <i class="fas fa-floppy-disk"></i> Save Custom
+          </button>
+        </div>
       </div>
 
       {{!-- Forge Button --}}
