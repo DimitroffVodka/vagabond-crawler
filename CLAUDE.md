@@ -190,12 +190,22 @@ game.vagabondCrawler.lightTracker.getLightSourcesConfig()  // inspect current ov
 game.patrol                           // Patrol module instances (if installed)
 ```
 
-**Foundry MCP testing**:
+**Foundry MCP testing — use it.** A live FoundryVTT instance is reachable via the `foundry-mcp-bridge` module's MCP tools. When you make a change that touches runtime behavior — a hook, a singleton's state, a socket message, a render path, anything that only matters at runtime — drive it through the live game and verify the actual chat messages, flag state, socket traffic, and console output before reporting "done." **Don't ask the user to F5 and report results back unless you genuinely have no MCP access; reload it yourself via `evaluate({ code: 'setTimeout(() => window.location.reload(), 100); "reloading"' })` and test.**
+
+For state-leak / hook-order / socket-desync investigations specifically (the dominant Crawler failure modes):
+- **Hook ordering** → `trace_hooks` with the relevant pre/post hooks; inspect the timeline `dt` values.
+- **Socket desync** → `trace_socket` with `filter: "module.vagabond-crawler"` during the action; verify GM emit ↔ client receive ordering.
+- **State changes** → `snapshot_actor` before, perform action, `diff_actor` after to verify the change footprint matches intent.
+- **Silent failures** → `get_console_errors` with `sinceMs` scoped to the action window.
+
+Notes:
 - `mcp__foundry-vtt__evaluate` runs JS in the live game context. Module-wrapped classes (`SpellHandler`, `VagabondItem`) are already wrapped — test against live behavior, not the raw system code.
-- Reload after editing module files: `window.location.reload()` via evaluate. Wait ~1s then re-query. The MCP reconnects automatically.
+- Reload via `evaluate { setTimeout(() => window.location.reload(), 100); "reloading" }`. Wait ~3-5s then re-query. The MCP reconnects automatically.
 - Results larger than ~256KB are saved to a file path instead of returned inline; use `jq` on the file to extract.
 - For weapon-attack tests, VCE's `RangeValidator` returns `null` from `rollAttack` if target is out of range — pick an adjacent target or expect no roll formula in the result.
 - For transient test actors/tokens: create unlinked tokens from a cloned world actor so `token.actor` is synthetic (matches the real runtime path for NPCs); clean up both tokens and world actors in `finally`.
+
+If MCP testing isn't possible (server down, no connection), explicitly say so rather than just claiming the work is done off-disk.
 
 ## System / Module Wrap Chain Gotchas
 
