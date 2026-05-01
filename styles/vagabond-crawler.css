@@ -565,6 +565,54 @@ body.theme-light .vcb-phase-badge {
   border-radius: 0 0 var(--vcb-radius) var(--vcb-radius);
 }
 
+/* ── Strip tools (left-edge tool buttons, e.g. shop) ──────────────────────── */
+/* Visible to everyone when an opt-in tool is available — players use this
+ * to open their own shop window when the GM has marked the shop available. */
+
+.vcs-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-right: 1px solid var(--vcb-border, var(--vcb-accent-dim));
+  background: var(--vcb-surface-1);
+}
+
+.vcs-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--vcb-accent-dim);
+  border-radius: var(--vcb-radius-sm, 4px);
+  background: var(--vcb-surface-2);
+  color: var(--vcb-text);
+  cursor: pointer;
+  transition: background 0.12s ease, transform 0.06s ease, box-shadow 0.12s ease;
+}
+
+.vcs-tool-btn:hover {
+  background: var(--vcb-accent-dim);
+  box-shadow: 0 0 6px var(--vcb-shadow-sm);
+}
+
+.vcs-tool-btn:active {
+  transform: scale(0.94);
+}
+
+.vcs-tool-btn i {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Shop button — small accent so players notice when it appears */
+.vcs-tool-shop {
+  border-color: var(--vcb-accent, gold);
+  color: var(--vcb-accent, gold);
+}
+
 /* ── Hero / NPC groups ────────────────────────────────────────────────────── */
 
 .vcs-group {

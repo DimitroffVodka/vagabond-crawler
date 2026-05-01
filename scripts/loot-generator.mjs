@@ -190,8 +190,20 @@ const ART_ICONS = {
   7: ICONS.pottery, 8: ICONS.artifact,
 };
 
-/** Build an equipment itemData object for loot. */
-function _lootItem(name, img, goldValue, slots = 0, description = "") {
+/** Build an equipment itemData object for loot.
+ *
+ * `cost` may be either a flat number (treated as gold for backward
+ * compatibility with existing callers) or a `{ gold, silver, copper }`
+ * object — use the object form when the value isn't a clean gold
+ * amount, e.g. spices and copper ingots that are priced in silver
+ * or copper in the system compendium.
+ */
+function _lootItem(name, img, cost, slots = 0, description = "") {
+  const baseCost = (typeof cost === "number")
+    ? { gold: cost, silver: 0, copper: 0 }
+    : { gold:   cost?.gold   ?? 0,
+        silver: cost?.silver ?? 0,
+        copper: cost?.copper ?? 0 };
   return {
     name,
     type: "equipment",
@@ -201,7 +213,7 @@ function _lootItem(name, img, goldValue, slots = 0, description = "") {
       equipmentType: "gear",
       quantity: 1,
       baseSlots: slots,
-      baseCost: { gold: goldValue, silver: 0, copper: 0 },
+      baseCost,
       gearCategory: "Loot",
       isConsumable: false,
     },
@@ -307,13 +319,18 @@ function _addPowerValue(itemData, powerText, material) {
   }
 }
 
-/** Build a gem loot item. */
+/** Build a gem loot item. Per-unit baseCost — `quantity` scales the
+ *  stack value at sell time. Older code did `valueGold * qty` AND
+ *  `system.quantity = qty`, which made selling a stack of N pay
+ *  out N×N times the unit value. We DON'T bake `×N` into the name
+ *  because the inventory render patch already adds an `×N` badge from
+ *  `system.quantity` — having both produces "Uncommon Gem ×2 ×2". */
 function _gemItem(rarity, valueGold, qty = 1) {
   const icon = rarity === "Uncommon" ? ICONS.gemUncommon
     : rarity === "Rare" ? ICONS.gemRare : ICONS.gemVeryRare;
   const item = _lootItem(
-    qty > 1 ? `${rarity} Gem ×${qty}` : `${rarity} Gem`,
-    icon, valueGold * qty, 0,
+    `${rarity} Gem`,
+    icon, valueGold, 0,
     `${rarity} gemstone worth ${valueGold}g each.`,
   );
   if (qty > 1) item.system.quantity = qty;
@@ -332,16 +349,25 @@ function _tradeGoodItem(entry, qty) {
   else if (entry.includes("Ingot, Gold") || entry.includes("Ingots, Gold")) { icon = ICONS.ingotGold; name = "Gold Ingot"; }
   else if (entry.includes("Platinum")) { icon = ICONS.ingotPlatinum; name = "Platinum Ingot"; }
 
-  // Estimate value: spices ~1-5g, copper ingots ~1g, silver ~10g, gold ~100g, platinum ~5000g
+  // Estimate value: spices ~1-10g, copper ingots ~1g, silver ~10g, gold ~100g, platinum ~5000g.
+  // IMPORTANT — per-unit, NOT per-stack. The merchant code reads `baseCost`
+  // as a unit price and multiplies it by the sale `quantity`. Older code
+  // here pre-multiplied (`unitVal * qty`) and ALSO set `system.quantity =
+  // qty`, which made selling a stack pay out the per-unit price × stack
+  // size × stack size. Keep `baseCost` as the per-unit price — `quantity`
+  // alone scales the stack value.
   const values = {
     "Common Spice": 1, "Exotic Spice": 5, "Rare Spice": 10,
     "Copper Ingot": 1, "Silver Ingot": 10, "Gold Ingot": 100, "Platinum Ingot": 5000,
   };
   const unitVal = values[name] || 5;
 
+  // Don't bake `×N` into the name — the inventory render patch already
+  // adds an `×N` badge from `system.quantity`. Having both produces
+  // "Exotic Spice ×11 ×11" / "Copper Ingot ×20 ×12" in the merchant UI.
   const item = _lootItem(
-    qty > 1 ? `${name} ×${qty}` : name,
-    icon, unitVal * qty, 1,
+    name,
+    icon, unitVal, 1,
     `Trade goods: ${entry}.`,
   );
   if (qty > 1) item.system.quantity = qty;
@@ -855,9 +881,15 @@ export const LootGenerator = {
       if (bc?.silver) valParts.push(`${bc.silver}s`);
       if (bc?.copper) valParts.push(`${bc.copper}c`);
       const valStr = valParts.length ? ` (${valParts.join(" ")})` : "";
+      // Surface stack qty in the loot card. Trade goods and gems no
+      // longer bake `×N` into the name (the inventory badge handles
+      // that), so the card has to show qty explicitly or the player
+      // can't see they got a stack.
+      const qty = d.system?.quantity ?? 1;
+      const qtyStr = qty > 1 ? ` ×${qty}` : "";
       return `<div class="vcl-gen-claim-item">
         <img src="${d.img || "icons/svg/item-bag.svg"}" width="24" height="24" />
-        <span>${d.name}${valStr}</span>
+        <span>${d.name}${qtyStr}${valStr}</span>
       </div>`;
     }).join("");
 

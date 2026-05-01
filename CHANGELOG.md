@@ -1,5 +1,35 @@
 # Changelog
 
+## v1.16.2
+
+### Session Recap — Bug fixes and merchant tracking
+
+- **Last combat no longer dropped from the recap.** Previously, ending a session while a combat was still open in the tracker (or having the crawl-end flow auto-delete the combat after `sessionState` flipped inactive) silently dropped that combat from the recap — the Apr 30 session lost the Orichalcum Golem fight to this race. The recap now snapshots enemy roster + round count on `combatStart` / `updateCombat`, and `endAndSave` / `pauseSession` flush every entry still in `_activeCombats` before changing state. The `deleteCombat` handler also no longer guards on `sessionState`, so late-deletes still log when the combat was tracked from start.
+- **XP question breakdown is no longer lost.** The XP Counter Patch's `awardXP` handler reset `this.questions` to zeros *before* building the recap snapshot, so every XP entry showed `_(breakdown not recorded)_`. Snapshot is now taken before the reset; per-question lines (e.g. `Defeated a Boss — ×2 = 2 XP`) appear in the recap as intended.
+- **Combat enemy list no longer fragments comma-named bestiary entries.** Names like `"Bat, Giant"` or `"Centipede, Giant"` collided with the `, ` join separator in the Combat section's enemy and defeated lines, so a single Giant Bat rendered as two enemies (`Bat`, `Giant`). Switched the inter-enemy separator to ` · ` (middle dot) — matches the convention already used for encounter checks. Killer attribution inside the parentheses still uses commas (no ambiguity inside grouping marks).
+
+### Session Recap — Sales and Purchases tracking
+
+- **Merchant Shop transactions now feed the recap.** `MerchantShop.logTransaction` is the single chokepoint for buy / catalog buy / gamble / sell — it now also calls `SessionRecap.logSale` or `logPurchase`. No call-site changes needed in the four merchant handlers.
+- **Two new Discord export sections** — `## Sales` and `## Purchases`, grouped by player with per-player subtotals and a party total. Sales show the sell ratio in parentheses when it isn't 100% (so `(75%)` flags a discount at a glance). Sections only render when non-empty.
+- **In-place data migration.** `SessionRecap.getData` backfills `sales: []` / `purchases: []` on existing worlds so this version drops in cleanly. `endAndSave` snapshots include both new arrays so future archived sessions can re-render with the new sections.
+- **Currency formatting consolidated.** New `_formatCurrency` and `_toCopper` helpers on the recap singleton; sales/purchases sections use them for consistent g/s/c output. The existing loot-currency render is untouched (preserves byte-identical output for existing recaps).
+
+### Loot Generator — Trade-goods baseCost was per-stack, should be per-unit
+
+- **Stack baseCost was per-stack, should be per-unit (trade goods + gems).** A loot drop of `Rare Spice ×11` (10g per spice) used to set `baseCost = { gold: 110 }` (the full stack value) AND `system.quantity = 11`. The merchant code reads `baseCost` as a **per-unit** price and multiplies by sale quantity — so selling that stack paid out 110g per spice instead of 10g per spice (and selling all 11 paid out 1,210g instead of 110g). Same bug in `_gemItem` (`Uncommon Gem ×2` got `baseCost = 10g` for a 5g/gem stack). Both `_tradeGoodItem` and `_gemItem` now store `baseCost = unitVal` (per-unit) and let `quantity` alone scale the stack value, matching the system convention used by every compendium gear item. Affects: Common/Exotic/Rare Spice, Copper/Silver/Gold/Platinum Ingot, Uncommon/Rare/Very Rare Gems.
+- **`_lootItem` now accepts a baseCost object** (in addition to the legacy flat-gold number) so future callers can express silver/copper prices precisely without forcing every value into gold. Backward compatible — all 16 existing call sites still work unchanged.
+- **No more "×N ×N" doubled-quantity display in inventory.** `_gemItem` and `_tradeGoodItem` used to bake `×N` directly into the item name, but the inventory render patch already adds an `×N` badge from `system.quantity` — so the merchant card showed "Copper Ingot ×20 ×12" (name has ×20, badge adds ×12). Item names now stay clean (`Copper Ingot`, `Uncommon Gem`); the quantity badge alone shows stack size. Recap loot log still surfaces qty via `loot-tracker.logDrop` appending `×N` to the detail string when `system.quantity > 1`, so the session recap reads "Exotic Spice ×11" as before. Loot card display also adds `×N` next to the item name so players can see the qty at a glance.
+
+### Merchant Shop — opt-in shop visibility for players
+
+- **Shop is now player-opt-in, not force-popup.** "Open Shop for All Players" used to forcibly render the shop window on every connected player's screen the moment the GM clicked it. Renamed to **"Make Shop Available"** — instead, the shop becomes *available* and players choose when to open / close their own window. Two opt-in surfaces:
+  1. A chat card posted by the merchant when the shop opens, with an **Open Shop** button players click to launch their window.
+  2. A small storefront button (🏪) on the Crawl Strip that appears for everyone when the shop is available — players can use it to reopen the shop after closing their window, or to open it for the first time if they missed the chat card.
+- **GM keeps full control.** "Make Shop Available" → players can open · "Close Shop" → all open player windows close, strip button disappears, the chat card's Open Shop button grays out as superseded. Both transitions post a fresh chat card so the scrollback always announces the latest state.
+- **Reload-safe.** New world settings `shopAvailableToPlayers` and `shopAvailabilityData` persist the open state and an inventory snapshot, so a player who reloads while the shop is open still sees the strip button and can reopen with current inventory.
+- **GM workflow unchanged.** The GM still opens / configures the shop from Crawl Bar → Forge & Loot. The Make Available toggle is the only player-visibility change.
+
 ## v1.16.1
 
 ### Relic Forge — Power Database Search, Custom Library, Quick-fill

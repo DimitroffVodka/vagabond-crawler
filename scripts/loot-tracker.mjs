@@ -71,12 +71,19 @@ export const LootTracker = {
     }
 
     for (const item of (items ?? [])) {
+      // Stack quantity is now stored in `system.quantity` (the loot
+      // generator no longer bakes `×N` into the name to avoid the
+      // inventory `×N ×N` double-display). Surface qty in the recap
+      // detail string so the loot log still reads "Exotic Spice ×11"
+      // instead of just "Exotic Spice".
+      const qty = item.system?.quantity ?? item.quantity ?? 1;
+      const detail = qty > 1 ? `${item.name} ×${qty}` : item.name;
       await SessionRecap.logDrop({
         messageId,
         player: playerName,
         source: sourceName,
         type: "item",
-        detail: item.name,
+        detail,
         img: item.img,
       });
     }

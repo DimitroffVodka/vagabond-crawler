@@ -1,0 +1,64 @@
+{
+  "planPath": "docs/superpowers/plans/2026-05-01-session-recap-fixes.md",
+  "lastUpdated": "2026-05-01T09:55:00Z",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 0: Confirm doc paths and capture baseline",
+      "status": "completed",
+      "description": "Resolved: user-facing recap doc is `docs/session-tracking.md` (single file). No `docs/dev/session-recap.md` exists; design specs serve as the architectural reference. DEFAULT_DATA shape recorded."
+    },
+    {
+      "id": 1,
+      "subject": "Task 1: Fix XP breakdown snapshot order (Bug 1)",
+      "status": "completed",
+      "description": "Snapshot built before `this.questions` reset. Verified live: logXp persists `questions: [{label, xp, count}]` correctly."
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Snapshot enemy roster & rounds during active combats (Bug 2 prep)",
+      "status": "completed",
+      "description": "_snapshotEnemies helper added. combatStart captures initial roster + rounds. updateCombat refreshes snapshot. _activeCombats entries now carry { startTime, participants, rounds, enemies, lastSnapshotAt }."
+    },
+    {
+      "id": 3,
+      "subject": "Task 3: Flush active combats on session end/pause + loosen deleteCombat guard (Bug 2 fix)",
+      "status": "completed",
+      "blockedBy": [2],
+      "description": "_flushActiveCombats added. Wired into endAndSave and pauseSession. deleteCombat handler no longer guards on sessionState — proceeds when _activeCombats.has(id). Verified live with synthetic active combat + kill map."
+    },
+    {
+      "id": 4,
+      "subject": "Task 4: Extract shared currency formatter",
+      "status": "completed",
+      "description": "_toCopper and _formatCurrency helpers added. Loot rendering NOT refactored — preserves byte-identical comma-separated output for existing recaps. Sales/Purchases use the new helpers (space-separated, matching merchant chat format)."
+    },
+    {
+      "id": 5,
+      "subject": "Task 5: Add logSale / logPurchase data layer (Bug 3 part 1)",
+      "status": "completed",
+      "description": "DEFAULT_DATA extended with sales:[] and purchases:[]. getData() backfills missing arrays for existing worlds. logSale and logPurchase methods added with sessionState self-guards. endAndSave snapshot includes both new arrays."
+    },
+    {
+      "id": 6,
+      "subject": "Task 6: Wire merchant-shop into recap loggers (Bug 3 part 2)",
+      "status": "completed",
+      "blockedBy": [5],
+      "description": "SessionRecap import added to merchant-shop. logTransaction now forwards to logSale (with sell ratio) or logPurchase based on entry.action. All four merchant paths (buy/catalogBuy/gamble/sell) covered via this single chokepoint."
+    },
+    {
+      "id": 7,
+      "subject": "Task 7: Render Sales and Purchases sections (Bug 3 part 3)",
+      "status": "completed",
+      "blockedBy": [4, 5],
+      "description": "Sales and Purchases sections added to formatForDiscordFromData after Loot, before XP. Both grouped by player with subtotals + party total. Sales show ratio% only when !=100. Sections only render when arrays non-empty. Verified live with synthetic data."
+    },
+    {
+      "id": 8,
+      "subject": "Task 8: Update documentation",
+      "status": "completed",
+      "blockedBy": [3, 6, 7],
+      "description": "docs/session-tracking.md updated: new sections in tab list, settings table includes sales/purchases, gotcha entries for combat flush + merchant-feeds-recap. CHANGELOG.md v1.16.2 entry added covering all three fixes. module.json + README badge bumped to 1.16.2. Skipped creating new docs/dev/session-recap.md — design specs cover the architecture reference."
+    }
+  ]
+}
