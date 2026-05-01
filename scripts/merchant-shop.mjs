@@ -9,6 +9,7 @@
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
+import { SessionRecap } from "./session-recap.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -99,6 +100,19 @@ export const MerchantShop = {
     game.settings.register(MODULE_ID, "savedShopConfigs", {
       scope: "world", config: false, type: Object, default: {},
     });
+    // Player opt-in shop: when true, players can open/close their own
+    // shop window at will (chat card + Crawl Strip button) until the GM
+    // closes the shop. Persisted so a reload restores the indicator.
+    game.settings.register(MODULE_ID, "shopAvailableToPlayers", {
+      scope: "world", config: false, type: Boolean, default: false,
+    });
+    // Snapshot of inventory + display options at the moment the GM
+    // opened the shop. Players read this when they click Open Shop so
+    // they don't need a round-trip to the GM. Refreshed by GM whenever
+    // inventory changes (restock, sell, buy) while shop is available.
+    game.settings.register(MODULE_ID, "shopAvailabilityData", {
+      scope: "world", config: false, type: Object, default: null,
+    });
   },
 
   // ── Init (socket listeners) ───────────────────────────────────────────────
@@ -117,6 +131,43 @@ export const MerchantShop = {
       if (data.action === "shop:open")   this._onRemoteOpen(data);
       if (data.action === "shop:close")  this._onRemoteClose();
       if (data.action === "shop:result") this._onResult(data);
+    });
+
+    // Reload restoration: if shop was available before page reload,
+    // mirror that state into transient flags so the Crawl Strip's
+    // merchant button reappears and openLocally has a snapshot to use.
+    const persistedAvailable = game.settings.get(MODULE_ID, "shopAvailableToPlayers");
+    if (persistedAvailable) {
+      this._isOpenForPlayers = true;
+      if (!game.user.isGM) {
+        this._cachedAvailabilityData = game.settings.get(MODULE_ID, "shopAvailabilityData");
+      }
+    }
+
+    // Wire up the "Open Shop" button on shop-availability chat cards.
+    Hooks.on("renderChatMessageHTML", (message, html) => {
+      const flags = message.flags?.[MODULE_ID];
+      if (!flags?.shopAvailabilityCard) return;
+
+      const btn = html.querySelector(".vcm-shop-card-open-btn");
+      if (!btn) return;
+
+      // Card was superseded by a newer open/close — gray out and bail.
+      if (flags.superseded) {
+        btn.disabled = true;
+        btn.style.opacity = "0.5";
+        btn.innerHTML = `<i class="fas fa-ban"></i> Shop status changed`;
+        return;
+      }
+      // Close card has no button (above), so this only fires on open cards.
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        if (!game.settings.get(MODULE_ID, "shopAvailableToPlayers")) {
+          ui.notifications.warn("The shop isn't available right now.");
+          return;
+        }
+        this.openLocally();
+      });
     });
 
     console.log(`${MODULE_ID} | Merchant Shop initialized.`);
@@ -202,11 +253,46 @@ export const MerchantShop = {
 
   // ── Remote handlers (all clients) ─────────────────────────────────────────
 
+  /**
+   * Cache the broadcast snapshot so the player can open the window on
+   * demand later without round-tripping to the GM. Does NOT force the
+   * window open — players opt in via the chat card or Crawl Strip.
+   * GM is exempt because they already have their own window.
+   */
   _onRemoteOpen(data) {
-    // Don't re-open for the GM who initiated it
     if (game.user.isGM) return;
 
-    this._ensureApp();
+    this._cachedAvailabilityData = foundry.utils.deepClone(data);
+
+    // Refresh any already-open shop window (player kept it open while
+    // GM restocked, etc.) without forcing one to appear.
+    if (this._app?.rendered) {
+      this._applyAvailabilityToApp(data);
+      this._app.render();
+    }
+
+    // Nudge the Crawl Strip to add/refresh the merchant button.
+    game.vagabondCrawler?.strip?.render?.();
+  },
+
+  /**
+   * GM closed the shop. Close any open player window and let the
+   * Crawl Strip drop the merchant button on its next render.
+   */
+  _onRemoteClose() {
+    if (game.user.isGM) return;
+    this._cachedAvailabilityData = null;
+    this._app?.close();
+    game.vagabondCrawler?.strip?.render?.();
+  },
+
+  /**
+   * Apply broadcast/cached availability data onto the local _app
+   * instance. Pulled out of `_onRemoteOpen` so `openLocally` can reuse
+   * the same wiring when a player opts in after the broadcast.
+   */
+  _applyAvailabilityToApp(data) {
+    if (!this._app || !data) return;
     this._app._shopName = data.shopName;
     this._app._sellRatio = data.sellRatio;
     this._app._mode = data.mode;
@@ -215,13 +301,159 @@ export const MerchantShop = {
     this._app._catalogEnabled = data.catalogEnabled ?? true;
     this._app._buyMultiplier = data.buyMultiplier ?? 100;
     this._app._gambleEnabled = data.gambleEnabled ?? false;
-    this._app._tab = data.catalogEnabled === false && (!data.inventory || data.inventory.length === 0) ? "catalog" : "buy";
+    this._app._tab = data.catalogEnabled === false && (!data.inventory || data.inventory.length === 0)
+      ? "catalog" : "buy";
+  },
+
+  /**
+   * Open the shop window using cached availability data (broadcast at
+   * GM open, persisted in `shopAvailabilityData` for reload survival).
+   * Called from the chat card button and the Crawl Strip merchant
+   * button.
+   *
+   * GM: opens their existing app instance untouched (don't overwrite
+   * their authoring state with a player-facing snapshot).
+   * Players: pulls cached snapshot, falls back to persisted setting.
+   */
+  openLocally() {
+    this._ensureApp();
+    if (game.user.isGM) {
+      this._app.render(true);
+      return;
+    }
+    const data = this._cachedAvailabilityData
+      ?? game.settings.get(MODULE_ID, "shopAvailabilityData");
+    if (!data) {
+      ui.notifications.warn("The shop isn't available right now.");
+      return;
+    }
+    this._cachedAvailabilityData = data;
+    this._applyAvailabilityToApp(data);
     this._app.render(true);
   },
 
-  _onRemoteClose() {
-    if (game.user.isGM) return;
-    this._app?.close();
+  // ── GM-side availability control ─────────────────────────────────────────
+
+  /**
+   * Toggle "shop available to players" on or off. Persists to world
+   * settings, broadcasts, posts a chat card, and updates any open
+   * card buttons that refer to the previous state.
+   *
+   * Only callable by the GM.
+   */
+  async _setAvailability(available, payload = null) {
+    if (!game.user.isGM) return;
+
+    this._isOpenForPlayers = !!available;
+    await game.settings.set(MODULE_ID, "shopAvailableToPlayers", !!available);
+
+    if (available) {
+      // Persist the snapshot so reloaded players can still open the shop.
+      const snapshot = {
+        mode:           payload.mode,
+        actorId:        payload.actorId,
+        shopName:       payload.shopName,
+        sellRatio:      payload.sellRatio,
+        inventory:      foundry.utils.deepClone(payload.inventory ?? []),
+        catalogEnabled: payload.catalogEnabled ?? true,
+        buyMultiplier:  payload.buyMultiplier ?? 100,
+        gambleEnabled:  payload.gambleEnabled ?? false,
+      };
+      await game.settings.set(MODULE_ID, "shopAvailabilityData", snapshot);
+
+      // Disable the button on any prior shop-availability card so
+      // players don't get confused which "open" message is current.
+      await this._invalidateOldShopCards();
+
+      // Broadcast so live clients refresh strip / cache, then post chat card.
+      game.socket.emit(`module.${MODULE_ID}`, { action: "shop:open", ...snapshot });
+      await this._postShopCard("open", snapshot);
+    } else {
+      await game.settings.set(MODULE_ID, "shopAvailabilityData", null);
+      await this._invalidateOldShopCards();
+      game.socket.emit(`module.${MODULE_ID}`, { action: "shop:close" });
+      await this._postShopCard("close");
+    }
+
+    // Refresh GM's own strip too.
+    game.vagabondCrawler?.strip?.render?.();
+  },
+
+  /**
+   * Mark every previous shop-availability card as superseded so its
+   * Open Shop button no longer works. Called whenever availability
+   * flips so chat scrollback always points to the latest state.
+   */
+  async _invalidateOldShopCards() {
+    if (!game.user.isGM) return;
+    const updates = [];
+    for (const msg of game.messages) {
+      const flags = msg.flags?.[MODULE_ID];
+      if (!flags?.shopAvailabilityCard) continue;
+      if (flags.superseded) continue;
+      updates.push({ _id: msg.id, [`flags.${MODULE_ID}.superseded`]: true });
+    }
+    if (updates.length) {
+      await ChatMessage.updateDocuments(updates);
+    }
+  },
+
+  /**
+   * Post a chat card announcing shop open/close. Open cards include a
+   * button players can click to open their own window. Tagged with a
+   * module flag so the renderChatMessageHTML hook can wire up the
+   * click and gray it out when superseded.
+   */
+  async _postShopCard(kind, snapshot = null) {
+    if (!game.user.isGM) return;
+    const shopName = snapshot?.shopName ?? game.settings.get(MODULE_ID, "shopName") ?? "The Merchant";
+
+    const content = (kind === "open")
+      ? `<div class="vagabond-chat-card-v2" data-card-type="generic">
+           <div class="card-body">
+             <header class="card-header">
+               <div class="header-icon"><i class="fas fa-store" style="font-size:24px;"></i></div>
+               <div class="header-info">
+                 <h3 class="header-title">${shopName} is Open</h3>
+                 <div class="metadata-tags-row">
+                   <div class="meta-tag"><span>Browse at your own pace</span></div>
+                 </div>
+               </div>
+             </header>
+             <section class="content-body">
+               <div class="card-description" style="padding:6px 0;">
+                 <button type="button" class="vcm-shop-card-open-btn" style="width:100%;padding:8px;">
+                   <i class="fas fa-store"></i> Open Shop
+                 </button>
+               </div>
+             </section>
+           </div>
+         </div>`
+      : `<div class="vagabond-chat-card-v2" data-card-type="generic">
+           <div class="card-body">
+             <header class="card-header">
+               <div class="header-icon"><i class="fas fa-door-closed" style="font-size:24px;"></i></div>
+               <div class="header-info">
+                 <h3 class="header-title">${shopName} is Closed</h3>
+                 <div class="metadata-tags-row">
+                   <div class="meta-tag"><span>The shop is no longer available</span></div>
+                 </div>
+               </div>
+             </header>
+           </div>
+         </div>`;
+
+    await ChatMessage.create({
+      speaker: { alias: shopName },
+      content,
+      flags: {
+        [MODULE_ID]: {
+          shopAvailabilityCard: true,
+          kind,                 // "open" or "close"
+          superseded: false,
+        },
+      },
+    });
   },
 
   _onResult(data) {
@@ -861,6 +1093,31 @@ export const MerchantShop = {
     });
     await game.settings.set(MODULE_ID, "shopLog", log);
     if (this._app?.rendered) this._app.render();
+
+    // Forward to Session Recap. The recap loggers self-guard on
+    // sessionState, so this is a no-op when no session is tracking.
+    // All four merchant paths (`_handleBuy`, `_handleCatalogBuy`,
+    // `_handleGamble`, `_handleSell`) call through here, so this is
+    // the single integration point.
+    if (entry.action === "sell") {
+      const ratio = this._app?._sellRatio
+        ?? game.settings.get(MODULE_ID, "shopSellRatio")
+        ?? 100;
+      SessionRecap.logSale({
+        player: entry.player,
+        item:   entry.item,
+        qty:    entry.quantity,
+        price:  entry.price,
+        ratio,
+      });
+    } else if (entry.action === "buy") {
+      SessionRecap.logPurchase({
+        player: entry.player,
+        item:   entry.item,
+        qty:    entry.quantity,
+        price:  entry.price,
+      });
+    }
   },
 
   getLog() {
@@ -1726,16 +1983,13 @@ class MerchantShopApp extends HandlebarsApplicationMixin(ApplicationV2) {
         }
       });
 
-      // Open for all players
-      el.querySelector(".vcm-open-for-all")?.addEventListener("click", () => {
+      // Make Shop Available to Players (opt-in, no force-popup)
+      el.querySelector(".vcm-open-for-all")?.addEventListener("click", async () => {
         this._inventory = this._mode === "actor" && this._actorId
           ? MerchantShop._buildActorInventory(this._actorId)
           : MerchantShop._buildCompendiumInventory();
 
-        MerchantShop._isOpenForPlayers = true;
-
-        game.socket.emit(`module.${MODULE_ID}`, {
-          action: "shop:open",
+        await MerchantShop._setAvailability(true, {
           mode: this._mode,
           actorId: this._actorId,
           shopName: this._shopName,
@@ -1745,15 +1999,14 @@ class MerchantShopApp extends HandlebarsApplicationMixin(ApplicationV2) {
           buyMultiplier: this._buyMultiplier,
           gambleEnabled: this._gambleEnabled,
         });
-        ui.notifications.info("Shop opened for all players!");
+        ui.notifications.info("Shop is now available — players can open it from chat or the Crawl Strip.");
         this.render();
       }, { signal });
 
-      // Close for all players
-      el.querySelector(".vcm-close-for-all")?.addEventListener("click", () => {
-        MerchantShop._isOpenForPlayers = false;
-        game.socket.emit(`module.${MODULE_ID}`, { action: "shop:close" });
-        ui.notifications.info("Shop closed for all players.");
+      // Close shop for all players
+      el.querySelector(".vcm-close-for-all")?.addEventListener("click", async () => {
+        await MerchantShop._setAvailability(false);
+        ui.notifications.info("Shop closed.");
         this.render();
       }, { signal });
 

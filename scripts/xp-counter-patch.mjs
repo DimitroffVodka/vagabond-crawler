@@ -85,6 +85,12 @@ export const XpCounterPatch = {
         return;
       }
 
+      // Snapshot question counts BEFORE the reset on line below — otherwise
+      // the recap snapshot reads zeros and the "breakdown" shows nothing.
+      const questionSnapshot = xpQuestions
+        .map((q, i) => ({ label: q.question, xp: q.xp || 1, count: this.questions[i] || 0 }))
+        .filter(q => q.count > 0);
+
       const currentXP = this.actor.system.attributes.xp || 0;
       const newXP = currentXP + xpGained;
 
@@ -93,14 +99,6 @@ export const XpCounterPatch = {
       this.questions = new Array(xpQuestions.length || 5).fill(0);
 
       ui.notifications.info(`Awarded ${xpGained} XP to ${this.actor.name}. Total: ${newXP}`);
-
-      // Log to Session Recap
-      const xpQuestionsCfg = CONFIG.VAGABOND?.homebrew?.leveling?.xpQuestions ?? [];
-      const questionSnapshot = xpQuestionsCfg.map((q, i) => ({
-        label: q.question,
-        xp: q.xp || 1,
-        count: this.questions[i] || 0,
-      })).filter(q => q.count > 0);
 
       SessionRecap.logXp({
         player: this.actor.name,

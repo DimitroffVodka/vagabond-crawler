@@ -19,6 +19,8 @@ The five tabs:
 - **XP** — per-player award cards showing the level-up questionnaire breakdown (which questions got marked, sub-XP per question, total for the award). Fed by the [XP Counter Patch](#xp-counter-patch).
 - **History** — every ended session, listed with date, duration, top stats, and a preview. Click to drill in (the active tabs swap to viewing that archive), **Export to Discord** for a markdown copy, or **Delete**.
 
+The Discord export also produces two extra sections when the merchant shop saw activity: **Sales** and **Purchases**, grouped by player with per-player subtotals and a party total. Sales show the sell ratio in parentheses when it isn't 100% (so a `(75%)` tag flags discounted sales at a glance).
+
 A session moves through four states: `inactive` (no tracking), `active` (everything is captured), `paused` (data preserved, capture suspended), and the transient "viewing history" mode when you click into an archived session. Crawl start/end events prompt the GM with a **waitDialog** for the right state transition.
 
 ### How to use
@@ -35,7 +37,7 @@ No user-facing config settings. Persisted world state lives in two settings:
 
 | Setting | Purpose |
 |---|---|
-| `sessionRecap` | Current session data (state, sessionStart, loot, xp, combats, playerStats) |
+| `sessionRecap` | Current session data (state, sessionStart, loot, sales, purchases, xp, combats, playerStats, encounterChecks) |
 | `sessionHistory` | Archive array of ended sessions |
 
 Toggles are driven by lifecycle events, not config — start/pause/discard/save is always a deliberate choice in the dialog at crawl start or end.
@@ -50,6 +52,8 @@ Toggles are driven by lifecycle events, not config — start/pause/discard/save 
 - **Player stats aggregate per-actor, not per-user.** A player who switches characters mid-session gets one row per character, not one merged row; matches the way XP and loot are tracked — the character is the accounting unit.
 - **Loot log entries tag their source.** "Loot Generator", "Loot Drops", "Merchant Shop", and manual hand-offs each appear with a distinct source label, so you can answer "where did this relic come from?" in the History tab three months later.
 - **Combat rollup** snapshots stats at the end of each combat into that combat's card — the per-combat view is immutable after the combat ends, so a later combat's stats don't retroactively rewrite an earlier card.
+- **Combats still in the tracker at session end are flushed automatically.** If you click **End & Save** while an encounter is still open, the recap captures the latest snapshot (rounds, enemy roster, kill credits) before clearing state. Same on **Pause Session**.
+- **Merchant transactions feed Sales and Purchases.** Every buy and sell that flows through the Merchant Shop (regular shop, catalog buy, gamble, sell) auto-logs to the recap. Sales include the sell-ratio applied at the time, so a later ratio change doesn't rewrite history.
 - **Discord export is markdown.** Headings and tables are plain GFM, so the same string renders cleanly in GitHub, Notion, Obsidian, or anywhere else that speaks markdown.
 
 ---

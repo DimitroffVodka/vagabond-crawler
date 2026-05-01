@@ -15,6 +15,8 @@ const DEFAULT_DATA = {
   sessionState: "inactive",
   sessionStart: null,
   loot: [],
+  sales: [],
+  purchases: [],
   xp: [],
   combats: [],
   encounterChecks: [],
@@ -49,7 +51,12 @@ export const SessionRecap = {
   // ── Read / Write ───────────────────────────────────────────
 
   getData() {
-    return game.settings.get(MODULE_ID, SETTING_KEY) ?? foundry.utils.deepClone(DEFAULT_DATA);
+    const data = game.settings.get(MODULE_ID, SETTING_KEY) ?? foundry.utils.deepClone(DEFAULT_DATA);
+    // In-place migration for worlds that pre-date the sales/purchases fields.
+    // Safe because the next `_save` will persist them.
+    if (!Array.isArray(data.sales))     data.sales = [];
+    if (!Array.isArray(data.purchases)) data.purchases = [];
+    return data;
   },
 
   getHistory() {
@@ -96,6 +103,56 @@ export const SessionRecap = {
    */
   async logDrop(entry) {
     await this.logLoot({ claimed: false, ...entry });
+  },
+
+  // ── Sale Logging ───────────────────────────────────────────
+
+  /**
+   * Log a player sale to the merchant. `price` is the actual currency
+   * the seller received after the sell ratio was applied — store as a
+   * `{ gold, silver, copper }` object so the recap can sum across mixed
+   * denominations later. `ratio` is the sell-ratio percentage applied
+   * (e.g. 50, 75, 100); the recap render flags non-100% sales.
+   *
+   * Self-guarded on `sessionState === "active"` so callers don't need
+   * to check before invoking.
+   */
+  async logSale({ player, item, qty, price, ratio }) {
+    if (this.getData().sessionState !== "active") return;
+    const data = this.getData();
+    this._ensureStart(data);
+    data.sales.push({
+      player, item,
+      qty: qty ?? 1,
+      price: price ?? { gold: 0, silver: 0, copper: 0 },
+      ratio: ratio ?? 100,
+      timestamp: Date.now(),
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    });
+    await this._save(data);
+  },
+
+  // ── Purchase Logging ───────────────────────────────────────
+
+  /**
+   * Log a player purchase from the merchant. `price` is the actual
+   * `{ gold, silver, copper }` cost paid (with any buy-multiplier
+   * already applied upstream by `merchant-shop.mjs`).
+   *
+   * Self-guarded on `sessionState === "active"`.
+   */
+  async logPurchase({ player, item, qty, price }) {
+    if (this.getData().sessionState !== "active") return;
+    const data = this.getData();
+    this._ensureStart(data);
+    data.purchases.push({
+      player, item,
+      qty: qty ?? 1,
+      price: price ?? { gold: 0, silver: 0, copper: 0 },
+      timestamp: Date.now(),
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    });
+    await this._save(data);
   },
 
   /**
@@ -164,6 +221,40 @@ export const SessionRecap = {
     await this._save(data);
   },
 
+  /**
+   * Log every entry in `_activeCombats` to the recap and clear the map.
+   * Called from `endAndSave` / `pauseSession` to catch combats that
+   * were still open in the tracker when the session ended — without
+   * this, combats silently get dropped because the `deleteCombat` hook
+   * either never fires or fires after `sessionState` is no longer
+   * "active". Uses the live combat doc when still available, otherwise
+   * falls back to the snapshot captured by `_snapshotEnemies` on the
+   * last `updateCombat`.
+   */
+  async _flushActiveCombats() {
+    for (const [combatId, active] of this._activeCombats.entries()) {
+      const live = game.combats.get(combatId);
+      const rounds = live?.round ?? active.rounds ?? 0;
+      const enemies = (live ? this._snapshotEnemies(live) : (active.enemies ?? []))
+        .map(e => ({
+          name: e.name,
+          defeated: e.defeated,
+          killedBy: e.defeated ? (this._killMap.get(e.tokenId) ?? null) : null,
+        }));
+
+      await this.logCombat({
+        id: combatId,
+        rounds,
+        startTime: active.startTime,
+        endTime: Date.now(),
+        enemies,
+        participants: active.participants,
+      });
+    }
+    this._activeCombats.clear();
+    this._killMap.clear();
+  },
+
   // ── Player Stat Updates ────────────────────────────────────
 
   async updatePlayerStat(actorId, name, path, delta) {
@@ -216,6 +307,36 @@ export const SessionRecap = {
 
   // ── Combat & Damage Hooks ─────────────────────────────────
 
+  /**
+   * Build a fresh enemy roster snapshot from a Foundry Combat document.
+   * Used on combatStart for the initial roster and on every updateCombat
+   * to refresh defeated state. The killer attribution from `_killMap` is
+   * overlaid at flush/log time, not here, since the kill map updates
+   * asynchronously from damage-log messages.
+   *
+   * Returns an array of `{ name, defeated, tokenId }` — `tokenId` is
+   * retained so the flush path can resolve killer attribution against
+   * the live `_killMap` even when the combat document is already gone.
+   */
+  _snapshotEnemies(combat) {
+    const enemies = [];
+    for (const c of combat.combatants) {
+      if (!c.actor) continue;
+      const disp = c.token?.disposition ?? c.token?.document?.disposition;
+      if (disp === CONST.TOKEN_DISPOSITIONS.FRIENDLY) continue;
+
+      const hp = c.actor.system?.health;
+      const defeated = c.defeated || (hp && hp.value <= 0);
+      const tokenId = c.token?.id ?? c.token?.document?.id;
+      enemies.push({
+        name: c.actor.name,
+        defeated: !!defeated,
+        tokenId,
+      });
+    }
+    return enemies;
+  },
+
   _initCombatHooks() {
     if (!game.user.isGM) return;
 
@@ -266,34 +387,44 @@ export const SessionRecap = {
       this._activeCombats.set(combat.id, {
         startTime: Date.now(),
         participants,
+        rounds: combat.round ?? 1,
+        enemies: this._snapshotEnemies(combat),
+        lastSnapshotAt: Date.now(),
       });
     });
 
-    // ── Combat end ─────────────────────────────────────────
-    Hooks.on("deleteCombat", async (combat) => {
+    // ── Combat round / state changes — refresh snapshot ──────
+    // Keeps `_activeCombats[id]` fresh enough that `_flushActiveCombats`
+    // (called from endAndSave / pauseSession) can log a complete record
+    // even when the live combat doc is already gone.
+    Hooks.on("updateCombat", (combat, _changes) => {
       if (this.getData().sessionState !== "active") return;
       const active = this._activeCombats.get(combat.id);
       if (!active) return;
+      active.rounds = combat.round ?? active.rounds;
+      active.enemies = this._snapshotEnemies(combat);
+      active.lastSnapshotAt = Date.now();
+    });
 
-      const enemies = [];
-      for (const c of combat.combatants) {
-        if (!c.actor) continue;
-        const disp = c.token?.disposition ?? c.token?.document?.disposition;
-        if (disp === CONST.TOKEN_DISPOSITIONS.FRIENDLY) continue;
+    // ── Combat end ─────────────────────────────────────────
+    // Proceed when we have an active snapshot for this combat even if
+    // sessionState has already flipped to inactive (the late-delete
+    // race where the GM ends the session before / while the combat is
+    // being deleted from the tracker). Combats we never tracked from
+    // start are not logged here.
+    Hooks.on("deleteCombat", async (combat) => {
+      const active = this._activeCombats.get(combat.id);
+      if (!active) return;
 
-        const hp = c.actor.system?.health;
-        const defeated = c.defeated || (hp && hp.value <= 0);
-        const tokenId = c.token?.id ?? c.token?.document?.id;
-        enemies.push({
-          name: c.actor.name,
-          defeated: !!defeated,
-          killedBy: defeated ? (this._killMap.get(tokenId) ?? null) : null,
-        });
-      }
+      const enemies = this._snapshotEnemies(combat).map(e => ({
+        name: e.name,
+        defeated: e.defeated,
+        killedBy: e.defeated ? (this._killMap.get(e.tokenId) ?? null) : null,
+      }));
 
       await this.logCombat({
         id: combat.id,
-        rounds: combat.round ?? 0,
+        rounds: combat.round ?? active.rounds ?? 0,
         startTime: active.startTime,
         endTime: Date.now(),
         enemies,
@@ -458,6 +589,32 @@ export const SessionRecap = {
     return `${seconds}s`;
   },
 
+  /**
+   * Convert a `{ gold, silver, copper }` cost object to a single copper
+   * total. Vagabond uses 100c = 1s, 100s = 1g.
+   */
+  _toCopper(cost) {
+    return (cost?.gold ?? 0) * 10000 + (cost?.silver ?? 0) * 100 + (cost?.copper ?? 0);
+  },
+
+  /**
+   * Format a copper total as a short g/s/c string, e.g. `"500g 40s"`.
+   * Used by loot, sales and purchases sections so currency rendering
+   * stays consistent across the recap.
+   */
+  _formatCurrency(copperTotal) {
+    copperTotal = Math.max(0, Math.round(copperTotal));
+    if (copperTotal === 0) return "0c";
+    const gold   = Math.floor(copperTotal / 10000);
+    const silver = Math.floor((copperTotal % 10000) / 100);
+    const copper = copperTotal % 100;
+    const parts = [];
+    if (gold)   parts.push(`${gold}g`);
+    if (silver) parts.push(`${silver}s`);
+    if (copper) parts.push(`${copper}c`);
+    return parts.join(" ");
+  },
+
   formatForDiscordFromData(data, startTime, endTime) {
     const lines = [];
 
@@ -509,9 +666,13 @@ export const SessionRecap = {
           }
         }
 
+        // Use ` · ` (middle dot) as separator instead of `", "` so
+        // bestiary names that already contain commas (e.g. "Bat, Giant",
+        // "Centipede, Giant", "Snake, Constrictor") render as one item
+        // each instead of looking like multiple enemies.
         const enemyList = Object.entries(enemyCounts)
           .map(([name, c]) => `${name}${c.total > 1 ? ` x${c.total}` : ""}`)
-          .join(", ");
+          .join(" · ");
         lines.push(`- Enemies: ${enemyList}`);
 
         const defeatedParts = [];
@@ -519,6 +680,9 @@ export const SessionRecap = {
           if (c.defeated === 0) continue;
           const killerCounts = {};
           c.killers.forEach(k => { killerCounts[k] = (killerCounts[k] || 0) + 1; });
+          // Killer list inside the parentheses keeps commas — they're
+          // only ambiguous outside, where the enemy separator was the
+          // collision source.
           const killerStr = Object.entries(killerCounts)
             .map(([k, n]) => n > 1 ? `${k} x${n}` : k)
             .join(", ");
@@ -526,7 +690,7 @@ export const SessionRecap = {
           defeatedParts.push(killerStr ? `${label} (${killerStr})` : label);
         }
         if (defeatedParts.length > 0) {
-          lines.push(`- Defeated: ${defeatedParts.join(", ")}`);
+          lines.push(`- Defeated: ${defeatedParts.join(" · ")}`);
         }
         lines.push("");
       });
@@ -664,6 +828,61 @@ export const SessionRecap = {
       }
     }
 
+    // ── Sales ──────────────────────────────────────────────
+    // Renders only when there's at least one sale, so unaffected
+    // sessions / historical snapshots without the field stay clean.
+    if (Array.isArray(data.sales) && data.sales.length > 0) {
+      lines.push("## Sales");
+      const byPlayer = {};
+      for (const s of data.sales) {
+        if (!byPlayer[s.player]) byPlayer[s.player] = [];
+        byPlayer[s.player].push(s);
+      }
+      let partyCopper = 0;
+      for (const [player, entries] of Object.entries(byPlayer)) {
+        lines.push(`### ${player}`);
+        let playerCopper = 0;
+        for (const e of entries) {
+          const qtyStr   = (e.qty ?? 1) > 1 ? ` ×${e.qty}` : "";
+          const ratioStr = (e.ratio ?? 100) !== 100 ? ` (${e.ratio}%)` : "";
+          const lineCopper = this._toCopper(e.price);
+          playerCopper += lineCopper;
+          lines.push(`- ${e.item}${qtyStr} — ${this._formatCurrency(lineCopper)}${ratioStr}`);
+        }
+        lines.push(`- **Subtotal:** ${this._formatCurrency(playerCopper)}`);
+        partyCopper += playerCopper;
+        lines.push("");
+      }
+      lines.push(`**Party total:** ${this._formatCurrency(partyCopper)}`);
+      lines.push("");
+    }
+
+    // ── Purchases ──────────────────────────────────────────
+    if (Array.isArray(data.purchases) && data.purchases.length > 0) {
+      lines.push("## Purchases");
+      const byPlayer = {};
+      for (const p of data.purchases) {
+        if (!byPlayer[p.player]) byPlayer[p.player] = [];
+        byPlayer[p.player].push(p);
+      }
+      let partyCopper = 0;
+      for (const [player, entries] of Object.entries(byPlayer)) {
+        lines.push(`### ${player}`);
+        let playerCopper = 0;
+        for (const e of entries) {
+          const qtyStr = (e.qty ?? 1) > 1 ? ` ×${e.qty}` : "";
+          const lineCopper = this._toCopper(e.price);
+          playerCopper += lineCopper;
+          lines.push(`- ${e.item}${qtyStr} — ${this._formatCurrency(lineCopper)}`);
+        }
+        lines.push(`- **Subtotal:** ${this._formatCurrency(playerCopper)}`);
+        partyCopper += playerCopper;
+        lines.push("");
+      }
+      lines.push(`**Party total:** ${this._formatCurrency(partyCopper)}`);
+      lines.push("");
+    }
+
     // ── XP ─────────────────────────────────────────────────
     if (data.xp.length > 0) {
       const byPlayer = {};
@@ -761,12 +980,20 @@ export const SessionRecap = {
   },
 
   async pauseSession() {
+    // Flush combats still open in the tracker so they aren't lost when
+    // the session is resumed later (or never).
+    await this._flushActiveCombats();
     const data = this.getData();
     data.sessionState = "paused";
     await this._save(data);
   },
 
   async endAndSave() {
+    // Flush any combats still open in the tracker so the last fight
+    // doesn't get silently dropped (it gets dropped today when the GM
+    // ends the session before deleting the encounter from the tracker).
+    await this._flushActiveCombats();
+
     const data = this.getData();
     const now = Date.now();
     const history = this.getHistory();
@@ -778,6 +1005,8 @@ export const SessionRecap = {
       endTime: now,
       data: {
         loot: data.loot,
+        sales: data.sales,
+        purchases: data.purchases,
         xp: data.xp,
         combats: data.combats,
         playerStats: data.playerStats,

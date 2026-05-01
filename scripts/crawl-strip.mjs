@@ -281,8 +281,22 @@ export const CrawlStrip = {
     const leftClass  = allHeroesActed ? "vcs-label-npcs"    : "vcs-label-heroes";
     const rightClass = allHeroesActed ? "vcs-label-heroes"  : "vcs-label-npcs";
 
+    // Tools badge — visible to everyone when shop is available to
+    // players. Provides an opt-in entry point so the GM can leave the
+    // shop "open" without forcing a window on every player.
+    const shopAvailable = game.settings.get(MODULE_ID, "shopAvailableToPlayers");
+    const shopName = game.settings.get(MODULE_ID, "shopName") || "Merchant";
+    const toolsBadge = shopAvailable ? `
+      <div class="vcs-tools">
+        <button class="vcs-tool-btn vcs-tool-shop" type="button"
+                title="Open ${shopName}" aria-label="Open ${shopName}">
+          <i class="fas fa-store"></i>
+        </button>
+      </div>` : "";
+
     this._el.innerHTML = `
       <div class="vcs-inner ${inCombat ? "vcs-paused" : ""}">
+        ${toolsBadge}
         ${leftBadge}
         <div class="vcs-group ${leftGroup}">
           <div class="vcs-group-label ${leftClass}">${leftLabel}</div>
@@ -394,6 +408,14 @@ export const CrawlStrip = {
       });
     });
     bindNPCMenuEvents(this._el);
+
+    // Tool buttons (shop, etc.) — bound for everyone before the GM gate
+    // since players are the primary audience for the merchant shortcut.
+    this._el.querySelector(".vcs-tool-shop")?.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      game.vagabondCrawler?.merchantShop?.openLocally?.();
+    });
+
     if (!game.user.isGM) return;
 
     // Combat control buttons (prev/next round/turn, end encounter)
