@@ -557,20 +557,24 @@ Hooks.on("updateToken", async (tokenDoc, changes) => {
 // removed, or scene-switch churn. Runs regardless of combat state since the
 // stale entry causes create errors whenever a sync next runs.
 //
-// Party-split workflow: "move party from Scene A to Scene B" usually deletes
-// the Scene A tokens. Kicking the member on every delete drops the party
-// from the strip even though the same actor still has a token on another
-// scene (or one is created moments later). So before kicking, try to
-// rebind the member to a surviving token of the same actor. The short
-// defer also catches delete-then-recreate flows where the new token lands
-// just after the delete hook fires.
-Hooks.on("deleteToken", async (tokenDoc) => {
+// Party-split workflow: when a player walks through a teleport region (or
+// the GM moves party tokens between scenes), Foundry's
+// `RegionDocument.teleportToken` creates the destination token with the
+// SAME id as the source via `keepId: true`, then deletes the source — so
+// kicking on every delete dropped the entire party from the strip the
+// instant they crossed a stair / portal / level transition. The cleanup
+// now first honors the `opts.replacements` map Foundry passes for these
+// flows (oldId → newUuid), and otherwise searches all scenes for any
+// token of the same actor. Only a true orphan (no replacement, no other
+// token anywhere) gets kicked.
+Hooks.on("deleteToken", async (tokenDoc, opts = {}) => {
   if (!game.user.isGM || !CrawlState.active) return;
   const memberId = `token-${tokenDoc.id}`;
   const member = CrawlState.members.find(m => m.id === memberId);
   if (!member) return;
 
   const actorId = member.actorId ?? tokenDoc.actorId;
+  const replacementUuid = opts?.replacements?.[tokenDoc.id];
 
   // Wait one tick so delete-then-recreate flows have time to land the
   // replacement token before we decide whether to kick.
@@ -580,28 +584,36 @@ Hooks.on("deleteToken", async (tokenDoc) => {
   // dropped this member during the defer window.
   if (!CrawlState.members.some(m => m.id === memberId)) return;
 
-  if (actorId) {
-    let candidate = null;
+  // Resolve a replacement token: prefer the one Foundry told us about
+  // (teleport flow), otherwise scan all scenes for a token of the same
+  // actor. Note: by the time deleteToken fires, the source token has been
+  // removed from its scene's collection, so a token with the same id on
+  // another scene (Foundry's keepId teleport) is guaranteed to be the
+  // replacement, not the original — no need to filter by id.
+  let candidate = replacementUuid ? fromUuidSync(replacementUuid) : null;
+  if (candidate?.documentName !== "Token") candidate = null;
+
+  if (!candidate && actorId) {
     for (const scene of game.scenes) {
       for (const t of scene.tokens) {
-        if (t.id === tokenDoc.id) continue;
         if (t.actorId === actorId) { candidate = t; break; }
       }
       if (candidate) break;
     }
-    if (candidate) {
-      const newId = `token-${candidate.id}`;
-      // If a member already tracks the surviving token, the old member is
-      // a duplicate — fall through to the kick path.
-      if (!CrawlState.members.some(m => m.id === newId)) {
-        member.id      = newId;
-        member.tokenId = candidate.id;
-        if (candidate.name)        member.name = candidate.name;
-        if (candidate.texture?.src) member.img  = candidate.texture.src;
-        await CrawlState._save();
-        CrawlStrip.queueRender();
-        return;
-      }
+  }
+
+  if (candidate) {
+    const newId = `token-${candidate.id}`;
+    // If a member already tracks the surviving token, the old member is a
+    // duplicate — fall through to the kick path.
+    if (!CrawlState.members.some(m => m.id === newId && m !== member)) {
+      member.id      = newId;
+      member.tokenId = candidate.id;
+      if (candidate.name)         member.name = candidate.name;
+      if (candidate.texture?.src) member.img  = candidate.texture.src;
+      await CrawlState._save();
+      CrawlStrip.queueRender();
+      return;
     }
   }
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.16.6
+
+### Crawl Strip — Teleport-region scene transitions actually work now
+
+- **v1.16.5's rebind missed Foundry's real teleport flow.** The previous fix searched all scenes for a surviving token of the same actor, but skipped any token whose id matched the deleted one — that filter was meant to avoid re-finding the deleted document, but Foundry's `RegionDocument.teleportToken` deliberately uses `keepId: true` so the new destination token has the same id as the source. Result: every party member who walked through a stair / portal region got kicked off the strip, even though their replacement token already existed on the destination scene with a matching `actorId`.
+- **Drop the same-id filter** — by the time the `deleteToken` hook fires, the source token has been removed from its scene's collection, so a token with the same id on a different scene is guaranteed to be the keepId replacement, not the original. The rebind now finds it.
+- **Honor `opts.replacements`** — Foundry passes a `{ oldId → newUuid }` map on the delete options for teleport-style flows. The handler reads this directly via `fromUuidSync` for an exact, robust rebind without scanning. The all-scenes search remains as the fallback for non-teleport flows.
+
 ## v1.16.5
 
 ### Crawl Strip — Splitting the party between scenes no longer kicks members
