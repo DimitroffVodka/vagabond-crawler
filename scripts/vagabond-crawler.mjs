@@ -39,6 +39,42 @@ import { resolveHitDieConfig, calculateHP, dieAvg } from "./monster-mutator.mjs"
 
 export const MODULE_ID = "vagabond-crawler";
 
+// ── Inventory helpers (shared with movement-tracker) ─────────────────────────
+// The system's `actor.system.inventory.occupiedSlots` counts each item as
+// `baseSlots × 1` and ignores stacking, so these helpers compute the extra
+// slots Crawler's stack/pool model adds on top.
+const _INV_TYPES = new Set(["equipment", "weapon"]);
+
+export function getExtraOccupiedSlots(actor) {
+  if (!actor?.items) return 0;
+  let extra = 0;
+  const zeroSlotGroups = new Map();
+  for (const item of actor.items) {
+    if (!item.system || !_INV_TYPES.has(item.type)) continue;
+    const baseSlots = item.system.slots || item.system.baseSlots || 0;
+    const qty = item.system.quantity ?? 1;
+    if (baseSlots === 0 && qty > 0) {
+      if (item.getFlag(MODULE_ID, "trueZeroSlot")) continue;
+      const group = item.system.gearCategory || item.name;
+      zeroSlotGroups.set(group, (zeroSlotGroups.get(group) || 0) + qty);
+    } else if (qty > 1) {
+      extra += baseSlots * (qty - 1);
+    }
+  }
+  for (const total of zeroSlotGroups.values()) {
+    extra += Math.ceil(total / 10);
+  }
+  return extra;
+}
+
+export function isOverloaded(actor) {
+  if (actor?.type !== "character") return false;
+  const inv = actor.system?.inventory;
+  if (!inv || inv.maxSlots == null) return false;
+  const occupied = (inv.occupiedSlots ?? 0) + getExtraOccupiedSlots(actor);
+  return occupied > inv.maxSlots;
+}
+
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 // ── Setup: wrap buildAndEvaluateD20WithRollData BEFORE vagabond-character-enhancer ──
@@ -544,31 +580,9 @@ Hooks.once("ready", async () => {
       card.appendChild(badge);
     }
 
-    // 2. Fix .slot-value "X / Y"
-    //    - Stacked items (qty > 1, slots > 0): system only counts 1× slots, add the rest
-    //    - Zero-slot items: pool by gearCategory, every 10 units in a group = 1 slot
-    //      e.g. 3× Scroll of Fade + 3× Scroll of Life + 4× Scroll of Ward = 10 "Scrolls" = 1 slot
-    let extraSlots = 0;
-    const INV_TYPES = new Set(["equipment", "weapon"]);
-    const zeroSlotGroups = new Map();  // gearCategory|name → total qty
-    for (const item of actor.items) {
-      if (!item.system || !INV_TYPES.has(item.type)) continue;
-      const baseSlots = item.system.slots || item.system.baseSlots || 0;
-      const qty = item.system.quantity ?? 1;
-      if (baseSlots === 0 && qty > 0) {
-        // Skip items flagged as truly weightless
-        if (item.getFlag(MODULE_ID, "trueZeroSlot")) continue;
-        // Group by gearCategory; fall back to item name if no category
-        const group = item.system.gearCategory || item.name;
-        zeroSlotGroups.set(group, (zeroSlotGroups.get(group) || 0) + qty);
-      } else if (qty > 1) {
-        extraSlots += baseSlots * (qty - 1);
-      }
-    }
-    for (const total of zeroSlotGroups.values()) {
-      extraSlots += Math.ceil(total / 10);
-    }
-
+    // 2. Fix .slot-value "X / Y" — stacked + pooled extras the system doesn't count
+    //    See getExtraOccupiedSlots() at the top of this file for the math.
+    const extraSlots = getExtraOccupiedSlots(actor);
     if (!extraSlots) return;
     const slotValue = el.querySelector(".slot-value");
     if (!slotValue) return;

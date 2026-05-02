@@ -17,7 +17,7 @@
  * actor's moveRemaining flag).
  */
 
-import { MODULE_ID }  from "./vagabond-crawler.mjs";
+import { MODULE_ID, isOverloaded }  from "./vagabond-crawler.mjs";
 import { CrawlState } from "./crawl-state.mjs";
 import { CrawlStrip } from "./crawl-strip.mjs";
 import { ICONS }      from "./icons.mjs";
@@ -185,7 +185,10 @@ class VCSTokenRuler extends foundry.canvas.placeables.tokens.TokenRuler {
     const base = super._getWaypointLabelContext(waypoint, state);
     if (!this._isTracked || !base) return base;
     const after = this._moveRemaining - this._cumulativeAt(waypoint);
-    const tag   = after < 0 ? `Rush: ${after}ft` : `${after}ft left`;
+    const overloaded = CrawlState.paused && isOverloaded(this.token?.actor);
+    const tag   = after < 0
+      ? (overloaded ? `OVER: ${after}ft (overloaded — no Rush)` : `Rush: ${after}ft`)
+      : `${after}ft left`;
     base.label  = base.label ? `${base.label} (${tag})` : tag;
     return base;
   }
@@ -391,15 +394,24 @@ export const MovementTracker = {
     // and can go negative (down to -base), so the hard limit is:
     //   moveRemaining + baseSpeed  (= remaining Rush budget)
     // Crawl: hard stop at moveRemaining (no Rush).
-    const baseSpeed = _getBaseSpeed(actor, doc);
-    const limit     = inCombat ? moveRemaining + baseSpeed : moveRemaining;
+    // Overloaded characters cannot Rush — cap at moveRemaining in combat.
+    const baseSpeed   = _getBaseSpeed(actor, doc);
+    const overloaded  = inCombat && isOverloaded(actor);
+    const limit       = inCombat
+      ? (overloaded ? moveRemaining : moveRemaining + baseSpeed)
+      : moveRemaining;
 
     if (segFt > limit) {
       delete this._pendingDeduct?.[doc.id];
       if (userId === game.userId) {
-        const msg = inCombat && moveRemaining <= 0
-          ? `${actor.name}: Rush exhausted — no movement remaining.`
-          : `${actor.name}: only ${Math.max(0, moveRemaining)}ft remaining${inCombat ? ` (${limit}ft with Rush)` : ""}.`;
+        let msg;
+        if (overloaded) {
+          msg = `${actor.name}: overloaded — can't Rush. Only ${Math.max(0, moveRemaining)}ft remaining.`;
+        } else if (inCombat && moveRemaining <= 0) {
+          msg = `${actor.name}: Rush exhausted — no movement remaining.`;
+        } else {
+          msg = `${actor.name}: only ${Math.max(0, moveRemaining)}ft remaining${inCombat ? ` (${limit}ft with Rush)` : ""}.`;
+        }
         ui.notifications.warn(msg);
         // Schedule repeated clear attempts — #continueMovement may redraw after our first clear
         const tokenId = doc.id;

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.16.4
+
+### Movement — Overloaded characters can no longer Rush in combat
+
+- **The "you can't take the Rush action" warning is now enforced.** v1.16.3 made the warning visible for stacked-item overload, but the movement tracker still let overloaded tokens move into Rush territory (up to 2× base speed). It now caps an overloaded character's combat movement at base speed — any move past base is blocked with `"<name>: overloaded — can't Rush. Only Xft remaining."` The token ruler waypoint label also flips from `Rush: -Xft` to `OVER: -Xft (overloaded — no Rush)` so the constraint is visible while planning the move.
+- **Overload check uses Crawler's stack-aware slot math.** The system's `inventory.occupiedSlots` ignores stacks (counts each item as `baseSlots × 1`), so a character at "12 / 12" with a 2-stack of slot-1 items is *actually* 13 / 12. Both the inventory banner (v1.16.3) and the new movement gate now share `isOverloaded()` / `getExtraOccupiedSlots()` helpers so the displayed warning and the enforced rule never disagree. NPCs are unaffected — the rule applies only to character actors.
+- **Tied to the existing "Enforce Combat Movement" setting** — no new toggle. If you have combat enforcement off, the overload-no-Rush rule is skipped along with the rest.
+
 ## v1.16.3
 
 ### Inventory — Overload state now reflects stacked-item slot count
