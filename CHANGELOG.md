@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.16.3
+
+### Inventory — Overload state now reflects stacked-item slot count
+
+- **Stacked items inflated the displayed slot count, but the overload warning never fired.** `_patchInventory` correctly added per-stack slot weight to the slot total (so a stack of 5 torches showed as 5 slots, not 1), but the system's `.overloaded` class and the red `inventory-overload-warning` banner are gated by Handlebars on the system's own `occupiedSlots` calc — which counts each item as `baseSlots × 1` and ignores stacking. Sheets read e.g. `12 / 10` with no visual warning. The slot-field now re-evaluates against the adjusted total, toggling `.overloaded` and injecting / updating the banner inside `.inventory-grid-container` so overload state matches the displayed count.
+
 ## v1.16.2
 
 ### Session Recap — Bug fixes and merchant tracking
