@@ -572,9 +572,38 @@ Hooks.once("ready", async () => {
     if (!extraSlots) return;
     const slotValue = el.querySelector(".slot-value");
     if (!slotValue) return;
-    const match = slotValue.textContent.match(/(\d+)(\s*\/\s*\d+)/);
+    const match = slotValue.textContent.match(/(\d+)\s*\/\s*(\d+)/);
     if (match) {
-      slotValue.textContent = `${parseInt(match[1]) + extraSlots}${match[2]}`;
+      const newOccupied = parseInt(match[1]) + extraSlots;
+      const max = parseInt(match[2]);
+      slotValue.textContent = `${newOccupied} / ${max}`;
+      // System's Handlebars sets `.overloaded` on `.slot-field` from its own
+      // occupiedSlots calc which doesn't account for stacked / pooled extras.
+      // Re-evaluate against our adjusted total so stacked overflow turns red.
+      const slotField = slotValue.closest(".slot-field");
+      if (slotField) slotField.classList.toggle("overloaded", newOccupied > max);
+
+      // Same story for the "Inventory is full / Rush action" banner — gated
+      // by `{{#if isOverloaded}}` in features.hbs so it's missing from the DOM
+      // when the system thinks we're under capacity. Inject (or update) it.
+      if (newOccupied > max) {
+        const overloadAmount = newOccupied - max;
+        const msg = `Your Inventory is full, you can't take the Rush action. (+${overloadAmount} slots beyond capacity)`;
+        let warning = el.querySelector(".inventory-overload-warning");
+        if (warning) {
+          const span = warning.querySelector("span");
+          if (span) span.textContent = msg;
+        } else {
+          const gridContainer = el.querySelector(".inventory-grid-container");
+          if (gridContainer) {
+            warning = document.createElement("div");
+            warning.className = "inventory-overload-warning";
+            warning.innerHTML = `<i class="fas fa-exclamation-triangle"></i><span></span>`;
+            warning.querySelector("span").textContent = msg;
+            gridContainer.appendChild(warning);
+          }
+        }
+      }
     }
   };
   Hooks.on("renderVagabondCharacterSheet", _patchInventory);
