@@ -556,9 +556,56 @@ Hooks.on("updateToken", async (tokenDoc, changes) => {
 // scene — prevents orphans from summons despawning, tokens being manually
 // removed, or scene-switch churn. Runs regardless of combat state since the
 // stale entry causes create errors whenever a sync next runs.
+//
+// Party-split workflow: "move party from Scene A to Scene B" usually deletes
+// the Scene A tokens. Kicking the member on every delete drops the party
+// from the strip even though the same actor still has a token on another
+// scene (or one is created moments later). So before kicking, try to
+// rebind the member to a surviving token of the same actor. The short
+// defer also catches delete-then-recreate flows where the new token lands
+// just after the delete hook fires.
 Hooks.on("deleteToken", async (tokenDoc) => {
   if (!game.user.isGM || !CrawlState.active) return;
   const memberId = `token-${tokenDoc.id}`;
+  const member = CrawlState.members.find(m => m.id === memberId);
+  if (!member) return;
+
+  const actorId = member.actorId ?? tokenDoc.actorId;
+
+  // Wait one tick so delete-then-recreate flows have time to land the
+  // replacement token before we decide whether to kick.
+  await new Promise(r => setTimeout(r, 250));
+
+  // Re-fetch in case another path (deleteCombatant, manual remove) already
+  // dropped this member during the defer window.
+  if (!CrawlState.members.some(m => m.id === memberId)) return;
+
+  if (actorId) {
+    let candidate = null;
+    for (const scene of game.scenes) {
+      for (const t of scene.tokens) {
+        if (t.id === tokenDoc.id) continue;
+        if (t.actorId === actorId) { candidate = t; break; }
+      }
+      if (candidate) break;
+    }
+    if (candidate) {
+      const newId = `token-${candidate.id}`;
+      // If a member already tracks the surviving token, the old member is
+      // a duplicate — fall through to the kick path.
+      if (!CrawlState.members.some(m => m.id === newId)) {
+        member.id      = newId;
+        member.tokenId = candidate.id;
+        if (candidate.name)        member.name = candidate.name;
+        if (candidate.texture?.src) member.img  = candidate.texture.src;
+        await CrawlState._save();
+        CrawlStrip.queueRender();
+        return;
+      }
+    }
+  }
+
+  // No surviving token for this actor — kick.
   const idx = CrawlState.members.findIndex(m => m.id === memberId);
   if (idx === -1) return;
   CrawlState._state.members.splice(idx, 1);

@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.16.5
+
+### Crawl Strip — Splitting the party between scenes no longer kicks members
+
+- **The strip rebinds to a surviving token instead of kicking blindly.** The `deleteToken` cleanup at `crawl-strip.mjs` used to drop the matching member as soon as one specific tokenId was deleted, with no awareness of whether the same actor had another live token elsewhere. Sending the party from Scene A to Scene B (the typical "delete on A, create on B" workflow that most party-move macros use) deleted the Scene A tokens and silently kicked the heroes off the strip — even when their replacement tokens already existed on Scene B. The cleanup now searches all scenes for another token of the same `actorId`. If one exists, the member's `tokenId` / `id` / `name` / `img` rebind to it. Only when the actor has no surviving token anywhere does the member get kicked, preserving the original summon-despawn / orphan-cleanup behavior.
+- **Short defer to handle delete-then-recreate flows.** The handler waits 250ms before deciding so that the replacement token has time to land for macros that delete first and create second. If another path (`deleteCombatant`, manual remove) already dropped the member during the wait, the rebind is skipped — no double-kick.
+- **Duplicate handling.** If a surviving token is found but another member already tracks it, the orphan member falls through to the kick path (no merge, no id collision).
+
 ## v1.16.4
 
 ### Movement — Overloaded characters can no longer Rush in combat
