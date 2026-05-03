@@ -142,6 +142,16 @@ function _wrapNpcMaxHpForHitDie() {
 }
 
 Hooks.once("init", () => {
+  // One-time migration flag — relic AEs converted to system-native
+  // applicationMode + Strike I/II/III re-shaped to flag-based bonus dice.
+  // V1 (v1.16.7) stamped applicationMode and dropped homemade equip-gating.
+  // V2 (v1.16.7) replaced the Strike AE-changes with a bonusDamageDice flag
+  // because the system's roll-data overlay can't carry dice strings.
+  // The migrator runs every load until the V2 flag is set.
+  game.settings.register(MODULE_ID, "relicAppModeMigrationV2", {
+    scope: "world", config: false, type: Boolean, default: false
+  });
+
   // Encounter table UUID
   game.settings.register(MODULE_ID, "encounterTableUuid", {
     scope: "world", config: false, type: String, default: ""
@@ -322,6 +332,97 @@ Hooks.once("init", () => {
   console.log(`${MODULE_ID} | Initialized.`);
 });
 
+// ── Relic AE migration (one-time, GM-run) ────────────────────────────────────
+//
+// Pre-1.16.7 relic AEs used Crawler's homemade equip-gating: `disabled:
+// !system.equipped` toggled on `updateItem`, with our own `equipGated` flag.
+// 1.16.7 hands gating to the Vagabond system via `flags.vagabond.applicationMode`
+// — the system already filters effects by 'permanent' / 'when-equipped' /
+// 'on-use'.
+//
+// 1.16.7 also re-shaped Strike I/II/III to flag-based on-use because the
+// system's roll-data overlay does numeric ADD on rollData fields and can't
+// carry dice strings (Number('1d4') = NaN).
+//
+// This pass walks every owned and world-level forged item and:
+//   - Stamps `flags.vagabond.applicationMode` onto each relic AE (from the
+//     catalog), and clears Crawler's homemade `disabled:!equipped` gate.
+//   - For Strike I/II/III: drops the AE `changes` and adds the
+//     `bonusDamageDice` flag so the damage-helper patch can inject the
+//     dice at roll time.
+// Gated by the relicAppModeMigrationV2 setting — runs once per world.
+async function _migrateRelicApplicationModes() {
+  if (!game.user.isGM) return;
+  if (game.settings.get(MODULE_ID, "relicAppModeMigrationV2")) return;
+
+  const allItems = [];
+  for (const it of game.items)             allItems.push(it);
+  for (const a of game.actors)
+    for (const it of a.items)              allItems.push(it);
+
+  const STRIKE_IDS = new Set(["strike-1", "strike-2", "strike-3"]);
+
+  let migratedItems = 0;
+  let migratedEffects = 0;
+  for (const item of allItems) {
+    const forged = item.getFlag(MODULE_ID, "relicForge")?.forged;
+    if (!forged) continue;
+
+    const updates = [];
+    for (const eff of item.effects) {
+      const moduleFlags = eff.flags?.[MODULE_ID];
+      if (!moduleFlags?.relicPower) continue;
+
+      const power = getRelicPower(moduleFlags.relicPower);
+      const mode  = power?.applicationMode || 'when-equipped';
+      const update = { _id: eff.id, disabled: false };
+      let dirty = false;
+
+      // Stamp applicationMode if missing or stale
+      if (eff.flags?.vagabond?.applicationMode !== mode) {
+        update.flags = update.flags || {};
+        update.flags.vagabond = { applicationMode: mode };
+        dirty = true;
+      }
+
+      // Strike re-shape: empty changes + bonusDamageDice flag
+      if (STRIKE_IDS.has(moduleFlags.relicPower)) {
+        const expectedDice = power?.flags?.bonusDamageDice;
+        const hasOldChanges = (eff.changes?.length ?? 0) > 0;
+        const hasNewFlag    = !!eff.flags?.[MODULE_ID]?.bonusDamageDice;
+        if (hasOldChanges || (!hasNewFlag && expectedDice)) {
+          update.changes = [];
+          update.flags = update.flags || {};
+          update.flags[MODULE_ID] = {
+            ...(eff.flags?.[MODULE_ID] ?? {}),
+            bonusDamageDice:  expectedDice,
+            bonusDamageLabel: power?.flags?.bonusDamageLabel || "Striking",
+          };
+          dirty = true;
+        }
+      }
+
+      if (dirty) updates.push(update);
+    }
+    if (updates.length) {
+      try {
+        await item.updateEmbeddedDocuments("ActiveEffect", updates);
+        migratedItems   += 1;
+        migratedEffects += updates.length;
+      } catch (err) {
+        console.warn(`${MODULE_ID} | Migration failed on ${item.name}:`, err);
+      }
+    }
+  }
+
+  await game.settings.set(MODULE_ID, "relicAppModeMigrationV2", true);
+  if (migratedEffects > 0) {
+    const msg = `Vagabond Crawler: migrated ${migratedEffects} relic effect${migratedEffects === 1 ? "" : "s"} on ${migratedItems} item${migratedItems === 1 ? "" : "s"} to system-native application modes.`;
+    console.log(`${MODULE_ID} | ${msg}`);
+    ui.notifications.info(msg);
+  }
+}
+
 // ── Ready ─────────────────────────────────────────────────────────────────────
 
 Hooks.once("ready", async () => {
@@ -496,6 +597,11 @@ Hooks.once("ready", async () => {
   MonsterCreator.init();
   RelicForge.init();
   RelicEffects.init();
+  // One-time migration: stamp `flags.vagabond.applicationMode` onto every
+  // pre-existing relic AE so the system-native filter (permanent /
+  // when-equipped / on-use) takes over from Crawler's old `disabled:!equipped`
+  // gating. See _migrateRelicApplicationModes for the per-power mapping.
+  await _migrateRelicApplicationModes();
   EnchantmentScroll.init();
   LootManager.init();
   LootTracker.init();

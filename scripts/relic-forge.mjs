@@ -127,13 +127,24 @@ export const RelicForge = {
         }
       }
 
+      // The system filters AEs by `flags.vagabond.applicationMode`:
+      //   permanent     → always applies
+      //   when-equipped → applies while parent.system.equipped is true
+      //   on-use        → skipped from the actor pass; applied as a temporary
+      //                   roll-data overlay only for rolls FROM this item
+      // Defaulting to 'when-equipped' preserves the original Crawler behavior
+      // for any custom power that omits the field.
+      const applicationMode = power.applicationMode || 'when-equipped';
       effectDocs.push({
         name:     `Relic: ${power.name}${input ? ` (${input})` : ""}`,
         icon:     item.img || "icons/svg/item-bag.svg",
         changes,
-        disabled: !item.system?.equipped,
+        disabled: false,
         transfer: true,
-        flags:    { [MODULE_ID]: { ...moduleFlags, equipGated: true } },
+        flags: {
+          [MODULE_ID]: { ...moduleFlags },
+          vagabond:   { applicationMode },
+        },
       });
     }
 

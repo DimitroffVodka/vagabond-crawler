@@ -128,7 +128,7 @@ export const RELIC_POWERS = [
     inputType: 'compendium',
     inputSource: 'bestiary',
     inputLabel: 'Creature',
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [],
     flags: { relicPower: 'bane-niche', baneType: 'niche', baneDice: '1d6', baneTarget: '{input}' }
   },
@@ -149,7 +149,7 @@ export const RELIC_POWERS = [
       'Halfling', 'Hellspawn', 'Human', 'Insect', 'Mammal', 'Orc', 'Plant',
       'Potead', 'Reptile', 'Sahpechanger', 'Slime', 'Spider', 'Statue', 'Wyrm'
     ],
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [],
     flags: { relicPower: 'bane-specific', baneType: 'specific', baneDice: '2d6', baneTarget: '{input}' }
   },
@@ -167,7 +167,7 @@ export const RELIC_POWERS = [
     inputOptions: [
       'Artificial', 'Beast', 'Cryptid', 'Fae', 'Humanlike', 'Outer', 'Primordial', 'Undead'
     ],
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [],
     flags: { relicPower: 'bane-general', baneType: 'general', baneDice: '3d6', baneTarget: '{input}' }
   },
@@ -267,7 +267,7 @@ export const RELIC_POWERS = [
     description: '+1 bonus to Spell damage.',
     cost: 200,
     nameFormat: { position: 'suffix', text: 'of Minor Spell Power' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.universalSpellDamageBonus', mode: 2, value: '1' }],
     flags: { relicPower: 'bonus-trinket-1' }
   },
@@ -279,7 +279,7 @@ export const RELIC_POWERS = [
     description: '+2 bonus to Spell damage.',
     cost: 2500,
     nameFormat: { position: 'suffix', text: 'of Spell Power' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.universalSpellDamageBonus', mode: 2, value: '2' }],
     flags: { relicPower: 'bonus-trinket-2' }
   },
@@ -291,7 +291,7 @@ export const RELIC_POWERS = [
     description: '+3 bonus to Spell damage.',
     cost: 10000,
     nameFormat: { position: 'suffix', text: 'of Major Spell Power' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.universalSpellDamageBonus', mode: 2, value: '3' }],
     flags: { relicPower: 'bonus-trinket-3' }
   },
@@ -303,7 +303,7 @@ export const RELIC_POWERS = [
     description: '+1 bonus to Weapon damage.',
     cost: 100,
     nameFormat: { position: 'prefix', text: '+1' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.universalWeaponDamageBonus', mode: 2, value: '1' }],
     flags: { relicPower: 'bonus-weapon-1' }
   },
@@ -315,7 +315,7 @@ export const RELIC_POWERS = [
     description: '+2 bonus to Weapon damage.',
     cost: 1250,
     nameFormat: { position: 'prefix', text: '+2' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.universalWeaponDamageBonus', mode: 2, value: '2' }],
     flags: { relicPower: 'bonus-weapon-2' }
   },
@@ -327,7 +327,7 @@ export const RELIC_POWERS = [
     description: '+3 bonus to Weapon damage.',
     cost: 5000,
     nameFormat: { position: 'prefix', text: '+3' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.universalWeaponDamageBonus', mode: 2, value: '3' }],
     flags: { relicPower: 'bonus-weapon-3' }
   },
@@ -427,7 +427,7 @@ export const RELIC_POWERS = [
     description: '-1 weapon damage penalty.',
     cost: 0,
     nameFormat: { position: 'suffix', text: 'of Minor Weakness' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.universalWeaponDamageBonus', mode: 2, value: '-1' }],
     flags: { relicPower: 'cursed-weakness-1' }
   },
@@ -439,7 +439,7 @@ export const RELIC_POWERS = [
     description: '-2 weapon damage penalty.',
     cost: 0,
     nameFormat: { position: 'suffix', text: 'of Weakness' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.universalWeaponDamageBonus', mode: 2, value: '-2' }],
     flags: { relicPower: 'cursed-weakness-2' }
   },
@@ -451,7 +451,7 @@ export const RELIC_POWERS = [
     description: '-3 weapon damage penalty.',
     cost: 0,
     nameFormat: { position: 'suffix', text: 'of Major Weakness' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.universalWeaponDamageBonus', mode: 2, value: '-3' }],
     flags: { relicPower: 'cursed-weakness-3' }
   },
@@ -948,9 +948,14 @@ export const RELIC_POWERS = [
     description: '+1d4 bonus weapon damage die.',
     cost: 1000,
     nameFormat: { position: 'prefix', text: 'Minor Striking' },
-    applicationMode: 'when-equipped',
-    changes: [{ key: 'system.universalWeaponDamageDice', mode: 2, value: '1d4' }],
-    flags: { relicPower: 'strike-1' }
+    applicationMode: 'on-use',
+    // Flag-based on-use: the system's getRollDataWithItemEffects overlay does
+    // numeric ADD on rollData fields, which mangles dice strings like '1d4'
+    // into "NaN" via Number('1d4'). The damage-helper monkey-patch reads
+    // bonusDamageDice and injects it into the formula at roll time —
+    // weapon-scoped without going through the broken overlay path.
+    changes: [],
+    flags: { relicPower: 'strike-1', bonusDamageDice: '1d4', bonusDamageLabel: 'Striking' }
   },
   {
     id: 'strike-2',
@@ -960,9 +965,9 @@ export const RELIC_POWERS = [
     description: '+1d6 bonus weapon damage die.',
     cost: 2500,
     nameFormat: { position: 'prefix', text: 'Striking' },
-    applicationMode: 'when-equipped',
-    changes: [{ key: 'system.universalWeaponDamageDice', mode: 2, value: '1d6' }],
-    flags: { relicPower: 'strike-2' }
+    applicationMode: 'on-use',
+    changes: [],
+    flags: { relicPower: 'strike-2', bonusDamageDice: '1d6', bonusDamageLabel: 'Striking' }
   },
   {
     id: 'strike-3',
@@ -972,9 +977,9 @@ export const RELIC_POWERS = [
     description: '+1d8 bonus weapon damage die.',
     cost: 8000,
     nameFormat: { position: 'prefix', text: 'Major Striking' },
-    applicationMode: 'when-equipped',
-    changes: [{ key: 'system.universalWeaponDamageDice', mode: 2, value: '1d8' }],
-    flags: { relicPower: 'strike-3' }
+    applicationMode: 'on-use',
+    changes: [],
+    flags: { relicPower: 'strike-3', bonusDamageDice: '1d8', bonusDamageLabel: 'Striking' }
   },
 
   // ═══════════════════════════════════════════════════════════
@@ -1036,7 +1041,7 @@ export const RELIC_POWERS = [
     description: 'On hit, apply Burning with d4 countdown die.',
     cost: 4000,
     nameFormat: { position: 'prefix', text: 'Minor Burning' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.onHitBurningDice', mode: 5, value: 'd4' }],
     flags: { relicPower: 'burning-1' }
   },
@@ -1048,7 +1053,7 @@ export const RELIC_POWERS = [
     description: 'On hit, apply Burning with d6 countdown die.',
     cost: 15000,
     nameFormat: { position: 'prefix', text: 'Burning' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.onHitBurningDice', mode: 5, value: 'd6' }],
     flags: { relicPower: 'burning-2' }
   },
@@ -1060,7 +1065,7 @@ export const RELIC_POWERS = [
     description: 'On hit, apply Burning with d8 countdown die.',
     cost: 64000,
     nameFormat: { position: 'prefix', text: 'Major Burning' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [{ key: 'system.onHitBurningDice', mode: 5, value: 'd8' }],
     flags: { relicPower: 'burning-3' }
   },
@@ -1132,7 +1137,7 @@ export const RELIC_POWERS = [
     description: 'Skip your Move to become Invisible until you move or attack.',
     cost: 5000,
     nameFormat: { position: 'suffix', text: 'of Invisibility' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [],
     flags: { relicPower: 'invisibility-1' }
   },
@@ -1157,7 +1162,7 @@ export const RELIC_POWERS = [
     description: 'On kill, heal 1d8 HP.',
     cost: 1000,
     nameFormat: { position: 'prefix', text: 'Minor Lifestealing' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [],
     flags: { relicPower: 'lifesteal-1', onKillHealDice: '1d8' }
   },
@@ -1169,7 +1174,7 @@ export const RELIC_POWERS = [
     description: 'On kill, heal 2d8 HP.',
     cost: 12500,
     nameFormat: { position: 'prefix', text: 'Lifestealing' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [],
     flags: { relicPower: 'lifesteal-2', onKillHealDice: '2d8' }
   },
@@ -1181,7 +1186,7 @@ export const RELIC_POWERS = [
     description: 'On kill, heal 3d8 HP.',
     cost: 50000,
     nameFormat: { position: 'prefix', text: 'Major Lifestealing' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [],
     flags: { relicPower: 'lifesteal-3', onKillHealDice: '3d8' }
   },
@@ -1205,7 +1210,7 @@ export const RELIC_POWERS = [
     description: 'On kill, restore 1d4 Mana.',
     cost: 5000,
     nameFormat: { position: 'prefix', text: 'Minor Mana Stealing' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [],
     flags: { relicPower: 'manasteal-1', onKillManaDice: '1d4' }
   },
@@ -1217,7 +1222,7 @@ export const RELIC_POWERS = [
     description: 'On kill, restore 2d4 Mana.',
     cost: 20000,
     nameFormat: { position: 'prefix', text: 'Mana Stealing' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [],
     flags: { relicPower: 'manasteal-2', onKillManaDice: '2d4' }
   },
@@ -1229,7 +1234,7 @@ export const RELIC_POWERS = [
     description: 'On kill, restore 3d4 Mana.',
     cost: 50000,
     nameFormat: { position: 'prefix', text: 'Major Mana Stealing' },
-    applicationMode: 'when-equipped',
+    applicationMode: 'on-use',
     changes: [],
     flags: { relicPower: 'manasteal-3', onKillManaDice: '3d4' }
   },

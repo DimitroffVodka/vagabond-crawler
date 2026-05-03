@@ -61,46 +61,24 @@ function _getWeaponRelicFlags(item) {
 export const RelicEffects = {
 
   init() {
-    // Monkey-patch the damage helper once the system is ready
+    // Monkey-patch the damage helper once the system is ready. This stays
+    // because Bane / Vicious / Strike-elemental are flag-driven (changes:[])
+    // and never go through the system's AE pipeline — the damage helper
+    // patch is what reads their flags and injects bonus dice at roll time.
     this._patchDamageHelper();
 
-    // Hook into actor updates to detect kills for lifesteal
+    // Hook into actor updates to detect kills for lifesteal / manasteal.
     Hooks.on("updateActor", (actor, changes, options, userId) => {
       this._onActorUpdate(actor, changes, options, userId);
     });
 
-    // Equip-gating for relic Active Effects. Relic-forged items embed their
-    // effects with `transfer: true`, which would normally apply the bonuses
-    // to the actor as soon as the item is owned (regardless of equipped
-    // state). We compensate by toggling each effect's `disabled` flag
-    // whenever `system.equipped` changes on the owning item.
-    Hooks.on("updateItem", (item, changes, options, userId) => {
-      if (!game.user.isGM && userId !== game.user.id) return;
-      const equippedChanged = foundry.utils.hasProperty(changes, "system.equipped");
-      if (!equippedChanged) return;
-      this._syncRelicEffectsForItem(item).catch((e) => console.warn(`${MODULE_ID} | Failed to sync relic effects:`, e));
-    });
+    // Equip-gating is now handled by the system: each relic AE carries
+    // `flags.vagabond.applicationMode` (set by the Forge), which the system
+    // filters in `_prepareItemEffectsList`. No more manual `disabled`
+    // toggling on `updateItem` — see relic-forge.mjs and the v1.16.7
+    // migration in vagabond-crawler.mjs for the data shape.
 
     console.log(`${MODULE_ID} | Relic Effects initialized.`);
-  },
-
-  /** Flip the `disabled` flag on every relic-forged effect embedded in this
-   *  item to match the item's current `system.equipped` state. Foundry
-   *  propagates the change to transferred copies on the parent actor, so
-   *  the bonus lights up when equipped and goes dark when unequipped. */
-  async _syncRelicEffectsForItem(item) {
-    if (!item?.effects?.size) return;
-    const shouldBeDisabled = !item.system?.equipped;
-    const updates = [];
-    for (const eff of item.effects) {
-      const isRelicGated = eff.flags?.[MODULE_ID]?.equipGated;
-      if (!isRelicGated) continue;
-      if (eff.disabled === shouldBeDisabled) continue; // already correct
-      updates.push({ _id: eff.id, disabled: shouldBeDisabled });
-    }
-    if (updates.length) {
-      await item.updateEmbeddedDocuments("ActiveEffect", updates);
-    }
   },
 
   /* -------------------------------------------- */
@@ -154,10 +132,24 @@ export const RelicEffects = {
             }
           }
 
-          // Strike: add elemental damage
+          // Strike: add elemental damage (typed Strike — strikeDice + strikeType)
           for (const { flags } of relicFlags) {
             if (flags.strikeDice && flags.strikeType) {
               bonusParts.push({ formula: flags.strikeDice, label: `${flags.strikeType} Strike` });
+            }
+          }
+
+          // Strike I/II/III: untyped bonus damage dice (bonusDamageDice flag).
+          // Drives the Striking-relic line — see relic-powers.mjs `strike-1/2/3`.
+          // The system's getRollDataWithItemEffects overlay can't carry dice
+          // strings (Number('1d4') = NaN), so the dice ride on a flag and we
+          // inject them here at damage-roll time, scoped to the firing weapon.
+          for (const { flags } of relicFlags) {
+            if (flags.bonusDamageDice) {
+              bonusParts.push({
+                formula: flags.bonusDamageDice,
+                label:   flags.bonusDamageLabel || "Bonus Damage",
+              });
             }
           }
 
