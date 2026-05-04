@@ -841,12 +841,8 @@ async function _fireAction(actor, type, indexStr, itemId) {
       const { VagabondChatCard } = globalThis.vagabond.utils;
       const attackResult = await item.rollAttack(actor);
       if (!attackResult) return;
-      // FX
-      try {
-        const { VagabondItemSequencer } = await import("/systems/vagabond/module/helpers/item-sequencer.mjs");
-        const casterToken = actor.token?.object ?? actor.getActiveTokens(true)[0] ?? null;
-        VagabondItemSequencer.play(item, casterToken, Array.from(game.user.targets), attackResult.isHit);
-      } catch { /* non-fatal */ }
+      // Animation FX is played by AnimationFx._onChatMessage on the
+      // createChatMessage hook below — covers every UI path uniformly.
       // Damage roll if hit
       let damageRoll = null;
       const isHit = attackResult.isHit ?? false;

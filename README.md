@@ -2,7 +2,7 @@
 
 ![Foundry v13](https://img.shields.io/badge/foundry-v13-green?style=for-the-badge)
 ![System](https://img.shields.io/badge/system-vagabond-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-1.16.7-orange?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.16.8-orange?style=for-the-badge)
 
 A comprehensive dungeon crawl management module for the **Vagabond RPG** system in Foundry VTT. Everything you need to run a crawl — turn tracking, movement enforcement, random encounters, light management, morale, combat automation, crafting, loot, and more — from a unified interface.
 
@@ -26,7 +26,6 @@ A comprehensive dungeon crawl management module for the **Vagabond RPG** system 
 - **[Session Recap](docs/session-tracking.md#session-recap)** — Combat stats, loot log, XP tracking, per-player breakdowns, Discord export.
 - **[NPC Abilities](docs/combat.md#npc-abilities)** — Magic Ward, Pack Instincts/Tactics/Hunter, Nimble, Soft Underbelly — automated at the table.
 - **[Flanking & Countdown Dice](docs/combat.md#flanking-checker)** — Auto-apply Vulnerable on flanks; auto-roll round-start countdown dice with tick damage.
-- **[Trap Builder](docs/exploration.md#trap-builder)** — Visual authoring for Scene-Region macro traps with save, VFX, damage, status effects.
 
 ---
 
@@ -37,7 +36,7 @@ A comprehensive dungeon crawl management module for the **Vagabond RPG** system 
 
 ### Optional
 - **vagabond-character-enhancer** — Class feature automation, alchemy
-- **Sequencer + JB2A** — Visual effects for spells, traps, and attacks
+- **Sequencer + JB2A** — Visual effects for spells and attacks
 
 ### Recommended
 - **Damage Log** — Enables damage and kill tracking in Session Recap

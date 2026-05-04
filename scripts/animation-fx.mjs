@@ -176,6 +176,48 @@ export const AnimationFx = {
     setTimeout(() => this._wrapNpcAction(), 100);
     // Run scale migration non-blocking (fixes stale scale values from pre-fix config)
     this._migrateScaleValues().catch(e => console.warn("[vagabond-crawler] scale migration failed:", e));
+    // Warn the GM if the system's item FX is also enabled — the chat-message
+    // hook here would double-fire weapon/alchemical FX whenever the system's
+    // sheet path also triggers VagabondItemSequencer.play.
+    this._warnIfSystemFxConflict();
+  },
+
+  /**
+   * The crawler is the authoritative provider for weapon / alchemical / gear
+   * Animation FX (chat-message hook covers every UI path). Two known
+   * conflicts cause double-fires and need to be surfaced to the GM:
+   *
+   *   1. The system's `vagabond.useItemAnimations` — fires from the sheet
+   *      click handler, so sheet attacks play FX twice.
+   *   2. The standalone `vagabond-item-fx` module — duplicates the
+   *      chat-message hook entirely, double-firing every UI path.
+   *
+   * One-shot per session, GM-only. Posts a permanent notification listing
+   * each detected conflict so the GM can disable them.
+   */
+  async _warnIfSystemFxConflict() {
+    if (!game.user.isGM) return;
+    if (this._systemFxWarned) return;
+
+    const conflicts = [];
+    try {
+      if (game.settings.get("vagabond", "useItemAnimations")) {
+        conflicts.push(`the system setting "Use Item Animations" (run: game.settings.set("vagabond", "useItemAnimations", false))`);
+      }
+    } catch { /* setting not present */ }
+    if (game.modules.get("vagabond-item-fx")?.active) {
+      conflicts.push(`the "vagabond-item-fx" module (disable it in Manage Modules)`);
+    }
+    if (conflicts.length === 0) return;
+
+    this._systemFxWarned = true;
+    const verb = conflicts.length === 1 ? "is" : "are";
+    ui.notifications.warn(
+      `Vagabond Crawler is the active provider for weapon/alchemical/gear Animation FX, ` +
+      `but ${conflicts.join(" and ")} ${verb} also active — attacks will play FX twice. ` +
+      `Disable to fix.`,
+      { permanent: true }
+    );
   },
 
   async _migrateScaleValues() {
@@ -467,9 +509,6 @@ export const AnimationFx = {
     if (flags.itemId) {
       const item = actor.items.get(flags.itemId);
       if (!item) return;
-      // Weapon animations are played by the system's own Item FX pipeline
-      // (we sync the config there via syncToItems). Skip crawler playback.
-      if (item.system?.equipmentType === "weapon") return;
       preset = this._resolve({ item });
     } else if (typeof flags.actionIndex === "number") {
       preset = this._resolve({ actor, actionIndex: flags.actionIndex });

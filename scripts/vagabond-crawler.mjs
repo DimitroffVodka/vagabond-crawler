@@ -475,6 +475,19 @@ Hooks.once("ready", async () => {
       const s = token.actor.system.speed;
       return { actorName: token.actor.name, speed: s, allSpeedKeys: Object.keys(s ?? {}) };
     },
+    // Lazy-loaded smoke-test runner. Test code never imports until the GM
+    // calls `game.vagabondCrawler.test.run()`, so production sessions stay
+    // clean. See scripts/test/index.mjs.
+    test: {
+      async run(filter = null) {
+        const mod = await import("./test/index.mjs");
+        return mod.run(filter);
+      },
+      async sweep() {
+        const mod = await import("./test/index.mjs");
+        return mod.sweep();
+      },
+    },
   };
 
   // Public API for cross-module integration (vgbnd-importer, etc.). Stable

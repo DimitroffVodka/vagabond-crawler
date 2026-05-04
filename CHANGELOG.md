@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.16.8
+
+### Animation FX — single owner for weapon / alchemical / gear FX
+
+- **The chat-message hook is now the sole trigger for weapon FX.** `AnimationFx._onChatMessage` previously bailed on weapons (`if (item.system?.equipmentType === "weapon") return;`) on the assumption that the system's `VagabondItemSequencer.play` would handle them — but that call only fires from the sheet path, so attacks via TAH, ECH, macros, and the NPC action menu had no FX at all. The bail-out is gone; the chat hook resolves and plays for every weapon attack regardless of UI path.
+- **NPC action menu no longer double-fires FX.** With the chat hook now weapon-aware, the explicit `VagabondItemSequencer.play(...)` call inside `_fireAction`'s weapon branch (`scripts/npc-action-menu.mjs`) was redundant — every NPC-menu weapon attack played its hit/miss animation twice (once from the explicit call, once from the chat hook). Dropped the explicit call; the chat hook handles it once. Verified live: `Sequence.prototype.play` invocation count drops from 2 to 1 for the same attack flow.
+- **Permanent GM warning when known double-fire sources are also active.** `_warnIfSystemFxConflict` runs once at `ready` and posts a notification listing each detected conflict — the system's `vagabond.useItemAnimations` setting (sheet-click double-fire) and the standalone `vagabond-item-fx` module (chat-hook double-fire on every UI path). Names the offender, includes a working `game.settings.set` snippet for the system case, and tells the GM to disable both. Plurality grammar (`is` vs `are`) flips correctly when both are detected.
+
+### Light Sources — preview a config on a token before saving
+
+- **New "Test on Token" workflow.** The Light Sources Configuration window can now overlay a working config onto the selected token in real time — adjust dim/bright/color/animation, click Test on Token, see the result on the canvas without saving. A "Stop Test" button (and auto-cleanup on window close) restores the original light. The pre-test light data is snapshotted to a `lightTestSnapshot` flag on the token document so restoration is exact even after canvas refresh.
+- **Cross-scene-aware cleanup.** Tested tokens are tracked as `"<sceneId>:<tokenId>"` keys and resolved via `game.scenes.get(sceneId).tokens.get(tokenId)` at restore time. Testing a token on Scene A then navigating to Scene B before closing the window now still restores Scene A's token cleanly. Previous tracking (token-id only, resolved through `canvas.tokens` which is current-scene scoped) silently leaked the test light when the GM swapped scenes mid-test.
+- **Silent close path.** Closing the config window without ever clicking Test no longer pops a stray "No active light test to stop." notification — the toast is reserved for the explicit Stop Test button, where it acts as user feedback. The success-path "Restored light on N token(s)." toast is unchanged.
+
+### Smoke Test Runner — live-runtime test framework at `scripts/test/`
+
+- **Tests run inside Foundry against synthetic actors.** `await game.vagabondCrawler.test.run()` from the GM console exercises every registered suite. Each case spins up cloned actors / tokens, hits the real hook chain + wrap stack + document lifecycle, then auto-cleans. Surfaces the bugs unit tests miss — hook ordering, socket desync, stale state across linked/unlinked tokens.
+- **Lazy-loaded — zero overhead at session ready.** Test code never imports until `run()` or `sweep()` is called, so production sessions stay clean. `sweep()` deletes orphan fixtures left behind by an interrupted run.
+- **12 suites covering animation-fx (happy + adversarial), crawl-state, crawl-strip, exploration-tools, flanking-countdown, light-tracker, loot-spell-scroll, merchant-recap, movement-tracker, npc-abilities, relic-effects.** See `CLAUDE.md` § Smoke Test Runner for the harness API and gotchas.
+
 ## v1.16.7
 
 ### Relic Forge — Universal-bonus relics no longer leak across other equipped weapons

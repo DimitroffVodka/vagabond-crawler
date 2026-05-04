@@ -83,7 +83,7 @@ class MyApp extends HandlebarsApplicationMixin(ApplicationV2) {
 | `rest-breather.mjs` | Recovery dialog — breather (ration + heal) and full rest |
 | `flanking-checker.mjs` | Auto-apply Vulnerable when 2+ allies adjacent to foe, mirrors outgoingSavesModifier to world actor for unlinked tokens |
 | `npc-abilities.mjs` | Passive hooks: Pack Instincts/Tactics (save hinder), Magic Ward I/II/III (cast penalty), npcAction wrapper |
-| `animation-fx.mjs` | Animation FX subsystem — unified resolver + playback for weapons, alchemical, gear, NPC actions. Chat hook trigger. Per-item/per-action override flags. |
+| `animation-fx.mjs` | Animation FX subsystem — **authoritative** resolver + playback for weapons, alchemical, gear, NPC actions. `createChatMessage` hook trigger (covers all UI paths). Per-item/per-action override flags. Posts GM warning if `vagabond.useItemAnimations` is on (would cause double-fire on sheet clicks). |
 | `animation-fx-config.mjs` | ApplicationV2 config window for Animation FX — 6 tabs (Weapons, Skill Fallbacks, Alchemical, Gear, NPC Actions, Settings) with hit/miss animation editor |
 | `light-sources-config.mjs` | Light Sources Configuration ApplicationV2 window — edit per-type Foundry light properties (dim/bright/color/animation) for the 12 light source types |
 | `animation-fx-defaults.mjs` | Default Animation FX preset data (JB2A-aware at runtime) |
@@ -181,7 +181,7 @@ game.vagabondCrawler.state            // crawl state object
 game.vagabondCrawler.debugCombat()    // active combat summary
 game.vagabondCrawler.debugSpeed()     // selected token's speed data
 game.vagabondCrawler.scrollForge.open()  // open Scroll Forge
-game.vagabondCrawler.animationFx.syncToItems()  // push config → item.system.itemFx for all world weapons
+game.vagabondCrawler.animationFx.syncToItems()  // LEGACY — push config → item.system.itemFx (escape hatch, not primary path)
 game.vagabondCrawler.animationFx.startPersistent(preset, token)  // idempotent light-on
 game.vagabondCrawler.animationFx.stopPersistent(preset, token)   // idempotent light-off
 game.vagabondCrawler.movement._turnStartPos  // rollback position snapshots
@@ -206,6 +206,70 @@ Notes:
 - For transient test actors/tokens: create unlinked tokens from a cloned world actor so `token.actor` is synthetic (matches the real runtime path for NPCs); clean up both tokens and world actors in `finally`.
 
 If MCP testing isn't possible (server down, no connection), explicitly say so rather than just claiming the work is done off-disk.
+
+## Smoke Test Runner
+
+Lightweight live-runtime test framework at `scripts/test/`. Tests execute inside Foundry against synthetic actors / tokens (cloned per case, auto-cleaned) so they hit the real hook chain, wrap stack, and document lifecycle — the things unit tests miss and that break in real play sessions.
+
+**Run from console (GM only):**
+
+```js
+await game.vagabondCrawler.test.run()              // run every suite
+await game.vagabondCrawler.test.run("crawl strip") // filter by suite-name substring
+await game.vagabondCrawler.test.sweep()            // delete orphan test fixtures from interrupted runs
+```
+
+Output uses `console.group` per suite, ✓ / ✗ per case, diff on failure, totals at the bottom. Returns `{ total, passed, failed, durationMs, failures }` for programmatic checks.
+
+**File layout:**
+
+| File | Purpose |
+|---|---|
+| `scripts/test/harness.mjs` | Test runner core — `suite()`, `case_()`, `expect()` chain, isolated cleanup via `ctx.cleanup(fn)` |
+| `scripts/test/fixtures.mjs` | `Fixtures.createTestPC / createTestNPC / addWeapon` — every fixture stamps `flags.vctest.created` so `sweepOrphans()` can mop up after an interrupted run |
+| `scripts/test/index.mjs` | Lazy-loaded entry, registers all suites, exposes `run()` / `sweep()` |
+| `scripts/test/suites/<feature>.mjs` | One suite per README feature |
+
+**Ownership rule:** test code is lazy-loaded — none of it imports until `game.vagabondCrawler.test.run()` is called the first time. Production sessions stay clean.
+
+**Adding a new suite:** copy `scripts/test/suites/crawl-strip.mjs` as a template. Each case takes a `ctx` with `ctx.fx` (the Fixtures namespace) and `ctx.cleanup(fn)`. Use `await ctx.fx.createTestPC(ctx)` etc. — the fixtures auto-register their teardown. Then add a `() => import("./suites/<your-feature>.mjs")` line to `SUITE_LOADERS` in `scripts/test/index.mjs`.
+
+**Gotchas:**
+- VCE's `RangeValidator` returns `null` from `rollAttack` if target is out of range. Use `Fixtures.createTestNPCAdjacentTo(ctx, pcRef)` instead of computing positions by hand.
+- **Token placeable `.x` reads as `0` until canvas finishes its first render** — which hasn't happened yet at fixture-build time. Read `tokenDoc.x` (the document) instead of `token.x` (the placeable) for any positioning math. The `createTestNPCAdjacentTo` helper hides this.
+- Synthetic weapon items must set `system.equipmentState: "oneHand"` (or `"twoHands"`) — NOT `"equipped"`. Valid choices live in `systems/vagabond/module/data/base-equipment.mjs`. The `Fixtures.addWeapon` defaults already set this; don't override unless intentional.
+- For weapon attacks, pass `"favor3"` as `favorHinder` to bias toward hits so the damage-roll branch actually runs.
+- Animation FX uses staggered `setTimeout` chains. Use `await ctx.fx.settle(800)` before asserting on `Sequencer.EffectManager.getEffects()` deltas.
+- Synthetic actors created via `Actor.create()` are world actors — their tokens are linked-by-default, so `token.actor === worldActor`. NPC abilities helpers that need synthetic-token actors won't be exercised; for those, create unlinked tokens explicitly.
+- The test runner reads stale console errors before each run is harmless; if a real test failure also throws to the console, the failure summary in `summary.failures` is the source of truth — the console is just supplementary detail.
+- **NEVER call `CrawlState.start()` / `end()` from tests.** Those fire `vagabondCrawler.crawlStart` / `crawlEnd` hooks; SessionRecap (and any future subscriber) responds by popping a confirmation dialog. A suite that exercises lifecycle multiple times will stack a wall of dialogs over the GM's screen mid-run. Install state directly via `game.settings.set(MODULE_ID, "crawlState", ...)` then `await CrawlState.restore()` — see the `installState` helper in the Crawl State suite for the canonical pattern.
+
+## Animation FX Ownership
+
+The Crawler is the **authoritative provider** for weapon / alchemical / gear / NPC-action FX. Spells are owned by the system; class-feature buffs and auras are owned by VCE. Three modules, four domains, zero overlap.
+
+| Domain | Owner | Trigger |
+|---|---|---|
+| Weapons / Alchemical / Gear | **vagabond-crawler** (`AnimationFx._onChatMessage`) | `createChatMessage` hook — fires for ANY UI path (sheet, TAH, ECH, macros, NPC menu) |
+| NPC actions | **vagabond-crawler** | same hook + `npcAction` wrap stamps `flags.vagabond.actionIndex` + `tokenId` |
+| Spells | **vagabond core** (`VagabondSpellSequencer`) | sheet click only (`spell-handler.mjs`) — system-side limitation |
+| Class-feature persistent buffs (Hunter's Mark, Bard Virtuoso, Focus markers) | **VCE** (`feature-fx-config`) | Focus state changes |
+| Auras | **VCE** (`aura-manager`) | aura hooks |
+
+**Required setting state to avoid double-fire:**
+
+| Setting | Value | Why |
+|---|---|---|
+| `vagabond.useItemAnimations` (world) | **`false`** | The system's `VagabondItemSequencer.play` only fires from sheet clicks. Leaving it on causes weapons/alchemicals to play FX twice when attacked from the sheet. The Crawler posts a permanent GM warning at `ready` if this is on. |
+| `vagabond-item-fx` module | **disabled** | Standalone module that duplicates the chat-hook trigger entirely. Would double-fire every attack. |
+| `vagabond-crawler.animationFxEnabled` (client) | `true` | Per-client master switch for the Crawler's playback. |
+| `system.itemFx.*` on weapons | unused/legacy | Previously the source of truth via `syncToItems`. Crawler now reads its own config + flag overrides directly. The field is harmless once `useItemAnimations: false`. |
+
+**Per-item override:** `flag.vagabond-crawler.animationOverride` (set via the ⚡ Animation FX button on the item sheet header). Disable per-item via `flag.vagabond-crawler.disabled`.
+
+**`syncToItems` is now a legacy escape-hatch.** It still works for users who want to disable the Crawler and let the system play weapon FX from sheet clicks. Do NOT recommend it as the primary configuration mechanism.
+
+**Why the Crawler doesn't own spells:** the system's spell pipeline is much richer (school × delivery-type matrix, distance/area scaling, JB2A presets baked in via `sequencer-config.mjs`). Reproducing it would be a large lift for marginal gain. The same path-coverage limitation exists for spells (sheet-click only) — fix belongs in the system, not the Crawler.
 
 ## System / Module Wrap Chain Gotchas
 
