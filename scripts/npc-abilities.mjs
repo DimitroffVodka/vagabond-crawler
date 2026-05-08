@@ -189,7 +189,7 @@ function applyTargetModifiers(favorHinder) {
     let aeTouched = false;
     for (const effect of actor.effects) {
       if (effect.disabled || effect.isSuppressed) continue;
-      for (const change of effect.changes) {
+      for (const change of (effect.system?.changes ?? effect.changes ?? [])) {
         if (change.key !== "system.incomingAttacksModifier") continue;
         aeTouched = true;
         if (change.value === "favor") fav++;
@@ -517,9 +517,9 @@ export async function applyPackInstincts(attacker) {
         name:     "Pack Instincts (active)",
         img:      "icons/svg/downgrade.svg",
         flags:    { [MODULE_ID]: { tag: PACK_INSTINCTS_TAG } },
-        changes: [
-          { key: "system.outgoingSavesModifier", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "hinder" },
-        ],
+        system: { changes: [
+          { key: "system.outgoingSavesModifier", type: "override", value: "hinder" },
+        ] },
       }]);
     }
   }
@@ -618,9 +618,9 @@ async function ensureSoftUnderbellyEffect(actor) {
       name:   "Soft Underbelly (Prone)",
       img:    "icons/svg/downgrade.svg",
       flags:  { [MODULE_ID]: { tag: SOFT_UNDERBELLY_TAG } },
-      changes: [
-        { key: "system.armor", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "0", priority: 999 },
-      ],
+      system: { changes: [
+        { key: "system.armor", type: "override", value: "0", priority: 999 },
+      ] },
     }]);
     console.log(`${MODULE_ID} | Soft Underbelly: armor set to 0 on ${actor.name} (Prone)`);
   } catch (err) {

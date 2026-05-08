@@ -137,11 +137,11 @@ export const FlankingChecker = {
       img:      "icons/svg/downgrade.svg",
       statuses: ["vulnerable"],
       flags:    { [MODULE_ID]: { tag: "flanking" } },
-      changes: [
-        { key: "system.favorHinder",              mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "hinder" },
-        { key: "system.incomingAttacksModifier",   mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "favor"  },
-        { key: "system.outgoingSavesModifier",     mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "favor"  },
-      ],
+      system: { changes: [
+        { key: "system.favorHinder",              type: "override", value: "hinder" },
+        { key: "system.incomingAttacksModifier",   type: "override", value: "favor"  },
+        { key: "system.outgoingSavesModifier",     type: "override", value: "favor"  },
+      ] },
     };
   },
 
@@ -162,9 +162,9 @@ export const FlankingChecker = {
           name:     "Vulnerable — Saves (Flanked)",
           img:      "icons/svg/downgrade.svg",
           flags:    { [MODULE_ID]: { tag: "flankingSaves" } },
-          changes: [
-            { key: "system.outgoingSavesModifier", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "favor" },
-          ],
+          system: { changes: [
+            { key: "system.outgoingSavesModifier", type: "override", value: "favor" },
+          ] },
         }]);
       }
     }
