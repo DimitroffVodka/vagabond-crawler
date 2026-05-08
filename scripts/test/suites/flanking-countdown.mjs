@@ -20,7 +20,7 @@ export function register() {
       const data = fc._makeEffectData();
       expect(data.name).toContain("Flanked");
       expect(data.statuses).toContain("vulnerable");
-      const keys = data.changes.map(c => c.key);
+      const keys = (data.system?.changes ?? data.changes ?? []).map(c => c.key);
       expect(keys).toContain("system.favorHinder");
       expect(keys).toContain("system.incomingAttacksModifier");
       expect(keys).toContain("system.outgoingSavesModifier");
