@@ -535,7 +535,7 @@ export const AnimationFx = {
 
     // NPC action path
     if (source.actor && typeof source.actionIndex === "number") {
-      const actorOverrides = source.actor.getFlag(MODULE_ID, "actionOverrides") ?? {};
+      const actorOverrides = source.actor.getFlag?.(MODULE_ID, "actionOverrides") ?? {};
       const ov = actorOverrides[source.actionIndex];
       if (ov) {
         if (ov.disabled) return null;
