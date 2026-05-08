@@ -62,6 +62,9 @@
     {{!-- CENTER: Base Item + Config --}}
     <div class="forge-column forge-config">
 
+      <div class="forge-config-grid">
+      <div class="forge-config-base">
+
       {{!-- Drop Zone --}}
       <h3><i class="fas fa-hammer"></i> Base Item</h3>
       <div class="drop-zone {{#if baseItem}}has-item{{/if}}">
@@ -114,6 +117,10 @@
       </div>
       {{/unless}}
 
+      </div>{{!-- /.forge-config-base --}}
+
+      <div class="forge-config-custom">
+
       {{!-- Custom Power Builder --}}
       <h3><i class="fas fa-wand-magic-sparkles"></i> Custom Power</h3>
       <div class="custom-power-builder">
@@ -160,6 +167,9 @@
           </button>
         </div>
       </div>
+
+      </div>{{!-- /.forge-config-custom --}}
+      </div>{{!-- /.forge-config-grid --}}
 
       {{!-- Forge Button --}}
       <button type="button" class="forge-btn {{#unless canForge}}disabled{{/unless}}"

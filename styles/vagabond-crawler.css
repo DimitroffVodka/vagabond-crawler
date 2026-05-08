@@ -1785,6 +1785,27 @@ body.theme-light .vcb-phase-badge {
   text-align: center;
   font-size: 0.85em;
 }
+/* Side-by-side layout: Base Item (left) and Custom Power (right). Wraps
+ * to a vertical stack at narrow widths via flex-wrap with a basis floor. */
+.forge-config-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.forge-config-base,
+.forge-config-custom {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.forge-config-grid > .forge-config-base > h3:first-child,
+.forge-config-grid > .forge-config-custom > h3:first-child {
+  margin-top: 0;
+}
+
 .forge-browser-filters {
   display: flex;
   gap: 4px;
