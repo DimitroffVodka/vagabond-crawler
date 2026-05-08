@@ -2052,11 +2052,12 @@ body.theme-light .vcb-phase-badge {
 .vagabond-encounter-roller .loot-npc-panel {
   min-height: 0;
   height: calc(100% - 8px);
+  max-height: none;
   align-items: stretch;
 }
 .vagabond-encounter-roller .browse-list-fill {
   flex: 1 1 auto;
-  min-height: 480px;
+  min-height: 0;
 }
 
 .loot-npc-table {
