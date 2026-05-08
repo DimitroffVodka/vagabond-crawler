@@ -8,7 +8,7 @@
   </div>
 
   {{!-- Load from bestiary (collapsible, with filter+list) --}}
-  <details class="mc-section mc-collapsible" data-collapse="bestiary" {{#if sectionOpen.bestiary}}open{{/if}}>
+  <details data-sync class="mc-section mc-collapsible" data-collapse="bestiary" {{#if sectionOpen.bestiary}}open{{/if}}>
     <summary data-action="toggleBestiary">
       <span class="mc-collapse-title"><i class="fas fa-book-open"></i> Load from Bestiary</span>
       <span class="mc-collapse-summary">
@@ -47,7 +47,7 @@
   </details>
 
   {{!-- Identity + Images (collapsible) --}}
-  <details class="mc-section mc-collapsible" data-collapse="identity" {{#if sectionOpen.identity}}open{{/if}}>
+  <details data-sync class="mc-section mc-collapsible" data-collapse="identity" {{#if sectionOpen.identity}}open{{/if}}>
     <summary>
       <span class="mc-collapse-title">Identity</span>
       <span class="mc-collapse-summary"><span class="mc-collapse-preview">{{identitySummary}}</span></span>
@@ -103,7 +103,7 @@
   </details>
 
   {{!-- Stats (collapsible) --}}
-  <details class="mc-section mc-collapsible" data-collapse="stats" {{#if sectionOpen.stats}}open{{/if}}>
+  <details data-sync class="mc-section mc-collapsible" data-collapse="stats" {{#if sectionOpen.stats}}open{{/if}}>
     <summary>
       <span class="mc-collapse-title">Stats</span>
       <span class="mc-collapse-summary"><span class="mc-collapse-preview">{{statsSummary}}</span></span>
@@ -153,7 +153,7 @@
       <div class="mc-field mc-num"><label for="mc-field-appearing">Appearing</label><input id="mc-field-appearing" name="appearing" value="{{data.appearing}}" placeholder="1, 2d6" /></div>
     </div>
     {{!-- Senses (collapsible mini-section — Token Vision lives inside) --}}
-    <details class="mc-mini-collapsible" data-collapse="senses" {{#if sectionOpen.senses}}open{{/if}}>
+    <details data-sync class="mc-mini-collapsible" data-collapse="senses" {{#if sectionOpen.senses}}open{{/if}}>
       <summary class="mc-mini-head">
         <span class="mc-subhead">Senses</span>
         <span class="mc-collapse-preview">{{sensesPreview}}</span>
@@ -207,7 +207,7 @@
     </details>
 
     {{!-- Other Movement Modes (collapsible mini-section) --}}
-    <details class="mc-mini-collapsible" data-collapse="movement" {{#if sectionOpen.movement}}open{{/if}}>
+    <details data-sync class="mc-mini-collapsible" data-collapse="movement" {{#if sectionOpen.movement}}open{{/if}}>
       <summary class="mc-mini-head">
         <span class="mc-subhead">Other Movement Modes</span>
         <span class="mc-collapse-preview">{{movementPreview}}</span>
@@ -227,7 +227,7 @@
   </details>
 
   {{!-- Damage Immunities (collapsible) --}}
-  <details class="mc-section mc-collapsible" data-collapse="immunities" {{#if sectionOpen.immunities}}open{{/if}}>
+  <details data-sync class="mc-section mc-collapsible" data-collapse="immunities" {{#if sectionOpen.immunities}}open{{/if}}>
     <summary>
       <span class="mc-collapse-title">Damage Immunities</span>
       <span class="mc-collapse-summary">
@@ -247,7 +247,7 @@
   </details>
 
   {{!-- Damage Weaknesses (collapsible) --}}
-  <details class="mc-section mc-collapsible" data-collapse="weaknesses" {{#if sectionOpen.weaknesses}}open{{/if}}>
+  <details data-sync class="mc-section mc-collapsible" data-collapse="weaknesses" {{#if sectionOpen.weaknesses}}open{{/if}}>
     <summary>
       <span class="mc-collapse-title">Damage Weaknesses</span>
       <span class="mc-collapse-summary">
@@ -267,7 +267,7 @@
   </details>
 
   {{!-- Status Immunities (collapsible) --}}
-  <details class="mc-section mc-collapsible" data-collapse="statusImmunities" {{#if sectionOpen.statusImmunities}}open{{/if}}>
+  <details data-sync class="mc-section mc-collapsible" data-collapse="statusImmunities" {{#if sectionOpen.statusImmunities}}open{{/if}}>
     <summary>
       <span class="mc-collapse-title">Status Immunities</span>
       <span class="mc-collapse-summary">
@@ -287,7 +287,7 @@
   </details>
 
   {{!-- Actions (collapsible) --}}
-  <details class="mc-section mc-collapsible" data-collapse="actions" {{#if sectionOpen.actions}}open{{/if}}>
+  <details data-sync class="mc-section mc-collapsible" data-collapse="actions" {{#if sectionOpen.actions}}open{{/if}}>
     <summary>
       <span class="mc-collapse-title">Actions</span>
       <span class="mc-collapse-summary">
@@ -331,7 +331,7 @@
       {{#if actionRows.length}}
       <div class="mc-action-list">
         {{#each actionRows}}
-        <details class="mc-action-card" data-action-index="{{index}}" {{#if open}}open{{/if}}>
+        <details data-sync class="mc-action-card" data-action-index="{{index}}" {{#if open}}open{{/if}}>
           <summary class="mc-action-summary">
             <span class="mc-action-summary-name">{{name}}{{#if combo}} <span class="mc-combo-badge" title="Part of this monster's multi-attack routine">combo</span>{{/if}}</span>
             <span class="mc-action-summary-meta">{{attackTypeLabel}} · {{summary}}{{#if recharge}} · {{recharge}}{{/if}}{{#if causedStatuses.length}} · {{causedStatuses.length}} on-hit{{/if}}{{#if critCausedStatuses.length}} · {{critCausedStatuses.length}} crit{{/if}}</span>
@@ -438,7 +438,7 @@
   </details>
 
   {{!-- Abilities (collapsible) --}}
-  <details class="mc-section mc-collapsible" data-collapse="abilities" {{#if sectionOpen.abilities}}open{{/if}}>
+  <details data-sync class="mc-section mc-collapsible" data-collapse="abilities" {{#if sectionOpen.abilities}}open{{/if}}>
     <summary>
       <span class="mc-collapse-title">Abilities</span>
       <span class="mc-collapse-summary">
@@ -522,7 +522,7 @@
   </details>
 
   {{!-- Mutations (collapsible) --}}
-  <details class="mc-section mc-collapsible" data-collapse="mutations" {{#if sectionOpen.mutations}}open{{/if}}>
+  <details data-sync class="mc-section mc-collapsible" data-collapse="mutations" {{#if sectionOpen.mutations}}open{{/if}}>
     <summary>
       <span class="mc-collapse-title">Mutations</span>
       <span class="mc-collapse-summary">
@@ -585,7 +585,7 @@
   </details>
 
   {{!-- Description (collapsible) --}}
-  <details class="mc-section mc-collapsible" data-collapse="description" {{#if sectionOpen.description}}open{{/if}}>
+  <details data-sync class="mc-section mc-collapsible" data-collapse="description" {{#if sectionOpen.description}}open{{/if}}>
     <summary>
       <span class="mc-collapse-title">Description</span>
       <span class="mc-collapse-summary">

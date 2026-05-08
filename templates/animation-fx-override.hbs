@@ -48,7 +48,7 @@
         </div>
       </div>
 
-      <details class="vcfx-block vcfx-miss" {{#if hasMissFile}}open{{/if}}>
+      <details data-sync class="vcfx-block vcfx-miss" {{#if hasMissFile}}open{{/if}}>
         <summary>Miss Animation (optional)</summary>
         <div class="vcfx-row">
           <input type="text" name="miss.file" value="{{preset.miss.file}}" placeholder="file path" style="flex:1;min-width:200px;"/>
