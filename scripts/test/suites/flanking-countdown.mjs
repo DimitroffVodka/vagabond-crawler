@@ -33,7 +33,7 @@ export function register() {
       ctx.cleanup(async () => { await fc._removeFlanked(actor); });
 
       expect(actor.getFlag(MODULE_ID, "flankedBy")).toBe(true);
-      const ae = actor.effects.find(e => e.origin === `module.${MODULE_ID}.flanking`);
+      const ae = actor.effects.find(e => e.flags?.[MODULE_ID]?.tag === "flanking");
       expect(ae).not.toBeUndefined();
       expect(ae.statuses?.has?.("vulnerable")).toBe(true);
     });
@@ -45,7 +45,7 @@ export function register() {
       await fc._applyFlanked(actor);
       ctx.cleanup(async () => { await fc._removeFlanked(actor); });
 
-      const matching = actor.effects.filter(e => e.origin === `module.${MODULE_ID}.flanking`);
+      const matching = actor.effects.filter(e => e.flags?.[MODULE_ID]?.tag === "flanking");
       expect(matching.length).toBe(1);
     });
 
@@ -55,7 +55,7 @@ export function register() {
       await fc._applyFlanked(actor);
       await fc._removeFlanked(actor);
       expect(actor.getFlag(MODULE_ID, "flankedBy")).toBeFalsy();
-      const ae = actor.effects.find(e => e.origin === `module.${MODULE_ID}.flanking`);
+      const ae = actor.effects.find(e => e.flags?.[MODULE_ID]?.tag === "flanking");
       expect(ae).toBeUndefined();
     });
 

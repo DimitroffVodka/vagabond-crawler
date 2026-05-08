@@ -460,7 +460,7 @@ async function _wrapSystemClasses() {
  * cleaned up on turn change or combat end.
  * ──────────────────────────────────────────────────────────────────────────── */
 
-const PACK_INSTINCTS_ORIGIN = `module.${MODULE_ID}.packInstincts`;
+const PACK_INSTINCTS_TAG = "packInstincts";
 
 /**
  * Apply Vulnerable (Pack Instincts) to each targeted token if the attacker
@@ -512,11 +512,11 @@ export async function applyPackInstincts(attacker) {
   // source via game.actors.get(actorId), not the synthetic token actor.
   if (applied) {
     const worldActor = game.actors.get(attacker.id) ?? attacker;
-    if (!worldActor.effects.some(e => e.origin === PACK_INSTINCTS_ORIGIN)) {
+    if (!worldActor.effects.some(e => e.flags?.[MODULE_ID]?.tag === PACK_INSTINCTS_TAG)) {
       await worldActor.createEmbeddedDocuments("ActiveEffect", [{
         name:     "Pack Instincts (active)",
         img:      "icons/svg/downgrade.svg",
-        origin:   PACK_INSTINCTS_ORIGIN,
+        flags:    { [MODULE_ID]: { tag: PACK_INSTINCTS_TAG } },
         changes: [
           { key: "system.outgoingSavesModifier", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "hinder" },
         ],
@@ -529,13 +529,13 @@ export async function applyPackInstincts(attacker) {
 export async function cleanupPackInstincts() {
   if (!game.user.isGM) return;
   for (const actor of game.actors) {
-    const effect = actor.effects.find(e => e.origin === PACK_INSTINCTS_ORIGIN);
+    const effect = actor.effects.find(e => e.flags?.[MODULE_ID]?.tag === PACK_INSTINCTS_TAG);
     if (effect) await effect.delete();
   }
   // Also check synthetic (unlinked) token actors on the current scene
   for (const token of canvas.tokens?.placeables ?? []) {
     if (token.actor?.isToken) {
-      const effect = token.actor.effects.find(e => e.origin === PACK_INSTINCTS_ORIGIN);
+      const effect = token.actor.effects.find(e => e.flags?.[MODULE_ID]?.tag === PACK_INSTINCTS_TAG);
       if (effect) await effect.delete();
     }
   }
@@ -598,7 +598,7 @@ function _registerWardRoundResetHook() {
  * (remove when prone lost), ready (catch pre-existing prone + Soft Underbelly).
  * ──────────────────────────────────────────────────────────────────────────── */
 
-const SOFT_UNDERBELLY_ORIGIN = `module.${MODULE_ID}.softUnderbelly`;
+const SOFT_UNDERBELLY_TAG = "softUnderbelly";
 
 function effectInvolvesProne(effect) {
   if (effect?.statuses?.has?.("prone")) return true;
@@ -612,12 +612,12 @@ async function ensureSoftUnderbellyEffect(actor) {
   if (!actor) return;
   if (!hasAbility(actor, "Soft Underbelly")) return;
   if (!actor.statuses?.has?.("prone")) return;
-  if (actor.effects.some((e) => e.origin === SOFT_UNDERBELLY_ORIGIN)) return;
+  if (actor.effects.some((e) => e.flags?.[MODULE_ID]?.tag === SOFT_UNDERBELLY_TAG)) return;
   try {
     await actor.createEmbeddedDocuments("ActiveEffect", [{
       name:   "Soft Underbelly (Prone)",
       img:    "icons/svg/downgrade.svg",
-      origin: SOFT_UNDERBELLY_ORIGIN,
+      flags:  { [MODULE_ID]: { tag: SOFT_UNDERBELLY_TAG } },
       changes: [
         { key: "system.armor", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "0", priority: 999 },
       ],
@@ -630,7 +630,7 @@ async function ensureSoftUnderbellyEffect(actor) {
 
 async function clearSoftUnderbellyEffect(actor) {
   if (!actor) return;
-  const ours = actor.effects.find((e) => e.origin === SOFT_UNDERBELLY_ORIGIN);
+  const ours = actor.effects.find((e) => e.flags?.[MODULE_ID]?.tag === SOFT_UNDERBELLY_TAG);
   if (!ours) return;
   // Don't clear if actor is still prone (multiple sources of prone)
   if (actor.statuses?.has?.("prone")) return;
