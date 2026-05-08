@@ -94,6 +94,12 @@
       {{#unless baseItem}}
       <div class="forge-browser">
         <input type="text" class="forge-browser-search" placeholder="🔎 Search weapons &amp; equipment…" value="{{browserQuery}}" />
+        <div class="forge-browser-filters" role="tablist" aria-label="Filter by kind">
+          <button type="button" role="tab" class="forge-browser-filter {{#if (eq browserKindFilter 'all')}}active{{/if}}" data-kind="all" aria-selected="{{#if (eq browserKindFilter 'all')}}true{{else}}false{{/if}}">All</button>
+          <button type="button" role="tab" class="forge-browser-filter {{#if (eq browserKindFilter 'weapon')}}active{{/if}}" data-kind="weapon" aria-selected="{{#if (eq browserKindFilter 'weapon')}}true{{else}}false{{/if}}">Weapon</button>
+          <button type="button" role="tab" class="forge-browser-filter {{#if (eq browserKindFilter 'armor')}}active{{/if}}" data-kind="armor" aria-selected="{{#if (eq browserKindFilter 'armor')}}true{{else}}false{{/if}}">Armor</button>
+          <button type="button" role="tab" class="forge-browser-filter {{#if (eq browserKindFilter 'gear')}}active{{/if}}" data-kind="gear" aria-selected="{{#if (eq browserKindFilter 'gear')}}true{{else}}false{{/if}}">Gear</button>
+        </div>
         <div class="forge-browser-list">
           {{#each browserResults}}
           <div class="forge-browser-row" data-uuid="{{uuid}}" title="Click to use as base">

@@ -1785,6 +1785,33 @@ body.theme-light .vcb-phase-badge {
   text-align: center;
   font-size: 0.85em;
 }
+.forge-browser-filters {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.forge-browser-filter {
+  flex: 1;
+  padding: 4px 8px;
+  background: var(--vcb-bg-alt);
+  border: 1px solid var(--vcb-border);
+  border-radius: var(--vcb-radius);
+  color: var(--vcb-text-dim);
+  cursor: pointer;
+  font-family: var(--vcb-font);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  transition: border-color 120ms, color 120ms, background 120ms;
+}
+.forge-browser-filter:hover {
+  border-color: var(--vcb-accent, #c9a54a);
+  color: var(--vcb-text);
+}
+.forge-browser-filter.active {
+  border-color: var(--vcb-accent, #c9a54a);
+  color: var(--vcb-text);
+  background: rgba(201, 165, 74, 0.15);
+}
 .forge-browser-list {
   display: flex;
   flex-direction: column;

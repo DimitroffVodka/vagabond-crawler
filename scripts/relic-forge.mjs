@@ -206,6 +206,7 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this._compendiumCache = null;
     // Base-item browser state (alternative to drag/drop).
     this._browserQuery = "";
+    this._browserKindFilter = "all"; // all | weapon | armor | gear
     this._browserItemCache = null; // lazy-populated on first render
   }
 
@@ -310,9 +311,10 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     let browserEmptyMessage = "Loading…";
     if (!this._item && this._browserItemCache) {
       const q = (this._browserQuery ?? "").trim().toLowerCase();
+      const kind = this._browserKindFilter ?? "all";
       browserResults = this._browserItemCache
-        .filter((it) => !q || it.name.toLowerCase().includes(q))
-        .slice(0, 200);
+        .filter((it) => kind === "all" || it.kind.toLowerCase() === kind)
+        .filter((it) => !q || it.name.toLowerCase().includes(q));
       browserEmptyMessage = q ? `No items match "${this._browserQuery}".` : "No equipment found in compendium.";
     }
 
@@ -356,6 +358,7 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       previewName: this._computeName(),
       totalCostDisplay: this._computeCostDisplay(),
       browserQuery: this._browserQuery,
+      browserKindFilter: this._browserKindFilter,
       browserResults,
       powerSearchQuery: this._powerSearchQuery,
       browserEmptyMessage,
@@ -464,9 +467,10 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const _rebuildBrowserList = () => {
       if (!browserList || !this._browserItemCache) return;
       const q = (this._browserQuery ?? "").trim().toLowerCase();
+      const kind = this._browserKindFilter ?? "all";
       const matches = this._browserItemCache
-        .filter((it) => !q || it.name.toLowerCase().includes(q))
-        .slice(0, 500);
+        .filter((it) => kind === "all" || it.kind.toLowerCase() === kind)
+        .filter((it) => !q || it.name.toLowerCase().includes(q));
       if (matches.length === 0) {
         browserList.innerHTML = `<div class="forge-browser-empty">${
           q ? `No items match "${this._browserQuery}".` : "No equipment found in compendium."
@@ -488,6 +492,19 @@ class RelicForgeApp extends HandlebarsApplicationMixin(ApplicationV2) {
         _rebuildBrowserList();
       }, { signal });
     }
+
+    // Kind filter chips (All / Weapon / Armor / Gear). Mutate state, toggle
+    // active class in-place, and rebuild the list — no full re-render so
+    // search-input focus is preserved.
+    const filterButtons = el.querySelectorAll(".forge-browser-filter");
+    filterButtons.forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        const kind = ev.currentTarget.dataset.kind || "all";
+        this._browserKindFilter = kind;
+        filterButtons.forEach((b) => b.classList.toggle("active", b.dataset.kind === kind));
+        _rebuildBrowserList();
+      }, { signal });
+    });
 
     // Delegated click — fires for current AND future rows (after rebuild).
     if (browserList) {
