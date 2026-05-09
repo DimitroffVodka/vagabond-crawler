@@ -2636,6 +2636,45 @@ body.theme-light .vcb-phase-badge {
   background: rgba(11, 26, 35, 0.18);
 }
 
+/* ── Loot Drops: Per-Player Whisper & Pool Cards ──────────────────────────── */
+/* Reuses .vcl-gen-claim-btn and .vcl-gen-claim-item from the Loot Generator
+   so the visual style stays unified across both whisper-card flows. */
+
+.vcl-drops-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Each button stays full-width; just zero out the margin-top from the
+   single-button preset since the actions wrapper already controls spacing. */
+.vcl-drops-actions .vcl-gen-claim-btn {
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+/* Status replacement (claimed/passed) — same gold-bar visual as the disabled btn */
+.vcl-drops-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 6px 14px;
+  border: 2px solid var(--vcb-text-muted);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--vcb-text-muted);
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.vcl-drops-status--claimed {
+  border-color: var(--vcb-action-buy, #4caf50);
+  color: var(--vcb-action-buy, #4caf50);
+  background: rgba(76, 175, 80, 0.10);
+}
+
 /* ── Inventory quantity badge ─────────────────────────────────────────────── */
 
 .vcb-qty-badge {
