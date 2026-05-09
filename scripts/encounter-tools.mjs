@@ -32,6 +32,70 @@ function parseDieFormula(formula) {
   return { count, faces, min: count, max: count * faces, slotCount: count * faces - count + 1 };
 }
 
+/** Parse the free-text `system.senses` field into a normalized array of
+ *  base sense names. Drops parenthetical annotations ("(only in labyrinth)")
+ *  and dedupes case/whitespace variants ("All-Sight" / "Allsight" → "Allsight").
+ *  Returns both the normalized list (for filtering / dropdown) and the raw
+ *  string (for tooltips). */
+function parseSenses(raw) {
+  if (!raw) return { list: [], raw: "" };
+  const text = Array.isArray(raw) ? raw.join(", ") : String(raw);
+  const list = text
+    .split(/[,;]\s*/)
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(s => s.replace(/\s*\([^)]*\)\s*/g, "").trim())   // drop "(only in X)"
+    .map(s => s.replace(/[-\s]+/g, ""))                    // "All-Sight" → "AllSight"
+    .map(s => s.toLowerCase())
+    .filter(s => s && /^[a-z]+$/.test(s) && s.length >= 4);  // drop fragments like "mushroomsonly)"
+  // Title-case for display
+  const display = [...new Set(list)].map(s => s[0].toUpperCase() + s.slice(1));
+  return { list: display, raw: text };
+}
+
+/** Count attack actions by category (melee/ranged/cast). `castClose` and
+ *  `castRanged` collapse into a single `cast` count. */
+function classifyAttacks(actions = []) {
+  const counts = { melee: 0, ranged: 0, cast: 0 };
+  for (const a of actions ?? []) {
+    const at = (a?.attackType || "").toLowerCase();
+    if (at === "melee") counts.melee++;
+    else if (at === "ranged") counts.ranged++;
+    else if (at.startsWith("cast")) counts.cast++;
+  }
+  return counts;
+}
+
+/** FontAwesome glyph map for senses + damage types. Used to render the
+ *  compact icon tokens in the Browse NPCs table (Senses / Weak / Imm cols).
+ *  Unmapped values fall back to fa-question for visual debug. */
+const SENSE_ICONS = {
+  Darksight: "fa-eye-low-vision",
+  Allsight: "fa-eye",
+  Blindsight: "fa-eye-slash",
+  Blindsense: "fa-ear-listen",
+  Echolocation: "fa-volume-high",
+  Seismicsense: "fa-mountain",
+  Telepathy: "fa-brain",
+};
+const DMG_ICONS = {
+  acid: "fa-flask-vial",
+  blunt: "fa-hammer",
+  cold: "fa-snowflake",
+  coldIron: "fa-magnet",
+  fire: "fa-fire",
+  magical: "fa-wand-sparkles",
+  physical: "fa-shield",
+  piercing: "fa-arrow-right-long",
+  poison: "fa-skull-crossbones",
+  psychic: "fa-brain",
+  shock: "fa-bolt",
+  silver: "fa-circle-dot",
+  slashing: "fa-khanda",
+};
+function senseToken(name)  { return { value: name, label: name, icon: SENSE_ICONS[name] || "fa-question" }; }
+function damageToken(name) { return { value: name, label: name, icon: DMG_ICONS[name]   || "fa-question" }; }
+
 function rollDistance() {
   const v = Math.floor(Math.random() * 6) + 1;
   return {
@@ -153,6 +217,13 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     this._browseSortCol   = "name";
     this._browseSortAsc   = true;
     this._browseCache     = {};
+    // Multi-select chip filters (arrays of selected values)
+    this._browseSenses      = [];
+    this._browseWeaknesses  = [];
+    this._browseImmunities  = [];
+    this._browseAbilities   = [];
+    this._browseAbilSearch  = "";
+    this._browseHasCast     = false;
   }
 
   async _prepareContext() {
@@ -169,8 +240,32 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
       const allNpcs = await this._getBrowseNPCs(this._browseSource);
 
-      // Collect types before any filters are applied
+      // Collect types + filter options before any filters are applied so the
+      // dropdowns reflect the FULL source, not the filtered subset.
       ctx.browseBeingTypes = [...new Set(allNpcs.map(n => n.beingType).filter(t => t && t !== "—"))].sort();
+      const allSenses     = new Set();
+      const allWeaknesses = new Set();
+      const allImmunities = new Set();
+      for (const n of allNpcs) {
+        n.senses.forEach(s => allSenses.add(s));
+        n.weaknesses.forEach(w => allWeaknesses.add(w));
+        n.immunities.forEach(i => allImmunities.add(i));
+      }
+      const allAbilities = new Set();
+      for (const n of allNpcs) n.abilities.forEach(a => allAbilities.add(a));
+      ctx.browseSenses     = [...allSenses].sort().map(v => ({ value: v, active: this._browseSenses.includes(v) }));
+      ctx.browseWeaknesses = [...allWeaknesses].sort().map(v => ({ value: v, active: this._browseWeaknesses.includes(v) }));
+      ctx.browseImmunities = [...allImmunities].sort().map(v => ({ value: v, active: this._browseImmunities.includes(v) }));
+
+      // Abilities filter: filter the chip list by the search input. Active
+      // selections always stay visible so the user can click to deselect them
+      // even after typing a non-matching search.
+      const abilSearch = (this._browseAbilSearch || "").toLowerCase();
+      ctx.browseAbilities = [...allAbilities].sort()
+        .filter(v => !abilSearch || v.toLowerCase().includes(abilSearch) || this._browseAbilities.includes(v))
+        .map(v => ({ value: v, active: this._browseAbilities.includes(v) }));
+      ctx.browseAbilSearch = this._browseAbilSearch;
+      ctx.browseHasCast    = this._browseHasCast;
 
       // Type filter
       let npcs = allNpcs;
@@ -181,6 +276,23 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       const tlMax = this._browseTlMax !== "" ? parseFloat(this._browseTlMax) : null;
       if (tlMin !== null) npcs = npcs.filter(n => n.threatLevel >= tlMin);
       if (tlMax !== null) npcs = npcs.filter(n => n.threatLevel <= tlMax);
+
+      // Multi-select chip filters: each group is OR within itself, AND across groups.
+      // (Match if NPC has ≥1 of the selected senses, AND ≥1 of the selected
+      // weaknesses, AND ≥1 of the selected immunities.)
+      if (this._browseSenses.length) {
+        npcs = npcs.filter(n => n.senses.some(s => this._browseSenses.includes(s)));
+      }
+      if (this._browseWeaknesses.length) {
+        npcs = npcs.filter(n => n.weaknesses.some(w => this._browseWeaknesses.includes(w)));
+      }
+      if (this._browseImmunities.length) {
+        npcs = npcs.filter(n => n.immunities.some(i => this._browseImmunities.includes(i)));
+      }
+      if (this._browseAbilities.length) {
+        npcs = npcs.filter(n => n.abilities.some(a => this._browseAbilities.includes(a)));
+      }
+      if (this._browseHasCast) npcs = npcs.filter(n => n.hasCast);
 
       // Sort
       const col = this._browseSortCol;
@@ -392,6 +504,50 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this._browseTlMax = ev.currentTarget.value;
       this.render();
     }, { signal });
+
+    // Multi-select chip filters: click toggles a value in the bound array.
+    on(".filter-chip", "click", ev => {
+      ev.preventDefault();
+      const chip = ev.currentTarget;
+      const group = chip.closest(".filter-chip-group");
+      const filter = group?.dataset.filter;
+      const value = chip.dataset.value;
+      if (!filter || !value) return;
+      const map = {
+        senses: "_browseSenses",
+        weaknesses: "_browseWeaknesses",
+        immunities: "_browseImmunities",
+        abilities: "_browseAbilities",
+      };
+      const key = map[filter];
+      if (!key) return;
+      const arr = this[key];
+      const i = arr.indexOf(value);
+      if (i >= 0) arr.splice(i, 1);
+      else arr.push(value);
+      this.render();
+    });
+
+    $(".browse-has-cast")?.addEventListener("change", ev => {
+      this._browseHasCast = ev.currentTarget.checked;
+      this.render();
+    }, { signal });
+
+    // Abilities search box — filters the abilities chip list as you type.
+    // We re-render so the chip group reflects the filtered list, but use a
+    // small debounce to avoid hammering on every keystroke.
+    const abilSearch = $(".browse-abilities-search");
+    if (abilSearch) {
+      abilSearch.value = this._browseAbilSearch;
+      let t;
+      abilSearch.addEventListener("input", () => {
+        clearTimeout(t);
+        t = setTimeout(() => {
+          this._browseAbilSearch = abilSearch.value;
+          this.render();
+        }, 150);
+      }, { signal });
+    }
 
     // Browse sort
     on(".loot-sortable", "click", ev => {
@@ -885,6 +1041,13 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
         )
       );
       const hp = calculateHP(s.hd ?? 1, s.size ?? "medium", die);
+      const senses = parseSenses(s.senses);
+      const atk = classifyAttacks(s.actions);
+      const abilities = (s.abilities ?? [])
+        .map(x => typeof x === "string" ? x : x?.name)
+        .filter(Boolean);
+      const weaknesses = [...(s.weaknesses ?? [])];
+      const immunities = [...(s.immunities ?? [])];
       return {
         id: a.id || a._id, name: a.name, img: a.img,
         uuid: uuid || a.uuid,
@@ -895,6 +1058,20 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
         hp,
         hpDisplay: rolled ? `${hp} (rolled)` : String(hp),
         dpr: calculateDPR(s.actions ?? []),
+        senses: senses.list,
+        sensesRaw: senses.raw,
+        weaknesses,
+        immunities,
+        senseTokens:    senses.list.map(senseToken),
+        weaknessTokens: weaknesses.map(damageToken),
+        immunityTokens: immunities.map(damageToken),
+        abilities,
+        atk,
+        hasCast: atk.cast > 0,
+        actionsList: (s.actions ?? []).map(act => ({
+          name: act?.name ?? "?",
+          type: (act?.attackType || "").toLowerCase(),
+        })),
       };
     };
 
@@ -933,18 +1110,40 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
             && !d.flags?.["vagabond-crawler"]?.hitDie
           )
         );
-        const hp = calculateHP(d.system?.hd ?? 1, d.system?.size ?? "medium", die);
+        const sys = d.system ?? {};
+        const hp = calculateHP(sys.hd ?? 1, sys.size ?? "medium", die);
+        const senses = parseSenses(sys.senses);
+        const atk = classifyAttacks(sys.actions);
+        const abilities = (sys.abilities ?? [])
+          .map(x => typeof x === "string" ? x : x?.name)
+          .filter(Boolean);
+        const weaknesses = [...(sys.weaknesses ?? [])];
+        const immunities = [...(sys.immunities ?? [])];
         return {
           id: d.id, name: d.name,
           img: d.img || "icons/svg/mystery-man.svg",
           uuid: d.uuid,
-          beingType: d.system?.beingType || "—",
-          threatLevel: d.system?.threatLevel ?? 0,
-          threatLevelDisplay: d.system?.threatLevelFormatted ?? d.system?.threatLevel ?? "—",
-          appearing: d.system?.appearing || "1",
+          beingType: sys.beingType || "—",
+          threatLevel: sys.threatLevel ?? 0,
+          threatLevelDisplay: sys.threatLevelFormatted ?? sys.threatLevel ?? "—",
+          appearing: sys.appearing || "1",
           hp,
           hpDisplay: rolled ? `${hp} (rolled)` : String(hp),
-          dpr: calculateDPR(d.system?.actions ?? []),
+          dpr: calculateDPR(sys.actions ?? []),
+          senses: senses.list,
+          sensesRaw: senses.raw,
+          weaknesses,
+          immunities,
+          senseTokens:    senses.list.map(senseToken),
+          weaknessTokens: weaknesses.map(damageToken),
+          immunityTokens: immunities.map(damageToken),
+          abilities,
+          atk,
+          hasCast: atk.cast > 0,
+          actionsList: (sys.actions ?? []).map(a => ({
+            name: a?.name ?? "?",
+            type: (a?.attackType || "").toLowerCase(),
+          })),
         };
       });
     }

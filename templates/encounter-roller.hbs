@@ -100,6 +100,59 @@
           <input type="number" class="browse-tl-max" value="{{browseTlMax}}" placeholder="Max" step="0.1" style="width:55px;" />
         </div>
       </div>
+
+      {{#if browseSenses.length}}
+      <div class="loot-filter-row">
+        <label>Senses</label>
+        <div class="filter-chip-group" data-filter="senses">
+          {{#each browseSenses}}
+          <button type="button" class="filter-chip {{#if active}}active{{/if}}" data-value="{{value}}">{{value}}</button>
+          {{/each}}
+        </div>
+      </div>
+      {{/if}}
+
+      {{#if browseWeaknesses.length}}
+      <div class="loot-filter-row">
+        <label>Weaknesses</label>
+        <div class="filter-chip-group" data-filter="weaknesses">
+          {{#each browseWeaknesses}}
+          <button type="button" class="filter-chip {{#if active}}active{{/if}}" data-value="{{value}}">{{value}}</button>
+          {{/each}}
+        </div>
+      </div>
+      {{/if}}
+
+      {{#if browseImmunities.length}}
+      <div class="loot-filter-row">
+        <label>Immunities</label>
+        <div class="filter-chip-group" data-filter="immunities">
+          {{#each browseImmunities}}
+          <button type="button" class="filter-chip {{#if active}}active{{/if}}" data-value="{{value}}">{{value}}</button>
+          {{/each}}
+        </div>
+      </div>
+      {{/if}}
+
+      {{#if browseAbilities.length}}
+      <div class="loot-filter-row">
+        <label>Abilities</label>
+        <input type="text" class="browse-abilities-search" placeholder="Filter abilities…" value="{{browseAbilSearch}}" />
+        <div class="filter-chip-group filter-chip-group--scroll" data-filter="abilities">
+          {{#each browseAbilities}}
+          <button type="button" class="filter-chip {{#if active}}active{{/if}}" data-value="{{value}}">{{value}}</button>
+          {{/each}}
+        </div>
+      </div>
+      {{/if}}
+
+      <div class="loot-filter-row">
+        <label class="filter-toggle-label">
+          <input type="checkbox" class="browse-has-cast" {{#if browseHasCast}}checked{{/if}} />
+          Has Cast Attacks
+        </label>
+      </div>
+
       <p class="table-hint" style="margin-top:8px;">Drag NPCs from the list into Build Table slots.</p>
     </div>
     <div class="loot-list-panel browse-list-fill">
@@ -112,6 +165,10 @@
             <th class="loot-sortable" data-sort="threatLevel" style="width:40px;">TL <i class="fas fa-sort"></i></th>
             <th class="loot-sortable" data-sort="hp"  style="width:50px; text-align:center;">HP <i class="fas fa-sort"></i></th>
             <th class="loot-sortable" data-sort="dpr" style="width:50px; text-align:center;">DPR <i class="fas fa-sort"></i></th>
+            <th style="width:80px; text-align:center;" title="Attack actions: ⚔ melee, 🏹 ranged, ✨ cast">Atk</th>
+            <th style="width:60px; text-align:center;" title="Senses">Sns</th>
+            <th style="width:60px; text-align:center;" title="Weaknesses">Wk</th>
+            <th style="width:80px; text-align:center;" title="Immunities">Imm</th>
             <th style="width:30px;"></th>
           </tr>
         </thead>
@@ -124,6 +181,26 @@
             <td class="loot-npc-tl"  style="text-align:center;">{{threatLevelDisplay}}</td>
             <td class="loot-npc-hp"  style="text-align:center;">{{hpDisplay}}</td>
             <td class="loot-npc-dpr" style="text-align:center;">{{dpr}}</td>
+            <td class="loot-npc-atk" style="text-align:center; font-size:0.85em;">
+              {{#if atk.melee}}<span title="Melee attacks" class="atk-icon atk-melee">⚔{{atk.melee}}</span>{{/if}}
+              {{#if atk.ranged}}<span title="Ranged attacks" class="atk-icon atk-ranged">🏹{{atk.ranged}}</span>{{/if}}
+              {{#if atk.cast}}<span title="Cast attacks" class="atk-icon atk-cast">✨{{atk.cast}}</span>{{/if}}
+            </td>
+            <td class="loot-npc-tokens loot-npc-senses">
+              {{#each senseTokens}}
+              <i class="fas {{icon}} token-icon token-icon--sense" title="{{label}}" aria-label="{{label}}"></i>
+              {{/each}}
+            </td>
+            <td class="loot-npc-tokens loot-npc-weak">
+              {{#each weaknessTokens}}
+              <i class="fas {{icon}} token-icon token-icon--weak" title="Weak: {{label}}" aria-label="Weak: {{label}}"></i>
+              {{/each}}
+            </td>
+            <td class="loot-npc-tokens loot-npc-imm">
+              {{#each immunityTokens}}
+              <i class="fas {{icon}} token-icon token-icon--imm" title="Immune: {{label}}" aria-label="Immune: {{label}}"></i>
+              {{/each}}
+            </td>
             <td><button type="button" class="browse-add-btn" title="Add to encounter table" aria-label="Add {{name}} to encounter table"><i class="fas fa-plus" aria-hidden="true"></i></button></td>
           </tr>
           {{/each}}

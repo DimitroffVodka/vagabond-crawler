@@ -669,84 +669,88 @@ let _app = null;
 
 export const LootGenerator = {
   init() {
-    // Give buttons on GM-only loot chat cards
+    // Claim/Pass buttons on GM-only Roll Loot chat cards
     Hooks.on("renderChatMessageHTML", (message, html) => {
-      if (!game.user.isGM) return;
-      const lootFlag = message.flags?.["vagabond-crawler"]?.lootGeneratorCard;
-      if (!lootFlag) return;
+      const flags = message.flags?.["vagabond-crawler"];
+      if (!flags?.lootGeneratorCard) return;
+      if (!game.user.isGM) return;  // Roll Loot cards are GM-controlled
 
-      const giveBtns = html.querySelectorAll(".vcl-gen-give-btn");
-      for (const btn of giveBtns) {
-        btn.addEventListener("click", async (ev) => {
-          const actorId = ev.currentTarget.dataset.actorId;
-          const actor = game.actors.get(actorId);
-          if (!actor) return;
+      const claimBtn = html.querySelector(".vcl-drops-claim-btn");
+      const passBtn = html.querySelector(".vcl-drops-pass-btn");
+      const actions = html.querySelector(".vcl-drops-actions");
 
-          const itemData = message.flags["vagabond-crawler"]?.itemData;
-          if (!itemData?.length) return;
-
-          // Create items on the actor
-          for (const data of itemData) {
-            await Item.create(data, { parent: actor });
-          }
-
-          // Log to LootTracker
-          await LootTracker.logClaim(
-            actor.name,
-            "Loot Generator",
-            { gold: 0, silver: 0, copper: 0 },
-            itemData.map(d => ({ name: d.name, img: d.img })),
-          );
-
-          // Update the chat card to show it was given
-          const giveSection = html.querySelector(".vcl-gen-give-section");
-          if (giveSection) {
-            giveSection.innerHTML = `<span style="color:#4caf50;font-size:11px;"><i class="fas fa-check"></i> Given to ${actor.name}</span>`;
-          }
-
-          // Also update the message content to persist
-          const content = message.content.replace(
-            /<div class="vcl-gen-give-section".*?<\/div>/s,
-            `<div class="vcl-gen-give-section" style="margin-top:8px;padding-top:6px;border-top:1px solid #333;"><span style="color:#4caf50;font-size:11px;"><i class="fas fa-check"></i> Given to ${actor.name}</span></div>`
-          );
-          await message.update({ content });
-
-          ui.notifications.info(`Gave loot to ${actor.name}`);
-        });
+      // Locked states
+      if (flags.claimed) {
+        if (actions) actions.innerHTML = `<span class="vcl-drops-status vcl-drops-status--claimed"><i class="fas fa-check"></i> Claimed by ${flags.claimedByName ?? "???"}</span>`;
+        return;
       }
+      if (flags.passed) {
+        if (actions) actions.innerHTML = `<span class="vcl-drops-status"><i class="fas fa-arrow-right-arrow-left"></i> Passed to party</span>`;
+        return;
+      }
+
+      claimBtn?.addEventListener("click", async () => {
+        // GM picks a recipient via dropdown dialog
+        const players = game.actors.filter(a => a.type === "character" && a.hasPlayerOwner);
+        if (!players.length) {
+          ui.notifications.warn("No player-owned characters in the world.");
+          return;
+        }
+        const options = players.map(a => `<option value="${a.id}">${a.name}</option>`).join("");
+        const recipientId = await new Promise(resolve => {
+          new foundry.applications.api.DialogV2({
+            window: { title: "Claim Loot — Pick Recipient" },
+            content: `<div style="padding:8px;"><label>Give to: <select name="recipient" style="width:100%;margin-top:4px;">${options}</select></label></div>`,
+            buttons: [
+              { action: "ok", label: "Give", default: true, callback: (_e, b, dlg) => dlg.element.querySelector('select[name="recipient"]').value },
+              { action: "cancel", label: "Cancel", callback: () => null },
+            ],
+            submit: r => resolve(r),
+          }).render({ force: true });
+        });
+        if (!recipientId) return;
+        await LootGenerator._handleRollLootClaim(message.id, recipientId);
+      });
+
+      passBtn?.addEventListener("click", async () => {
+        await LootGenerator._handleRollLootPass(message.id);
+      });
     });
 
-    // Claim buttons on whispered loot cards (any user)
+    // Claim buttons on whispered loot cards (Roll for Selected Token)
     Hooks.on("renderChatMessageHTML", (message, html) => {
       const flags = message.flags?.[MODULE_ID];
       if (!flags?.lootClaimCard) return;
 
-      const btn = html.querySelector(".vcl-gen-claim-btn");
-      if (!btn) return;
+      const claimBtn = html.querySelector(".vcl-drops-claim-btn");
+      const actions = html.querySelector(".vcl-drops-actions");
 
       if (flags.claimed) {
-        btn.disabled = true;
-        btn.innerHTML = `<i class="fas fa-check"></i> Claimed by ${flags.claimedBy ?? "???"}`;
-        btn.classList.add("vcl-gen-claim-btn--done");
+        if (actions) actions.innerHTML = `<span class="vcl-drops-status vcl-drops-status--claimed"><i class="fas fa-check"></i> Claimed by ${flags.claimedBy ?? "???"}</span>`;
+        return;
+      }
+      if (flags.passed) {
+        if (actions) actions.innerHTML = `<span class="vcl-drops-status"><i class="fas fa-arrow-right-arrow-left"></i> Passed to party</span>`;
         return;
       }
 
-      btn.addEventListener("click", async (ev) => {
+      if (!claimBtn) return;
+
+      claimBtn.addEventListener("click", async (ev) => {
         ev.preventDefault();
-        const actorId = flags.actorId;
-        const actor = game.actors.get(actorId);
-        if (!actor?.isOwner) {
+        const actor = game.actors.get(flags.actorId);
+        if (!actor?.isOwner && !game.user.isGM) {
           ui.notifications.warn("You don't own this character.");
           return;
         }
 
-        btn.disabled = true;
-        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Claiming\u2026`;
+        claimBtn.disabled = true;
+        claimBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Claiming\u2026`;
 
         const payload = {
           action: "claimLoot",
           messageId: message.id,
-          actorId,
+          actorId: flags.actorId,
           userId: game.user.id,
         };
 
@@ -758,13 +762,111 @@ export const LootGenerator = {
       });
     });
 
+    // Pass buttons on Roll-for-Selected-Token whisper cards
+    Hooks.on("renderChatMessageHTML", (message, html) => {
+      const flags = message.flags?.[MODULE_ID];
+      if (!flags?.lootClaimCard) return;
+      if (flags.passed) return;  // already passed — claim btn handler shows status
+
+      const passBtn = html.querySelector(".vcl-drops-pass-btn");
+      if (!passBtn) return;
+
+      const actor = game.actors.get(flags.actorId);
+      if (!actor?.isOwner && !game.user.isGM) {
+        passBtn.disabled = true;
+        return;
+      }
+
+      passBtn.addEventListener("click", async () => {
+        passBtn.disabled = true;
+        await LootGenerator._handleRollForTokenPass(message.id);
+      });
+    });
+
     // Socket handler (GM only)
     game.socket.on(LOOT_SOCKET, async (data) => {
       if (!game.user.isGM) return;
       if (data.action === "claimLoot") {
         await LootGenerator._handleClaim(data);
+      } else if (data.action === "rollForTokenPass") {
+        await LootGenerator._handleRollForTokenPass(data.messageId);
       }
     });
+  },
+
+  /* ── Roll Loot card: GM picks recipient via dialog, then transfers ── */
+  async _handleRollLootClaim(messageId, recipientId) {
+    const message = game.messages.get(messageId);
+    const flags = message?.flags?.["vagabond-crawler"];
+    if (!flags?.lootGeneratorCard || flags.claimed || flags.passed) return;
+
+    const recipient = game.actors.get(recipientId);
+    if (!recipient) return;
+
+    await message.update({
+      [`flags.vagabond-crawler.claimed`]: true,
+      [`flags.vagabond-crawler.claimedByName`]: recipient.name,
+    });
+
+    for (const itemData of flags.itemData ?? []) {
+      await Item.create(itemData, { parent: recipient });
+    }
+
+    await LootTracker.logClaim(
+      recipient.name,
+      flags.sourceLabel || "Loot Generator",
+      { gold: 0, silver: 0, copper: 0 },
+      (flags.itemData ?? []).map(d => ({ name: d.name, img: d.img })),
+    );
+
+    ui.notifications.info(`${recipient.name} claimed loot from ${flags.sourceLabel || "Loot Generator"}.`);
+  },
+
+  /* ── Roll Loot card: emit public pool card for any player to claim ── */
+  async _handleRollLootPass(messageId) {
+    const message = game.messages.get(messageId);
+    const flags = message?.flags?.["vagabond-crawler"];
+    if (!flags?.lootGeneratorCard || flags.claimed || flags.passed) return;
+
+    await message.update({ [`flags.vagabond-crawler.passed`]: true });
+
+    // Emit public pool card via LootDrops singleton
+    const lc = game.vagabondCrawler?.lootDrops;
+    if (!lc) return;
+    const passer = { name: "GM", id: game.user.id };
+    await lc._emitPoolCard(
+      passer,
+      flags.sourceLabel || "Loot Generator",
+      { gold: 0, silver: 0, copper: 0 },
+      flags.itemData ?? [],
+      flags.trace ?? [],
+    );
+  },
+
+  /* ── Roll for Selected Token card: pass to public pool ── */
+  async _handleRollForTokenPass(messageId) {
+    const message = game.messages.get(messageId);
+    const flags = message?.flags?.[MODULE_ID];
+    if (!flags?.lootClaimCard || flags.claimed || flags.passed) return;
+
+    if (!game.user.isGM) {
+      // Players forward to GM via socket
+      game.socket.emit(LOOT_SOCKET, { action: "rollForTokenPass", messageId });
+      return;
+    }
+
+    await message.update({ [`flags.${MODULE_ID}.passed`]: true });
+
+    const lc = game.vagabondCrawler?.lootDrops;
+    if (!lc) return;
+    const passer = game.actors.get(flags.actorId) ?? { name: "GM", id: game.user.id };
+    await lc._emitPoolCard(
+      passer,
+      `Loot Roll (Lv${flags.level})`,
+      flags.currency ?? { gold: 0, silver: 0, copper: 0 },
+      flags.itemData ?? [],
+      flags.trace ?? [],
+    );
   },
 
   /**
@@ -827,13 +929,9 @@ export const LootGenerator = {
       );
     }
 
-    // Update the chat card to show claimed state
-    const updatedContent = message.content
-      .replace(
-        /<button[^>]*class="vcl-gen-claim-btn"[^>]*>.*?<\/button>/s,
-        `<span class="vcl-gen-claim-btn vcl-gen-claim-btn--done"><i class="fas fa-check"></i> Claimed by ${user.name}</span>`
-      );
-    await message.update({ content: updatedContent });
+    // Mark claimed via flags — the renderChatMessageHTML hook flips the UI to
+    // the locked "Claimed by X" status block on next render and on reload.
+    await message.update({ [`flags.${MODULE_ID}.claimedBy`]: user.name });
 
     ui.notifications.info(`${actor.name} claimed loot from Level ${flags.level} roll.`);
   },
@@ -871,7 +969,7 @@ export const LootGenerator = {
       return;
     }
 
-    const { currency, items } = result;
+    const { currency, items, trace } = result;
 
     // Build the chat card content
     const itemLines = items.map(d => {
@@ -909,6 +1007,8 @@ export const LootGenerator = {
 
     const lootIcon = items[0]?.img || "icons/svg/item-bag.svg";
 
+    const traceHtml = renderTraceHtml(trace);
+
     const cardContent = `
       <div class="vagabond-chat-card-v2" data-card-type="generic">
         <div class="card-body">
@@ -925,12 +1025,16 @@ export const LootGenerator = {
           </header>
           <section class="content-body">
             <div class="card-description" style="padding:4px 8px;">
+              ${traceHtml}
               ${currencyLine}
               ${itemLines}
             </div>
-            <div style="padding:4px 8px 8px;">
-              <button type="button" class="vcl-gen-claim-btn">
+            <div class="vcl-drops-actions" style="padding:4px 8px 8px;">
+              <button type="button" class="vcl-gen-claim-btn vcl-drops-claim-btn">
                 <i class="fas fa-hand-holding"></i> Claim Loot
+              </button>
+              <button type="button" class="vcl-gen-claim-btn vcl-drops-pass-btn">
+                <i class="fas fa-arrow-right-arrow-left"></i> Pass Loot
               </button>
             </div>
           </section>
@@ -955,7 +1059,9 @@ export const LootGenerator = {
           currency,
           actorId: actor.id,
           level: clampedLevel,
+          trace,
           claimed: false,
+          passed: false,
         },
       },
     });
@@ -1605,35 +1711,30 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /* ── Post to chat ───────────────────────────────────── */
 
   async _postToChat(entry) {
-    const traceHtml = entry.trace.map(t =>
-      `<span>\u2192</span> <span>${t.label}</span> <span>(${t.formula}=${t.total})</span>`
-    ).join("<br>");
-
-    // Build player buttons (GM only)
-    const players = game.actors.filter(a => a.type === "character" && a.hasPlayerOwner);
-    const playerBtns = players.map(a =>
-      `<button type="button" class="vcl-gen-give-btn" data-actor-id="${a.id}">${a.name}</button>`
-    ).join("");
+    const traceHtml = renderTraceHtml(entry.trace);
 
     // Item icon for the card
     const itemImg = entry.itemData?.[0]?.img || "icons/svg/item-bag.svg";
 
-    // Value display — sum all items
-    let valCopper = 0;
-    for (const d of (entry.itemData ?? [])) {
+    // Item rows — vcl-gen-claim-item style, matches Roll for Selected Token + Loot Drops
+    const itemLines = (entry.itemData ?? []).map(d => {
       const bc = d.system?.baseCost;
-      if (bc) valCopper += (bc.gold ?? 0) * 10000 + (bc.silver ?? 0) * 100 + (bc.copper ?? 0);
-    }
-    const valParts = [];
-    if (valCopper) {
-      const vg = Math.floor(valCopper / 10000);
-      const vs = Math.floor((valCopper % 10000) / 100);
-      const vc = valCopper % 100;
-      if (vg) valParts.push(`${vg}g`);
-      if (vs) valParts.push(`${vs}s`);
-      if (vc) valParts.push(`${vc}c`);
-    }
-    const valueStr = valParts.length ? `<div class="meta-tag"><span>${valParts.join(" ")}</span></div>` : "";
+      const vp = [];
+      if (bc?.gold)   vp.push(`${bc.gold}g`);
+      if (bc?.silver) vp.push(`${bc.silver}s`);
+      if (bc?.copper) vp.push(`${bc.copper}c`);
+      const valStr = vp.length ? ` (${vp.join(" ")})` : "";
+      const qty = d.system?.quantity ?? 1;
+      const qtyStr = qty > 1 ? ` ×${qty}` : "";
+      return `<div class="vcl-gen-claim-item"><img src="${d.img || "icons/svg/item-bag.svg"}" width="24" height="24" /><span>${d.name}${qtyStr}${valStr}</span></div>`;
+    }).join("");
+
+    const buttonRow = entry.itemData?.length
+      ? `<div class="vcl-drops-actions" style="padding:4px 8px 8px;">
+          <button type="button" class="vcl-gen-claim-btn vcl-drops-claim-btn"><i class="fas fa-hand-holding"></i> Claim Loot</button>
+          <button type="button" class="vcl-gen-claim-btn vcl-drops-pass-btn"><i class="fas fa-arrow-right-arrow-left"></i> Pass Loot</button>
+        </div>`
+      : `<div style="padding:4px 8px 8px;font-size:14px;color:var(--vcb-text-muted);">(Text-only)</div>`;
 
     const msgData = {
       content: `<div class="vagabond-chat-card-v2" data-card-type="generic" data-loot-gen="true">
@@ -1646,17 +1747,15 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
               <h3 class="header-title">Level ${entry.level} ${entry.category}</h3>
               <div class="metadata-tags-row">
                 <div class="meta-tag"><span>${entry.item}</span></div>
-                ${valueStr}
               </div>
             </div>
           </header>
           <section class="content-body">
             <div class="card-description" style="padding:4px 8px;">
-              <div style="font-size:14px;line-height:1.6;margin-bottom:6px;font-family:monospace;color:#0b1a23;">${traceHtml}</div>
+              ${traceHtml}
+              ${itemLines}
             </div>
-            ${entry.itemData ? `<div class="vcl-gen-give-section" style="padding:4px 8px 8px;">
-              <span style="font-size:14px;color:#0b1a23;">Give to:</span> ${playerBtns}
-            </div>` : '<div style="padding:4px 8px 8px;font-size:14px;color:#0b1a23;">(Text-only \u2014 no item to give)</div>'}
+            ${buttonRow}
           </section>
         </div>
       </div>`,
@@ -1665,6 +1764,10 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
         "vagabond-crawler": {
           lootGeneratorCard: true,
           itemData: entry.itemData,
+          trace: entry.trace,
+          sourceLabel: `Level ${entry.level} ${entry.category}`,
+          claimed: false,
+          passed: false,
         },
       },
     };
@@ -1684,10 +1787,14 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
 export async function generateLevelLoot(level) {
   const currency = { gold: 0, silver: 0, copper: 0 };
   const items = [];
+  const trace = [];
 
-  const _roll = async (formula) => {
+  // Trace-aware roller — every roll pushes a labeled entry so the chat
+  // card can show the GM the dice path that produced this loot.
+  const _R = async (formula, label) => {
     const r = new Roll(formula);
     await r.evaluate();
+    trace.push({ label, formula, total: r.total });
     return r.total;
   };
 
@@ -1700,19 +1807,21 @@ export async function generateLevelLoot(level) {
     // ── Level 1: weighted random from p.186 table ──
     const totalWeight = LEVEL1_TABLE.reduce((s, e) => s + e[0], 0);
     let roll = Math.floor(Math.random() * totalWeight);
+    const rollDisplay = roll + 1;  // 1-indexed for trace display
     let pick = LEVEL1_TABLE[0];
     for (const entry of LEVEL1_TABLE) {
       roll -= entry[0];
       if (roll < 0) { pick = entry; break; }
     }
     const [, name, uuid] = pick;
+    trace.push({ label: "Vagabond Loot (p.186)", formula: `1d${totalWeight}`, total: rollDisplay });
 
     // Parse currency from name
     const coinMatch = name.match(/^Coins\s+\((.+?)\)\s+(gold|silver|copper)$/i);
     if (coinMatch) {
-      const coinRoll = await _roll(coinMatch[1]);
+      const coinRoll = await _R(coinMatch[1], "Coins");
       currency[coinMatch[2].toLowerCase()] += coinRoll;
-      return { currency, items };
+      return { currency, items, trace };
     }
 
     // Compendium item
@@ -1745,32 +1854,32 @@ export async function generateLevelLoot(level) {
     else if (name.includes("Scroll")) {
       items.push(_createEnchantmentScroll(1));
     }
-    return { currency, items };
+    return { currency, items, trace };
   }
 
   // ── Levels 2-10: category chain ──
   const formulas = LEVEL_FORMULAS[level];
-  if (!formulas) return { currency, items };
+  if (!formulas) return { currency, items, trace };
 
-  const catN = await _roll("1d6");
+  const catN = await _R("1d6", "Category");
 
   if (catN === 1) {
     // Treasure chain
-    const n = await _roll(formulas.treasure);
+    const n = await _R(formulas.treasure, "Treasure");
     const entry = TREASURE[n];
     if (entry) {
       // Coins: "Coins: 5d10 gold"
       const coinMatch = entry.match(/^Coins:\s+(.+)$/);
       if (coinMatch) {
         const formula = coinMatch[1].replace(/\u00d7/g, "*").replace(/gold/i, "").trim();
-        try { currency.gold += (await _roll(formula)); } catch { /* complex formula */ }
+        try { currency.gold += (await _R(formula, "Coin Roll")); } catch { /* complex formula */ }
       }
       // Gems: "1d8 Uncommon Gems (0-Slot, 5g each)"
       else if (entry.includes("Gems")) {
         const qtyMatch = entry.match(/(\d+d\d+|\d+)/);
         const valMatch = entry.match(/(\d+)g\s+each/i);
         if (qtyMatch && valMatch) {
-          const qty = await _roll(qtyMatch[1]);
+          const qty = await _R(qtyMatch[1], "Gem Quantity");
           const rarity = entry.includes("Very Rare") ? "Very Rare"
             : entry.includes("Rare") ? "Rare" : "Uncommon";
           items.push(_gemItem(rarity, parseInt(valMatch[1]), qty));
@@ -1780,12 +1889,12 @@ export async function generateLevelLoot(level) {
       else if (entry.startsWith("Trade Goods")) {
         const diceMatch = entry.match(/\((.+?)\)/);
         if (diceMatch) {
-          const tgN = await _roll(diceMatch[1]);
+          const tgN = await _R(diceMatch[1], "Trade Goods");
           const tgEntry = TRADE_GOODS[tgN];
           if (tgEntry) {
             const tgQtyMatch = tgEntry.match(/^(\d+d\d+|\d+)\s+(.+)$/);
             if (tgQtyMatch) {
-              const qty = await _roll(tgQtyMatch[1]);
+              const qty = await _R(tgQtyMatch[1], "Trade Good Quantity");
               items.push(_tradeGoodItem(tgQtyMatch[2], qty));
             } else {
               items.push(_tradeGoodItem(tgEntry, 1));
@@ -1799,7 +1908,7 @@ export async function generateLevelLoot(level) {
         const diceMatch = entry.match(/\((.+?)\)/);
         const worthGold = worthMatch ? parseInt(worthMatch[1]) : 20;
         if (diceMatch) {
-          const artN = await _roll(diceMatch[1]);
+          const artN = await _R(diceMatch[1], "Art");
           const artName = ART[artN] || "Art Object";
           const baseName = artName.replace(/\s*\(.+?\)/g, "").trim();
           const slotsMatch = artName.match(/(\d+)-Slot/);
@@ -1814,10 +1923,10 @@ export async function generateLevelLoot(level) {
         const diceMatch = entry.match(/\((.+?)\)/);
         const worthGold = worthMatch ? parseInt(worthMatch[1]) : 10;
         if (diceMatch) {
-          const jN = await _roll(diceMatch[1]);
+          const jN = await _R(diceMatch[1], "Jewelry");
           if (jN === 12) {
             // Redirect to Clothing sub-table
-            const cN = await _roll("1d20");
+            const cN = await _R("1d20", "Clothing");
             const cName = CLOTHING[cN] || "Clothing";
             items.push(_lootItem(`Fine ${cName}`, CLOTHING_ICONS[cN] || ICONS.cloak, worthGold, 1,
               `Fine clothing worth ${worthGold}g.`));
@@ -1832,7 +1941,7 @@ export async function generateLevelLoot(level) {
       else if (entry.startsWith("Relic")) {
         const diceMatch = entry.match(/\((.+?)\)/);
         if (diceMatch) {
-          const rN = await _roll(diceMatch[1]);
+          const rN = await _R(diceMatch[1], "Relic");
           const relicName = RELIC[rN];
           if (relicName) {
             const doc = await _findCompendiumItem("vagabond.relics", relicName);
@@ -1847,7 +1956,7 @@ export async function generateLevelLoot(level) {
     }
   } else if (catN === 2) {
     // Armor — get base + power
-    const baseN = await _roll("1d20");
+    const baseN = await _R("1d20", "Armor Base");
     const base = _lookupRange(ARMOR_BASE, baseN) ?? "Light Armor";
 
     // Special entries
@@ -1856,13 +1965,13 @@ export async function generateLevelLoot(level) {
       items.push(_createEnchantmentScroll(1));
     } else if (base.includes("Accessory")) {
       // Accessory: d4 → 1-2 = Jewelry, 3-4 = Clothing
-      const accRoll = await _roll("1d4");
+      const accRoll = await _R("1d4", "Accessory Type");
       let accName, accImg;
       if (accRoll <= 2) {
-        const jN = await _roll("1d12");
+        const jN = await _R("1d12", "Jewelry");
         const jEntry = JEWELRY[jN];
         if (jEntry === "\u2192Clothing" || !jEntry) {
-          const cN = await _roll("1d20");
+          const cN = await _R("1d20", "Clothing");
           accName = CLOTHING[cN] || "Clothing";
           accImg = ICONS.cloak;
         } else {
@@ -1870,12 +1979,12 @@ export async function generateLevelLoot(level) {
           accImg = ICONS.ring;
         }
       } else {
-        const cN = await _roll("1d20");
+        const cN = await _R("1d20", "Clothing");
         accName = CLOTHING[cN] || "Clothing";
         accImg = ICONS.cloak;
       }
       const itemData = _lootItem(accName, accImg, 0, 0, "A magical accessory.");
-      const powN = await _roll(formulas.armor);
+      const powN = await _R(formulas.armor, "Armor Power");
       const rawPower = ARMOR_POWER[powN];
       const { display, powerText } = await _resolveRawPower(rawPower, "armor");
       itemData.name = display ? `${accName} ${display}` : accName;
@@ -1891,9 +2000,9 @@ export async function generateLevelLoot(level) {
       const doc = await _findCompendiumItem("vagabond.armor", armorPack);
       if (doc) {
         const itemData = doc.toObject();
-        const powN = await _roll(formulas.armor);
+        const powN = await _R(formulas.armor, "Armor Power");
         if (powN >= 8) {
-          const matN = await _roll("1d12");
+          const matN = await _R("1d12", "Armor Material");
           const mat = ARMOR_MATERIAL[matN];
           if (mat && mat !== "Mundane") {
             itemData.system.metal = mat.toLowerCase();
@@ -1912,7 +2021,7 @@ export async function generateLevelLoot(level) {
     }
   } else if (catN <= 4) {
     // Weapons
-    const baseN = await _roll("1d48");
+    const baseN = await _R("1d48", "Weapon Base");
     const baseName = WEAPONS_LIST[baseN - 1];
     if (baseName) {
       // Try weapons, then gear (for trinkets, spell books, etc.)
@@ -1930,9 +2039,9 @@ export async function generateLevelLoot(level) {
       };
       // Preserve the full trinket name
       itemData.name = baseName;
-      const powN = await _roll(formulas.weapon);
+      const powN = await _R(formulas.weapon, "Weapon Power");
       if (doc && powN >= 10) {
-        const matN = await _roll("1d8");
+        const matN = await _R("1d8", "Weapon Material");
         const mat = WEAPON_MATERIAL[matN];
         if (mat && mat !== "Mundane") {
           itemData.system.metal = mat.toLowerCase();
@@ -1951,7 +2060,7 @@ export async function generateLevelLoot(level) {
   } else {
     // Alchemy (roll twice)
     for (let i = 0; i < 2; i++) {
-      const n = await _roll(formulas.alchemy);
+      const n = await _R(formulas.alchemy, `Alchemy Roll ${i + 1}`);
       const name = ALCHEMY[n];
       if (!name) continue;
 
@@ -1975,5 +2084,22 @@ export async function generateLevelLoot(level) {
     }
   }
 
-  return { currency, items };
+  return { currency, items, trace };
+}
+
+/* ── Trace HTML helper (shared across all loot card flows) ──── */
+
+/**
+ * Render a trace array as the monospace "→ Label (formula=total)" block
+ * used by all three loot card flows (Roll Loot, Roll for Selected Token,
+ * Loot Drops). Returns the HTML for a `card-description` block.
+ * @param {{label: string, formula: string, total: number}[]} trace
+ * @returns {string}
+ */
+export function renderTraceHtml(trace) {
+  if (!trace?.length) return "";
+  const lines = trace.map(t =>
+    `<span>→</span> <span>${t.label}</span> <span>(${t.formula}=${t.total})</span>`
+  ).join("<br>");
+  return `<div style="font-size:14px;line-height:1.6;margin-bottom:6px;font-family:monospace;color:#0b1a23;">${lines}</div>`;
 }

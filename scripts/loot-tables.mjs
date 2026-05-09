@@ -46,6 +46,7 @@ export function getCurrencyForTL(tl) {
 export async function generateLoot(npc, customTableUuid = null) {
   const currency = { gold: 0, silver: 0, copper: 0 };
   const items = [];
+  let trace = [];
 
   if (customTableUuid?.startsWith("loot-level:")) {
     // Built-in Level Loot — delegate to Loot Generator engine
@@ -60,6 +61,7 @@ export async function generateLoot(npc, customTableUuid = null) {
           currency.copper += result.currency.copper ?? 0;
         }
         if (result.items?.length) items.push(...result.items);
+        if (result.trace?.length) trace = result.trace;
       }
     }
   } else if (customTableUuid) {
@@ -82,7 +84,7 @@ export async function generateLoot(npc, customTableUuid = null) {
     }
   }
 
-  return { currency, items };
+  return { currency, items, trace };
 }
 
 /* -------------------------------------------- */

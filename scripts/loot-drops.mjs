@@ -10,6 +10,7 @@ import { MODULE_ID } from "./vagabond-crawler.mjs";
 import { generateLoot } from "./loot-tables.mjs";
 import { LootManager } from "./loot-manager.mjs";
 import { LootTracker } from "./loot-tracker.mjs";
+import { renderTraceHtml } from "./loot-generator.mjs";
 
 const LOOT_ICON = "icons/containers/chest/chest-worn-oak-tan.webp";
 
@@ -160,7 +161,11 @@ export const LootDrops = {
       const shares = [];
       for (const pc of pcs) {
         const loot = await generateLoot(npc, customTable);
-        const share = { currency: loot.currency, items: loot.items };
+        const share = {
+          currency: loot.currency,
+          items: loot.items,
+          trace: loot.trace ?? [],
+        };
         if (!_shareIsEmpty(share)) shares.push({ pc, share });
       }
       if (shares.length === 0) continue;
@@ -184,6 +189,7 @@ export const LootDrops = {
       ...game.users.filter(u => u.isGM).map(u => u.id),
     ]));
 
+    const traceHtml = renderTraceHtml(share.trace ?? []);
     const content = `
       <div class="vagabond-chat-card-v2" data-card-type="generic">
         <div class="card-body">
@@ -200,6 +206,7 @@ export const LootDrops = {
           </header>
           <section class="content-body">
             <div class="card-description" style="padding:4px 8px;">
+              ${traceHtml}
               ${_renderShareBody(share)}
             </div>
             <div class="vcl-drops-actions" style="padding:4px 8px 8px;">
@@ -225,6 +232,7 @@ export const LootDrops = {
           sourceNpc: npc.name,
           currency: share.currency,
           items: share.items,
+          trace: share.trace ?? [],
           claimed: false,
           passed: false,
         },
@@ -383,13 +391,14 @@ export const LootDrops = {
     });
 
     // Emit public pool card
-    await this._emitPoolCard(recipient, flags.sourceNpc, flags.currency, flags.items);
+    await this._emitPoolCard(recipient, flags.sourceNpc, flags.currency, flags.items, flags.trace ?? []);
 
     console.log(`${MODULE_ID} | ${recipient.name} passed loot from ${flags.sourceNpc}`);
   },
 
-  async _emitPoolCard(passer, sourceNpc, currency, items) {
+  async _emitPoolCard(passer, sourceNpc, currency, items, trace = []) {
     const share = { currency, items };
+    const traceHtml = renderTraceHtml(trace);
     const content = `
       <div class="vagabond-chat-card-v2" data-card-type="generic">
         <div class="card-body">
@@ -400,12 +409,14 @@ export const LootDrops = {
             <div class="header-info">
               <h3 class="header-title">Passed Loot — ${sourceNpc}</h3>
               <div class="metadata-tags-row">
-                <div class="meta-tag"><span>${passer.name} passed — first to click claims</span></div>
+                <div class="meta-tag"><span>${passer.name} passed</span></div>
+                <div class="meta-tag"><span>First click claims</span></div>
               </div>
             </div>
           </header>
           <section class="content-body">
             <div class="card-description" style="padding:4px 8px;">
+              ${traceHtml}
               ${_renderShareBody(share)}
             </div>
             <div class="vcl-drops-actions" style="padding:4px 8px 8px;">
@@ -426,6 +437,7 @@ export const LootDrops = {
           sourceNpc,
           currency,
           items,
+          trace,
           passerId: passer.id,
           passerName: passer.name,
           claimedBy: null,
