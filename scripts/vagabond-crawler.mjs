@@ -303,9 +303,12 @@ Hooks.once("init", () => {
     hint: "Burn light sources in real time (1 real second = 1 game second). Pauses when Foundry is paused. If disabled, light only burns when Time Passes is clicked.",
     scope: "world", config: false, type: Boolean, default: false,
     onChange: (val) => {
-      const { LightTracker } = game.vagabondCrawler ?? {};
-      if (!LightTracker) return;
-      val ? LightTracker.startRealTime() : LightTracker.stopRealTime();
+      // game.vagabondCrawler exposes the singleton under `lightTracker` (and
+      // `light` alias); the previous `LightTracker` destructure was always
+      // undefined so toggling the setting silently no-op'd.
+      const lt = game.vagabondCrawler?.lightTracker;
+      if (!lt) return;
+      val ? lt.startRealTime() : lt.stopRealTime();
     },
   });
 

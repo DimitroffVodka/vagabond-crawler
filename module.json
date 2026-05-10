@@ -25,7 +25,7 @@
     ],
     "optional": [
       {
-        "id": "vagabond-extras",
+        "id": "vagabond-character-enhancer",
         "type": "module"
       }
     ],

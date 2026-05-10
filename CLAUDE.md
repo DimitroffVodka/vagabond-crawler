@@ -7,7 +7,7 @@ Dungeon crawl management module for the **Vagabond RPG** system on Foundry VTT v
 - **Module ID**: `vagabond-crawler`
 - **Entry point**: `scripts/vagabond-crawler.mjs`
 - **System dependency**: vagabond v4.1.0+
-- **Optional dependency**: vagabond-extras
+- **Optional dependency**: vagabond-character-enhancer
 - **No build step** — raw ES modules (`.mjs`), single CSS file, Handlebars templates
 
 ## Architecture

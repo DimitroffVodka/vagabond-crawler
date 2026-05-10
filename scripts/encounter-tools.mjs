@@ -3,7 +3,7 @@
  *
  * Encounter Check: d6 roll, configurable threshold (1-in-6 through 5-in-6).
  * On hit, auto-opens the encounter roller and rolls the active table.
- * Encounter Roller: full Application window matching vagabond-extras UX:
+ * Encounter Roller: full Application window matching vagabond-character-enhancer UX:
  *   - Build Table tab: drag NPCs onto slots, save as RollTable
  *   - Roll Tables tab: pick any world RollTable (grouped by folder) and roll it
  *   - Result panel: monster × count, distance, reaction with reroll buttons

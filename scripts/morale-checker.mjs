@@ -1,7 +1,7 @@
 /**
  * Vagabond Crawler — Morale Checker
  *
- * Hook pattern copied exactly from vagabond-extras/gm-tools.mjs.
+ * Hook pattern copied exactly from vagabond-character-enhancer/gm-tools.mjs.
  * - Group: first death, half dead (updateCombatant, changes.defeated === true)
  * - Solo:  drops to half HP (updateActor, changes.system.health.value)
  */
@@ -70,7 +70,7 @@ export const MoraleChecker = {
       }, 300);
     });
 
-    // Group morale — exact pattern from vagabond-extras
+    // Group morale — exact pattern from vagabond-character-enhancer
     Hooks.on("updateCombatant", async (combatant, changes) => {
       if (!game.user.isGM || !game.combat) return;
       if (!_isEnemyNpc(combatant)) return;  // friendly NPC deaths don't trigger morale
@@ -89,7 +89,7 @@ export const MoraleChecker = {
       }
     });
 
-    // Solo morale — exact pattern from vagabond-extras
+    // Solo morale — exact pattern from vagabond-character-enhancer
     Hooks.on("updateActor", async (actor, changes) => {
       if (!game.user.isGM || !game.combat) return;
       if (actor.type !== "npc") return;
@@ -118,7 +118,7 @@ export const MoraleChecker = {
     const npcAlive = combat.combatants.filter(c => _isEnemyNpc(c) && !c.defeated);
     if (!npcAlive.length) return;
 
-    // Highest threat level NPC leads — exact field from vagabond-extras
+    // Highest threat level NPC leads — exact field from vagabond-character-enhancer
     let leader = null, highestTL = -Infinity;
     for (const c of npcAlive) {
       const tl = c.actor.system.threatLevel ?? 0;

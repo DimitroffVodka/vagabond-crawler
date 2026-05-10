@@ -275,11 +275,17 @@ export const CrawlBar = {
         // Reset movement on every phase change (Heroes→GM and GM→Heroes)
         await MovementTracker.resetAll();
         if (result?.newTurn) {
-          // A new crawl turn = 1 Scene: advance clock, burn lights, track time
+          // A new crawl turn = 1 Scene: advance progress clock + narrative
+          // elapsed time (always). Torches only burn on turn changes when
+          // realtimeTracking is OFF — when it's ON (Shadowdark rule), torches
+          // burn solely on the real-time tick, but the scene clock + session
+          // timer still march forward per turn.
           if (CrawlClock.available) await CrawlClock.advance("scene");
           const mins = game.settings.get(MODULE_ID, "timePassesMinutes");
-          await LightTracker.advanceTime(mins * 60);
           await CrawlState.addTime(mins);
+          if (!game.settings.get(MODULE_ID, "realtimeTracking")) {
+            await LightTracker.advanceTime(mins * 60);
+          }
         }
         this.render();
         (await import("./crawl-strip.mjs")).CrawlStrip.render();
