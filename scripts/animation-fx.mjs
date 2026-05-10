@@ -783,6 +783,38 @@ export const AnimationFx = {
     // Parent-class variants (ItemSheetV2, ApplicationV2) also fire but we only need one.
     Hooks.on("getHeaderControlsVagabondItemSheet", itemHeaderHook);
 
+    // V14 ApplicationV2 collapses "extra" header controls into the ⋮ Toggle
+    // Controls dropdown by default — meaning the Animation FX entry registered
+    // above is hidden behind a click. Mirror the NPC-sheet pattern: inject a
+    // visible ⚡ button directly into the window-header so it's always inline.
+    const itemSheetRenderHook = (sheet) => {
+      const item = sheet.document;
+      if (!item) return;
+      const eq = item.system?.equipmentType;
+      const eligible = eq === "weapon" || item.type === "alchemical" || item.type === "gear" || eq === "gear";
+      if (!eligible) return;
+      const header = sheet.element?.querySelector("header.window-header");
+      if (!header) return;
+      if (header.querySelector(".vcfx-item-override")) return;  // already injected
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "header-control vcfx-item-override";
+      btn.title = "Animation FX override";
+      btn.setAttribute("aria-label", "Animation FX override");
+      btn.innerHTML = `<i class="fas fa-bolt"></i>`;
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.openOverrideDialog(item, "item");
+      });
+      // Insert before the close button (last) so the button order reads:
+      // ... ⋮ ⚡ ✕ — matches the V13 placement that had ⚡ inline.
+      const close = header.querySelector('[data-action="close"]');
+      if (close) header.insertBefore(btn, close);
+      else header.appendChild(btn);
+    };
+    Hooks.on("renderVagabondItemSheet", itemSheetRenderHook);
+
     // NPC sheet action rows — inject ⚡ button next to each [data-action-index] row.
     // v13 fires renderVagabondNPCSheet(sheet) where sheet.element is the HTMLElement.
     const npcHook = (sheet) => {

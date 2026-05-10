@@ -275,18 +275,22 @@ export const CrawlState = {
     if (dirty) await this._save();
 
     // Combat ← Strip: push any hero member missing from the combat tracker.
-    // Only runs once the combat has actually STARTED. Gating on combat.started
-    // prevents a race when a GM right-clicks a token and Foundry's "Toggle
-    // Combat State" creates the combat + its initial combatant in parallel:
-    // createCombat fires before the token's combatant lands in the snapshot,
-    // so the reconciler used to see the hero as "missing" and push a
-    // duplicate combatant. Once the user hits Begin Encounter, combatStart
-    // fires with combat.started = true and this block runs normally.
+    // Runs as soon as the combat has at least one combatant — covers both
+    // "Begin Encounter" (combat.started flips true) and the GM right-click
+    // "Toggle Combat State" path that creates a combat + NPC combatant
+    // BEFORE start. Without this, heroes never auto-join until the GM hits
+    // Begin Encounter explicitly.
     //
-    // In v13 a combat doc may be "sceneless" — combat.scene is undefined and
-    // each combatant carries its own sceneId. Derive the target scene from
-    // (in order) combat.scene, the first existing combatant, or the canvas.
-    if (combat && combat.started) {
+    // The original duplicate-combatant race (createCombat firing before the
+    // first combatant lands in the snapshot) is now guarded by:
+    //   1. `_syncing` reentrancy lock at the top of this function
+    //   2. `combatantTokenIds.has(m.tokenId)` skip below
+    //   3. `combatants.length > 0` here (skip the dead initial-create window)
+    //
+    // In v13/v14 a combat doc may be "sceneless" — combat.scene is undefined
+    // and each combatant carries its own sceneId. Derive the target scene
+    // from (in order) combat.scene, the first existing combatant, or canvas.
+    if (combat && combatants.length > 0) {
       const targetSceneId = combat.scene?.id
         ?? combatants[0]?.sceneId
         ?? canvas.scene?.id;

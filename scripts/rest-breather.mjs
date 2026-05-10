@@ -2,7 +2,7 @@
  * Vagabond Crawler — Rest & Breather
  *
  * Combined dialog for Rest (full recovery) and Breather (ration heal).
- * Ported from vagabond-extras/gm-tools.mjs.
+ * Ported from vagabond-character-enhancer/gm-tools.mjs.
  */
 
 import { MODULE_ID }    from "./vagabond-crawler.mjs";

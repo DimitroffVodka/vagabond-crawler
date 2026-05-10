@@ -435,11 +435,13 @@ export const MerchantShop = {
                <div class="header-icon"><i class="fas fa-door-closed" style="font-size:24px;"></i></div>
                <div class="header-info">
                  <h3 class="header-title">${shopName} is Closed</h3>
-                 <div class="metadata-tags-row">
-                   <div class="meta-tag"><span>The shop is no longer available</span></div>
-                 </div>
                </div>
              </header>
+             <section class="content-body">
+               <div class="card-description" style="padding:6px 8px; text-align:center; color:var(--vcb-text-muted, #aaa);">
+                 The shop is no longer available.
+               </div>
+             </section>
            </div>
          </div>`;
 

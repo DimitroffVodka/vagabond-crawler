@@ -550,6 +550,38 @@ export const LightTracker = {
       try { await this.advanceTime(delta); } finally { _ticking = false; }
     });
 
+    // Deleting a lit light item leaves the token's glow in place because the
+    // item-side `lit:false` setFlag never gets a chance to run. Mirror the
+    // douse cleanup on preDelete so the token light + persistent FX are
+    // cleared before the item disappears.
+    Hooks.on("preDeleteItem", async (item, _options, userId) => {
+      // Only the user who initiated the delete runs the cleanup, so we don't
+      // get duplicate token-light updates from every connected client. The
+      // initiator is always the actor owner (delete perm), so they can also
+      // update the token's light config.
+      if (game.user.id !== userId) return;
+      const lit = item.getFlag(MODULE_ID, "lit");
+      if (!lit) return;
+      const actor = item.parent;
+      if (!actor) return;
+      const sourceKey = item.getFlag(MODULE_ID, "sourceKey");
+      const tokens = actor.getActiveTokens();
+      const fx = game.vagabondCrawler?.animationFx;
+      const targets = tokens.length ? tokens : (() => {
+        const pt = _findPartyToken(actor);
+        return pt && !_anyGatheredMemberLit(pt, actor) ? [pt] : [];
+      })();
+      for (const token of targets) {
+        try { await token.document.update({ light: DARK_LIGHT }); } catch (e) { /* token gone or perms */ }
+        if (sourceKey && fx) {
+          try {
+            const preset = fx.resolveGearPresetByLightType(sourceKey);
+            if (preset) await fx.stopPersistent(preset, token);
+          } catch (e) { console.warn("[vagabond-crawler] FX stop on item delete failed:", e); }
+        }
+      }
+    });
+
     Hooks.on("dropCanvasData", async (_canvasObj, data) => {
       if (data.type !== "Item") return;
       let item;
