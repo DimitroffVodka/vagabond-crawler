@@ -1,5 +1,41 @@
 # Changelog
 
+## v1.17.0
+
+### Loot Drops — Chat-card flow replaces canvas loot bags
+
+- **Defeated NPCs now whisper a per-player chat card** instead of spawning a "Loot: <NPC>" actor + token on the canvas. Each PC owner + GM gets a card with `[Claim Loot] [Pass Loot]` buttons; state lives in `ChatMessage` flags so it survives reload, world export, and zero orphan documents.
+- **Pass Loot emits a public pool card** that the first player to click can claim. Race-protected via flag `claimedBy` null-check on the GM-side socket handler.
+- **Removed entirely:** `Token._onClickLeft2` core patch, the `renderTokenHUD` injection, the `Dialog.wait` modal. Cleaner UX, no canvas litter, no walking-to-pickup ceremony.
+- **Recap integration preserved 1:1** — `LootTracker.logClaim()` still fires from both Claim and Pool-Claim paths, so loot history feeds Session Recap as before.
+
+### Loot Generator — Unified card style + dice trace across all 3 flows
+
+- **All three loot flows now look identical:** Roll Loot ("Post to Chat"), Roll for Selected Token, and the new Loot Drops cards share the same `vagabond-chat-card-v2` outer + `vcl-gen-claim-item` rows + `[Claim Loot] [Pass Loot]` button row.
+- **Dice trace shown on every card.** `generateLevelLoot` was instrumented with a `_R(formula, label)` roller that records every roll (~30 sites across levels 1-10), returns `{ currency, items, trace }`. New shared `renderTraceHtml(trace)` helper renders the monospace `→ Label (formula=total)` block consistently.
+- **Roll Loot's GM "Give to: [Player]" inline buttons replaced** with a Claim popup that picks a recipient via DialogV2 dropdown. Pass emits the same public pool card as Loot Drops.
+
+### Browse NPCs — Multi-select chip filters + at-a-glance icon columns
+
+- **Four new chip-style multi-select filters:** Senses, Weaknesses, Immunities, and Abilities (with search box for the 170+ ability list). Click chips to toggle; OR within each group, AND across groups.
+- **"Has Cast Attacks" checkbox toggle** matches NPCs with any action whose `attackType` is `castClose` or `castRanged` — actual schema, not name fuzz.
+- **4 new compact icon columns** in the NPC table: **Atk** (⚔ melee / 🏹 ranged / ✨ cast counts), **Sns** / **Wk** / **Imm** (FontAwesome glyphs, color-coded blue/red/gold) with hover tooltips. Senses normalized — case/whitespace duplicates collapsed, parenthetical annotations dropped for the dropdown but kept on the actor.
+- **Browse table font bumped 0.85rem → 1.13rem (+33%)**, token icons 12 → 16px to match.
+
+### V14 Compatibility & Fixes
+
+- **Real-Time Light Burn (Shadowdark rules):** Setting now correctly toggles the burn engine on change — previously the onChange handler destructured `LightTracker` (PascalCase) off `game.vagabondCrawler` but the singleton lives at `lightTracker` (camelCase), causing silent no-op. Turn changes (Hero ↔ GM) skip the per-turn 10-min torch deduction when realtime is ON; torches burn solely on the real-time tick. Progress clock + session timer still advance per turn.
+- **Lit-item delete cleanup.** Deleting a lit torch from inventory now clears the token's light + persistent FX (`preDeleteItem` hook gated on `game.user.id === userId`). Previously left phantom glow on the token until you also deleted the token.
+- **Heroes auto-join Combat Tracker** when the GM right-clicks an NPC to toggle combat state, instead of waiting for explicit "Begin Encounter". Drops the `combat.started` gate; reentrancy lock + tokenId dedup already prevent the duplicate-combatant race the gate was guarding against.
+- **Animation FX ⚡ button visible inline** in the V14 weapon item header. V14 ApplicationV2 collapses "extra" header controls under the ⋮ Toggle Controls dropdown by default, hiding the registered control. Mirrored the NPC-action-row injection pattern on `renderVagabondItemSheet` so the override dialog stays one click away.
+- **Loot Manager UX fixes.** `.loot-npc-panel`'s `max-height: 460px` hard cap and `.browse-list-fill`'s `min-height: 480px` floor both removed — the NPC list now actually fills the resized window. `.loot-apply-btn` given inline-flex layout + `white-space: nowrap` so the "Apply to Selected" button stops wrapping.
+- **"The Merchant is Closed" chat card** no longer truncates its descriptor — moved the "no longer available" text out of a meta-tag into a centered card-description block to match the "open" card structure.
+
+### Module manifest
+
+- **Optional dependency renamed:** `vagabond-extras` → `vagabond-character-enhancer` in `module.json`, `CLAUDE.md`, and historical-attribution comments in `encounter-tools` / `morale-checker` / `rest-breather`.
+- **Compatibility verified bumped** to V14.361 alongside V13 minimum.
+
 ## v1.16.8
 
 ### Animation FX — single owner for weapon / alchemical / gear FX
