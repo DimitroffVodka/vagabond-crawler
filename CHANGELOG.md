@@ -9,9 +9,9 @@
 
 ## v1.17.1
 
-### Magic Ward & spell cast checks — survive the system's v4.x spell-cast refactor
+### Magic Ward & spell cast checks — survive the system's spell-cast refactor
 
-- **Magic Ward surcharge works again.** The Vagabond system v4.x moved spell-cost calculation off `SpellHandler._calculateSpellCost` onto the static `SpellCastDialog.calculateCosts` — now the single authority for the dialog's cost preview, the mana/castingMax validation, and the actual deduction — and made `SpellHandler.castSpell` merely *open* the dialog (the real cast runs in `_executeCast`). The Crawler still wrapped the old method, so the "+N Mana to affect a warded being" surcharge silently stopped applying. Re-pointed the integration: the surcharge is added in `calculateCosts`, surfaced in the cast dialog via the system's `vagabond.spellCastMessages` hook, and the cast-check flag + ward "first affect per round" detection moved to `_executeCast`. Verified live — casting at a warded foe again deducts base + surcharge.
+- **Magic Ward surcharge works again.** A Vagabond system spell-cast refactor moved spell-cost calculation off `SpellHandler._calculateSpellCost` onto the static `SpellCastDialog.calculateCosts` — now the single authority for the dialog's cost preview, the mana/castingMax validation, and the actual deduction — and made `SpellHandler.castSpell` merely *open* the dialog (the real cast runs in `_executeCast`). The Crawler still wrapped the old method, so the "+N Mana to affect a warded being" surcharge silently stopped applying. Re-pointed the integration: the surcharge is added in `calculateCosts`, surfaced in the cast dialog via the system's `vagabond.spellCastMessages` hook, and the cast-check flag + ward "first affect per round" detection moved to `_executeCast`. Verified live — casting at a warded foe again deducts base + surcharge.
 - **Cast-check target modifiers and Nimble apply to spells again.** The same flag-timing bug meant a target's `incomingAttacksModifier` (Vulnerable, Prone, …) and the Nimble "can't be Favored" clamp were no longer applied to spell rolls. Holding the cast-check flag across the roll inside `_executeCast` restores both.
 
 ### Flanking / Pack Instincts / Soft Underbelly — un-removable effects on Foundry v14

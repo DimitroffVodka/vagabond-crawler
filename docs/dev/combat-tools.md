@@ -99,7 +99,7 @@ Magic Ward is a **mana surcharge**: the first time each combat round a warded
 being is unwillingly affected by a spell, the caster pays +N extra mana (out of
 combat, every cast triggers it). It is **not** a roll penalty die.
 
-The system's v4.x spell flow computes cost via the *static*
+The system's current spell flow computes cost via the *static*
 `SpellCastDialog.calculateCosts` (used by both the dialog preview/validation and
 the real deduction in `SpellHandler._executeCast`); `SpellHandler.castSpell` now
 only opens the dialog. Implemented by prototype-wrapping (see `_wrapSystemClasses`):

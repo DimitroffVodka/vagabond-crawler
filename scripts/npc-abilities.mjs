@@ -211,7 +211,7 @@ function applyTargetModifiers(favorHinder) {
 /* ──────────────────────────────────────────────────────────────────────────────
  * MAGIC WARD (mana surcharge) + CAST-CHECK TARGET MODIFIERS
  *
- * The v4.x spell flow casts through SpellCastDialog → SpellHandler._executeCast,
+ * The vagabond system's spell flow casts through SpellCastDialog → SpellHandler._executeCast,
  * with cost computed by the STATIC SpellCastDialog.calculateCosts (used by both
  * the dialog preview/validation and the real deduction). SpellHandler.castSpell
  * now only opens the dialog, so wrapping it no longer touches the cast.
@@ -365,7 +365,7 @@ async function _wrapSystemClasses() {
   }
 
   // ── 2. Wrap the authoritative cost path: SpellCastDialog.calculateCosts ────
-  //    The v4.x spell flow computes cost via this STATIC method for both the
+  //    The vagabond system's spell flow computes cost via this STATIC method for both the
   //    cast dialog preview/validation AND the real deduction in
   //    SpellHandler._executeCast. Adding the surcharge here is the single point
   //    that makes it appear in the dialog, gate the built-in mana/castingMax
