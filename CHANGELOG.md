@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.17.2
+
+### Compatibility
+
+- **Now requires Foundry v14** — `compatibility.minimum` raised from 13 to 14. Verified on 14.361.
+- **Vagabond system `verified` bumped to 5.8.1** (from 4.3.1; minimum stays 4.1.0).
+
 ## v1.17.1
 
 ### Magic Ward & spell cast checks — survive the system's v4.x spell-cast refactor
