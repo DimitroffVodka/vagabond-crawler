@@ -69,7 +69,7 @@ ApplicationV2 window for casting spells with full control over:
 
 1. Validate delivery type, mana sufficiency, casting max
 2. Import `VagabondRollBuilder` for d20 roll with favor/hinder
-3. Set `_isCastCheck = true` so Magic Ward penalty is injected
+3. Set `_isCastCheck = true` so cast-check target modifiers + Nimble apply to the roll
 4. On success: deduct mana, apply focus if toggled
 5. Roll damage via `VagabondDamageHelper.rollSpellDamage()`
 6. Create chat card via `VagabondChatCard.spellCast()`
@@ -84,9 +84,10 @@ ApplicationV2 window for casting spells with full control over:
 
 ```js
 PASSIVE_ABILITIES = {
-  "Magic Ward I":   { type: "castPenalty", penaltyDie: "1d4" },
-  "Magic Ward II":  { type: "castPenalty", penaltyDie: "1d6" },
-  "Magic Ward III": { type: "castPenalty", penaltyDie: "1d8" },
+  "Magic Ward I":    { type: "manaSurcharge", surcharge: 1 },  // I–VI: +1…+6 mana
+  "Pack Instincts":  { type: "packInstincts" },                // also Pack Tactics / Pack Hunter
+  "Nimble":          { type: "nimble" },
+  "Soft Underbelly": { type: "softUnderbelly" },
 }
 ```
 
@@ -94,18 +95,42 @@ Keyed by exact `actor.system.abilities[].name` string.
 
 ### Magic Ward Implementation
 
-Uses prototype wrapping (not hooks) for reliable injection:
+Magic Ward is a **mana surcharge**: the first time each combat round a warded
+being is unwillingly affected by a spell, the caster pays +N extra mana (out of
+combat, every cast triggers it). It is **not** a roll penalty die.
 
-1. **`SpellHandler.prototype.castSpell`** — wrapped to set `_isCastCheck = true` during the cast flow
-2. **`VagabondRollBuilder.buildAndEvaluateD20WithRollData`** — wrapped to:
-   - **A.** Check targets for `incomingAttacksModifier` (e.g., Vulnerable → Favor on cast checks). This patches a gap in the system that only applies target modifiers for weapon attacks, not spell casts.
-   - **B.** Inject Magic Ward penalty die into the base formula: `"1d20 - 1d4[Magic Ward I]"`
+The system's v4.x spell flow computes cost via the *static*
+`SpellCastDialog.calculateCosts` (used by both the dialog preview/validation and
+the real deduction in `SpellHandler._executeCast`); `SpellHandler.castSpell` now
+only opens the dialog. Implemented by prototype-wrapping (see `_wrapSystemClasses`):
 
-The strongest ward among all targets is used (die order: d4 < d6 < d8 < d10 < d12).
+1. **`SpellCastDialog.calculateCosts` (static)** — wrapped to add the surcharge to
+   `totalCost`. Single cost authority: feeds the dialog preview, the built-in
+   mana/castingMax validation (an unaffordable cast is blocked), and the actual
+   deduction in `_executeCast`.
+2. **`vagabond.spellCastMessages` hook** — surfaces the surcharge in the cast
+   dialog's message panel (display-only).
+3. **`SpellHandler._executeCast`** — the actual cast chokepoint for both the
+   dialog and legacy direct-cast flows. Wrapped to (a) hold `_isCastCheck` true
+   across the spell roll, and (b) detect a successful cast (mana decreased) and
+   flag each triggered ward so it doesn't charge again this round.
+4. **`SpellHandler._calculateSpellCost`** — still wrapped, but only the inline
+   favorited-spell row on the actor sheet reads it now; kept surcharge-aware so
+   the row matches the dialog.
+5. **`VagabondRollBuilder.buildAndEvaluateD20WithRollData`** — wrapped at `setup`
+   (innermost vs. VCE) to apply target `incomingAttacksModifier` (Vulnerable,
+   Prone, etc.) and the Nimble "can't be Favored" clamp to cast checks, gated on
+   `_isCastCheck`. The system applies target modifiers for weapon attacks but not
+   spell casts; this patches that gap.
+
+The strongest ward among all targets is used (highest surcharge wins).
 
 ### External Integration
 
-`setCastCheckFlag(val)` is exported so the crawl strip's spell dialog can bracket its own rolls with the same flag.
+`setCastCheckFlag(val)`, `computeWardSurcharge`, and `flagWardsTriggered` are
+exported so the crawl strip's own NPC spell dialog (`CrawlerSpellDialog` in
+`npc-action-menu.mjs`) can bracket its rolls with the same flag and run the same
+ward-surcharge flow for NPC casts.
 
 ---
 

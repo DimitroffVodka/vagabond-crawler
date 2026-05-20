@@ -2,6 +2,34 @@
 
 Dungeon crawl management module for the **Vagabond RPG** system on Foundry VTT v13+.
 
+## Session Start
+
+Read `.planning/STATUS.md` first. Cross-agent state lives there: in-progress
+work, awaiting review, blocked, recently completed, shared context. Don't
+ask the user "what's going on" — STATUS.md answers it. Update on task
+start/finish/handoff.
+
+## Verification Discipline (Non-Negotiable)
+
+Never write "verified," "complete," "tested," "live-verified," "fixed,"
+or similar claims without quoting the actual tool output, command result,
+or file:line evidence that proves it. Static analysis is acceptable but
+must be labeled as such (e.g., "verified by grep" or "static-only").
+If a claim is unverifiable, say so and explain what would prove it.
+
+Before claiming a fix is complete: grep for the bad pattern (inverse
+check), run `node --check` on touched files, exercise the runtime path
+via MCP `evaluate` where possible. Paste the result.
+
+## Tooling
+
+- `./verify.sh` — pre-commit grep wall + `node --check`. `--strict`
+  promotes warnings to errors. Patterns mostly come from SD module work
+  and may not all apply here; harmless when they don't match.
+- `dev/probes/*.mjs` — paste-able MCP `evaluate` snippets returning
+  `{ pass: bool, ... }` (none yet for this module; add as bugs surface).
+- `dev/fixtures/` — test data scaffold (placeholder).
+
 ## Quick Reference
 
 - **Module ID**: `vagabond-crawler`
@@ -276,6 +304,7 @@ The Crawler is the **authoritative provider** for weapon / alchemical / gear / N
 The `vagabond-character-enhancer` (VCE) module wraps several system methods in its `ready` hook. Since it's alphabetically before `vagabond-crawler`, VCE's ready fires first. Consequences:
 
 - **VCE wraps** `SpellHandler.castSpell`, `VagabondItem.rollAttack`, `VagabondRollBuilder.buildAndEvaluateD20WithRollData`, `VagabondDamageHelper.calculateFinalDamage`, etc.
+- **Spell-cast contract (system v4.x)**: spell cost is computed by the *static* `SpellCastDialog.calculateCosts` (`systems/vagabond/module/applications/spell-cast-dialog.mjs`) — used by BOTH the dialog preview/validation AND the real deduction in `SpellHandler._executeCast`. `SpellHandler.castSpell` now only *opens* the dialog and returns, so wrapping it does NOT bracket the cast. To change spell cost (e.g. Magic Ward surcharge) wrap `calculateCosts`; to bracket the cast (cast-check flag, post-cast ward detection) wrap `_executeCast`; `SpellHandler._calculateSpellCost` now only feeds the inline favorited-spell row. Dialog messages → `vagabond.spellCastMessages` hook (mutate `messages`; `blocking:true` stops the cast); spell-roll mods → `vagabond.preD20Roll`/`postD20Roll` (NOT fired on bypass casts: noRollRequired/GLYPH/IMBUE/altKey). See `_wrapSystemClasses` in `scripts/npc-abilities.mjs`.
 - **`_rangeFavorHinder` pattern**: VCE's `rollAttack` wrap strips the `favorHinder` argument and re-injects it via module-scope state inside its `buildAndEvaluateD20` wrap. A wrap that modifies `favorHinder` BEFORE VCE runs its combine will be overwritten.
 - **Fix for "run after VCE's favor combine"**: wrap in `Hooks.once("setup", ...)` (fires before any `ready` hook). Our wrap becomes innermost → VCE calls through to us with the fully-combined favor. See `registerEarlyRollBuilderWrap()` in `scripts/npc-abilities.mjs`.
 - **For weapon attacks**: the system's target-side `incomingAttacksModifier` is applied inside `rollAttack` using 1-for-1 cancellation (`systems/vagabond/module/documents/item.mjs:592`). By the time `buildAndEvaluateD20` fires, target modifiers are already baked into `favorHinder`.

@@ -211,20 +211,31 @@ function applyTargetModifiers(favorHinder) {
 /* ──────────────────────────────────────────────────────────────────────────────
  * MAGIC WARD (mana surcharge) + CAST-CHECK TARGET MODIFIERS
  *
+ * The v4.x spell flow casts through SpellCastDialog → SpellHandler._executeCast,
+ * with cost computed by the STATIC SpellCastDialog.calculateCosts (used by both
+ * the dialog preview/validation and the real deduction). SpellHandler.castSpell
+ * now only opens the dialog, so wrapping it no longer touches the cast.
+ *
  * Strategy:
- *   1. Wrap SpellHandler.prototype._calculateSpellCost to add the ward
- *      surcharge to totalCost. The system's downstream mana/castingMax
- *      validation runs against the inflated total; a caster without enough
- *      mana to cover the surcharge is blocked outright (no cast check).
- *   2. Wrap SpellHandler.prototype.castSpell to (a) flag the active Cast
- *      Check for the roll wrapper below, and (b) detect a successful cast
- *      by comparing mana before/after, and flag each triggered ward so it
- *      doesn't charge again this round.
- *   3. Wrap VagabondRollBuilder.buildAndEvaluateD20WithRollData to apply
+ *   1. Wrap SpellCastDialog.calculateCosts to add the ward surcharge to
+ *      totalCost. This is the single cost authority: it makes the surcharge
+ *      show in the dialog, gate the built-in mana/castingMax validation, and
+ *      be deducted on cast. Surface it via the supported
+ *      `vagabond.spellCastMessages` hook (display-only; validation already
+ *      blocks an unaffordable cast).
+ *   2. Keep wrapping SpellHandler._calculateSpellCost — only the inline
+ *      favorited-spell row on the actor sheet still reads it; keep it
+ *      surcharge-aware so the row matches the dialog.
+ *   3. Wrap SpellHandler._executeCast (the actual cast chokepoint for both the
+ *      dialog and legacy direct-cast flows) to (a) hold the Cast-Check flag
+ *      true across the spell roll for the roll wrapper below, and (b) detect a
+ *      successful cast by comparing mana before/after, flagging each triggered
+ *      ward so it doesn't charge again this round.
+ *   4. Wrap VagabondRollBuilder.buildAndEvaluateD20WithRollData to apply
  *      target incomingAttacksModifier (Vulnerable, Prone, etc.) to the
  *      cast's favor/hinder — the system's base code does this for weapon
  *      attacks but not for spell casts.
- *   4. Reset per-actor ward-triggered flags when the combat round advances
+ *   5. Reset per-actor ward-triggered flags when the combat round advances
  *      and when combat ends.
  * ──────────────────────────────────────────────────────────────────────────── */
 
@@ -335,8 +346,17 @@ async function _wrapSystemClasses() {
     return;
   }
 
-  if (!SpellHandler?.prototype?.castSpell) {
-    console.error(`${MODULE_ID} | SpellHandler.prototype.castSpell not found — cannot wrap`);
+  let SpellCastDialog;
+  try {
+    ({ SpellCastDialog } = await import(
+      "../../../systems/vagabond/module/applications/spell-cast-dialog.mjs"
+    ));
+  } catch (err) {
+    console.warn(`${MODULE_ID} | Could not import SpellCastDialog — ward surcharge will not reach the cast dialog`, err);
+  }
+
+  if (!SpellHandler?.prototype?._executeCast) {
+    console.error(`${MODULE_ID} | SpellHandler.prototype._executeCast not found — cannot wrap`);
     return;
   }
   if (!SpellHandler?.prototype?._calculateSpellCost) {
@@ -344,10 +364,52 @@ async function _wrapSystemClasses() {
     return;
   }
 
-  // ── 2. Wrap SpellHandler.prototype._calculateSpellCost ────────────────────
-  //    Add Magic Ward surcharge to totalCost so the preview, validation
-  //    (mana.current and castingMax), and deduction paths all see the
-  //    inflated amount.
+  // ── 2. Wrap the authoritative cost path: SpellCastDialog.calculateCosts ────
+  //    The v4.x spell flow computes cost via this STATIC method for both the
+  //    cast dialog preview/validation AND the real deduction in
+  //    SpellHandler._executeCast. Adding the surcharge here is the single point
+  //    that makes it appear in the dialog, gate the built-in mana/castingMax
+  //    validation, and actually be deducted on cast. We stash wardEntries on
+  //    the costs object so the message hook below can name the warded targets
+  //    without recomputing.
+  if (SpellCastDialog?.calculateCosts) {
+    const origCalcCosts = SpellCastDialog.calculateCosts;
+    SpellCastDialog.calculateCosts = function (spell, actor, state) {
+      const costs = origCalcCosts.call(this, spell, actor, state);
+      const ward = computeWardSurcharge(game.user?.targets);
+      if (ward.totalSurcharge > 0) {
+        costs.wardSurcharge = ward.totalSurcharge;
+        costs.wardEntries = ward.entries;
+        costs.totalCost = (costs.totalCost ?? 0) + ward.totalSurcharge;
+      }
+      return costs;
+    };
+    console.log(`${MODULE_ID} | ✓ Wrapped SpellCastDialog.calculateCosts (Magic Ward surcharge — cost authority)`);
+
+    // Surface the surcharge in the dialog message panel via the supported hook.
+    // Display-only: the surcharge is already in costs.totalCost above, so the
+    // dialog's built-in validation blocks an unaffordable cast on its own.
+    Hooks.on("vagabond.spellCastMessages", (dialog, messages, ctx) => {
+      const surcharge = ctx?.costs?.wardSurcharge;
+      if (!surcharge) return;
+      const names = (ctx.costs.wardEntries ?? [])
+        .map((e) => e.actor?.name)
+        .filter(Boolean)
+        .join(", ");
+      messages.push({
+        text: names
+          ? `Magic Ward: +${surcharge} mana surcharge vs ${names}.`
+          : `Magic Ward: +${surcharge} mana surcharge.`,
+        type: "warning",
+      });
+    });
+  }
+
+  // ── 3. Wrap SpellHandler.prototype._calculateSpellCost ────────────────────
+  //    Secondary path only: the inline favorited-spell row on the actor sheet
+  //    (_updateSpellDisplay) still reads cost from this instance method. Keep
+  //    it surcharge-aware so the row matches the dialog. The authoritative
+  //    cast/deduction path is the static calculateCosts wrap above.
   const origCalculate = SpellHandler.prototype._calculateSpellCost;
   SpellHandler.prototype._calculateSpellCost = function (spellId) {
     const costs = origCalculate.call(this, spellId);
@@ -358,14 +420,18 @@ async function _wrapSystemClasses() {
     }
     return costs;
   };
-  console.log(`${MODULE_ID} | ✓ Wrapped SpellHandler._calculateSpellCost (Magic Ward surcharge)`);
+  console.log(`${MODULE_ID} | ✓ Wrapped SpellHandler._calculateSpellCost (inline spell-row display)`);
 
-  // ── 3. Wrap SpellHandler.prototype.castSpell ──────────────────────────────
-  //    Set the cast-check flag for the roll-builder wrapper, and after the
-  //    original cast runs, detect success by checking if the caster's mana
-  //    actually decreased — if so, flag each triggered ward for the round.
-  const origCastSpell = SpellHandler.prototype.castSpell;
-  SpellHandler.prototype.castSpell = async function (event, target) {
+  // ── 4. Wrap SpellHandler.prototype._executeCast ───────────────────────────
+  //    _executeCast is the single chokepoint for the ACTUAL cast in both the
+  //    dialog flow (via the dialog's onCast callback) and the legacy
+  //    direct-cast flow. castSpell now only opens the dialog and returns, so
+  //    wrapping it no longer brackets the cast. Here we (a) hold _isCastCheck
+  //    true across the spell roll inside _executeCast, so the roll-builder wrap
+  //    applies target modifiers + Nimble; and (b) detect a successful cast by
+  //    the mana decrease and flag each triggered ward for the round.
+  const origExecuteCast = SpellHandler.prototype._executeCast;
+  SpellHandler.prototype._executeCast = async function (event, spellId, finalState, manaOverrideDelta = 0) {
     _isCastCheck = true;
     const manaBefore = this.actor?.system?.mana?.current;
     const wardSnapshot = computeWardSurcharge(game.user?.targets);
@@ -378,7 +444,7 @@ async function _wrapSystemClasses() {
     }
 
     try {
-      const result = await origCastSpell.call(this, event, target);
+      const result = await origExecuteCast.call(this, event, spellId, finalState, manaOverrideDelta);
       const manaAfter = this.actor?.system?.mana?.current;
       // Mana only decreases on a successful cast (system logic). If it did,
       // the cast went through and the target was affected → consume the wards.
@@ -399,9 +465,9 @@ async function _wrapSystemClasses() {
       _isCastCheck = false;
     }
   };
-  console.log(`${MODULE_ID} | ✓ Wrapped SpellHandler.castSpell (ward flag on success)`);
+  console.log(`${MODULE_ID} | ✓ Wrapped SpellHandler._executeCast (cast-check flag + ward flag on success)`);
 
-  // ── 4. Wrap VagabondItem.prototype.rollAttack ─────────────────────────────
+  // ── 5. Wrap VagabondItem.prototype.rollAttack ─────────────────────────────
   //    Set _isAttackRoll so the buildAndEvaluateD20 wrap knows to apply
   //    Nimble suppression. The system's own rollAttack computes
   //    effectiveFavorHinder (factoring target incomingAttacksModifier) and
@@ -426,7 +492,7 @@ async function _wrapSystemClasses() {
     console.log(`${MODULE_ID} | ✓ Wrapped VagabondItem.rollAttack (Nimble)`);
   }
 
-  // ── 5. Wrap VagabondChatCard.npcAction for Pack Instincts ────────────────
+  // ── 6. Wrap VagabondChatCard.npcAction for Pack Instincts ────────────────
   //    Works from both actor sheet clicks AND crawl strip action menu.
   let VagabondChatCard;
   try {
@@ -461,6 +527,15 @@ async function _wrapSystemClasses() {
  * ──────────────────────────────────────────────────────────────────────────── */
 
 const PACK_INSTINCTS_ORIGIN = `module.${MODULE_ID}.packInstincts`;
+
+// v14 ActiveEffect.origin is a DocumentUUIDField — non-UUID strings get nulled
+// at creation and the original is moved to flags.core.originText. Match by
+// module flag with origin / originText fallbacks for legacy AEs.
+function _isPackInstinctsEffect(e) {
+  return e.getFlag(MODULE_ID, "packInstincts") === true
+      || e.origin === PACK_INSTINCTS_ORIGIN
+      || e.flags?.core?.originText === PACK_INSTINCTS_ORIGIN;
+}
 
 /**
  * Apply Vulnerable (Pack Instincts) to each targeted token if the attacker
@@ -512,11 +587,12 @@ export async function applyPackInstincts(attacker) {
   // source via game.actors.get(actorId), not the synthetic token actor.
   if (applied) {
     const worldActor = game.actors.get(attacker.id) ?? attacker;
-    if (!worldActor.effects.some(e => e.origin === PACK_INSTINCTS_ORIGIN)) {
+    if (!worldActor.effects.some(_isPackInstinctsEffect)) {
       await worldActor.createEmbeddedDocuments("ActiveEffect", [{
         name:     "Pack Instincts (active)",
         img:      "icons/svg/downgrade.svg",
         origin:   PACK_INSTINCTS_ORIGIN,
+        flags:    { [MODULE_ID]: { packInstincts: true } },
         changes: [
           { key: "system.outgoingSavesModifier", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "hinder" },
         ],
@@ -529,14 +605,16 @@ export async function applyPackInstincts(attacker) {
 export async function cleanupPackInstincts() {
   if (!game.user.isGM) return;
   for (const actor of game.actors) {
-    const effect = actor.effects.find(e => e.origin === PACK_INSTINCTS_ORIGIN);
-    if (effect) await effect.delete();
+    // Delete ALL matching effects, not just the first — v14 origin-migration
+    // duplicate-stacking from pre-fix releases may have left several on one actor.
+    const stale = actor.effects.filter(_isPackInstinctsEffect);
+    for (const e of stale) await e.delete();
   }
   // Also check synthetic (unlinked) token actors on the current scene
   for (const token of canvas.tokens?.placeables ?? []) {
     if (token.actor?.isToken) {
-      const effect = token.actor.effects.find(e => e.origin === PACK_INSTINCTS_ORIGIN);
-      if (effect) await effect.delete();
+      const stale = token.actor.effects.filter(_isPackInstinctsEffect);
+      for (const e of stale) await e.delete();
     }
   }
 }
@@ -600,6 +678,12 @@ function _registerWardRoundResetHook() {
 
 const SOFT_UNDERBELLY_ORIGIN = `module.${MODULE_ID}.softUnderbelly`;
 
+function _isSoftUnderbellyEffect(e) {
+  return e.getFlag(MODULE_ID, "softUnderbelly") === true
+      || e.origin === SOFT_UNDERBELLY_ORIGIN
+      || e.flags?.core?.originText === SOFT_UNDERBELLY_ORIGIN;
+}
+
 function effectInvolvesProne(effect) {
   if (effect?.statuses?.has?.("prone")) return true;
   // Some systems attach the status id on a legacy field
@@ -612,12 +696,13 @@ async function ensureSoftUnderbellyEffect(actor) {
   if (!actor) return;
   if (!hasAbility(actor, "Soft Underbelly")) return;
   if (!actor.statuses?.has?.("prone")) return;
-  if (actor.effects.some((e) => e.origin === SOFT_UNDERBELLY_ORIGIN)) return;
+  if (actor.effects.some(_isSoftUnderbellyEffect)) return;
   try {
     await actor.createEmbeddedDocuments("ActiveEffect", [{
       name:   "Soft Underbelly (Prone)",
       img:    "icons/svg/downgrade.svg",
       origin: SOFT_UNDERBELLY_ORIGIN,
+      flags:  { [MODULE_ID]: { softUnderbelly: true } },
       changes: [
         { key: "system.armor", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "0", priority: 999 },
       ],
@@ -630,12 +715,13 @@ async function ensureSoftUnderbellyEffect(actor) {
 
 async function clearSoftUnderbellyEffect(actor) {
   if (!actor) return;
-  const ours = actor.effects.find((e) => e.origin === SOFT_UNDERBELLY_ORIGIN);
-  if (!ours) return;
   // Don't clear if actor is still prone (multiple sources of prone)
   if (actor.statuses?.has?.("prone")) return;
+  // Delete ALL matching — v14 pre-fix may have stacked duplicates.
+  const stale = actor.effects.filter(_isSoftUnderbellyEffect);
+  if (!stale.length) return;
   try {
-    await ours.delete();
+    for (const e of stale) await e.delete();
     console.log(`${MODULE_ID} | Soft Underbelly: armor restored on ${actor.name} (no longer Prone)`);
   } catch (err) {
     console.warn(`${MODULE_ID} | Soft Underbelly: failed to delete AE on ${actor.name}`, err);

@@ -10,10 +10,30 @@
  *
  * Uses actor flag `flankedBy` to track flanking-applied Vulnerable so
  * we never remove Vulnerable that was applied by other means.
+ *
+ * Effect lookup is flag-based, not origin-based. Foundry v14 changed
+ * ActiveEffect.origin to a DocumentUUIDField; non-UUID strings get
+ * migrated to flags.core.originText and origin is nulled — so an
+ * `e.origin === "module.vagabond-crawler.flanking"` lookup silently
+ * returns undefined and the effect can't be removed.
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
 import { distanceFt } from "./combat-helpers.mjs";
+
+// Match a flanking effect by module flag, with origin / originText fallbacks
+// so legacy effects (created before flag stamping) still get cleaned up.
+function _isFlankingEffect(e) {
+  return e.getFlag(MODULE_ID, "flanking") === true
+      || e.origin === `module.${MODULE_ID}.flanking`
+      || e.flags?.core?.originText === `module.${MODULE_ID}.flanking`;
+}
+
+function _isFlankingSavesEffect(e) {
+  return e.getFlag(MODULE_ID, "flanking_saves") === true
+      || e.origin === `module.${MODULE_ID}.flanking.saves`
+      || e.flags?.core?.originText === `module.${MODULE_ID}.flanking.saves`;
+}
 
 // ── Size hierarchy ──────────────────────────────────────────────────────────
 
@@ -118,7 +138,11 @@ export const FlankingChecker = {
 
       // Flanking: 2+ enemies close AND foe no more than one size larger than allies
       const shouldBeFlanked = closeEnemyCount >= 2 && targetSize <= smallestEnemySize + 1;
-      const currentlyFlanked = !!target.actor.getFlag(MODULE_ID, "flankedBy");
+      // Treat the effect's presence as "currently flanked" too — handles
+      // flag/effect drift (e.g. orphan effects from the v14 origin-migration
+      // bug that left flanking AEs un-removable for one release).
+      const hasFlankingEffect = target.actor.effects.some(_isFlankingEffect);
+      const currentlyFlanked = !!target.actor.getFlag(MODULE_ID, "flankedBy") || hasFlankingEffect;
 
       if (shouldBeFlanked && !currentlyFlanked) {
         await this._applyFlanked(target.actor);
@@ -137,6 +161,7 @@ export const FlankingChecker = {
       img:      "icons/svg/downgrade.svg",
       statuses: ["vulnerable"],
       origin:   `module.${MODULE_ID}.flanking`,
+      flags:    { [MODULE_ID]: { flanking: true } },
       changes: [
         { key: "system.favorHinder",              mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "hinder" },
         { key: "system.incomingAttacksModifier",   mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "favor"  },
@@ -148,7 +173,7 @@ export const FlankingChecker = {
   async _applyFlanked(actor) {
     await actor.setFlag(MODULE_ID, "flankedBy", true);
     // Only apply if we haven't already created the flanking effect
-    const existing = actor.effects.find(e => e.origin === `module.${MODULE_ID}.flanking`);
+    const existing = actor.effects.find(_isFlankingEffect);
     if (!existing) {
       await actor.createEmbeddedDocuments("ActiveEffect", [this._makeEffectData()]);
     }
@@ -157,11 +182,12 @@ export const FlankingChecker = {
     // only sees the world actor, not the synthetic token actor.
     if (actor.isToken) {
       const worldActor = game.actors.get(actor.id);
-      if (worldActor && !worldActor.effects.find(e => e.origin === `module.${MODULE_ID}.flanking.saves`)) {
+      if (worldActor && !worldActor.effects.find(_isFlankingSavesEffect)) {
         await worldActor.createEmbeddedDocuments("ActiveEffect", [{
           name:     "Vulnerable — Saves (Flanked)",
           img:      "icons/svg/downgrade.svg",
           origin:   `module.${MODULE_ID}.flanking.saves`,
+          flags:    { [MODULE_ID]: { flanking_saves: true } },
           changes: [
             { key: "system.outgoingSavesModifier", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "favor" },
           ],
@@ -171,19 +197,17 @@ export const FlankingChecker = {
   },
 
   async _removeFlanked(actor) {
-    const hadFlag = !!actor.getFlag(MODULE_ID, "flankedBy");
     await actor.unsetFlag(MODULE_ID, "flankedBy");
-    // Only remove the effect we created (matched by origin)
-    if (hadFlag) {
-      const effect = actor.effects.find(e => e.origin === `module.${MODULE_ID}.flanking`);
-      if (effect) {
-        await effect.delete();
-      }
-    }
+    // Always delete the effect if it exists. Don't gate on the flag — the flag
+    // and effect can drift apart (Foundry v14 nulled the origin field on
+    // pre-fix effects, leaving orphans that the previous flag-gated removal
+    // could never reach).
+    const effect = actor.effects.find(_isFlankingEffect);
+    if (effect) await effect.delete();
     // Clean up the mirrored world-actor effect for unlinked tokens
     if (actor.isToken) {
       const worldActor = game.actors.get(actor.id);
-      const saveEffect = worldActor?.effects.find(e => e.origin === `module.${MODULE_ID}.flanking.saves`);
+      const saveEffect = worldActor?.effects.find(_isFlankingSavesEffect);
       if (saveEffect) await saveEffect.delete();
     }
   },
@@ -192,19 +216,24 @@ export const FlankingChecker = {
 
   async _cleanupAll() {
     if (!game.user.isGM) return;
-    // Remove flanking Vulnerable from all actors (world + synthetic)
+    // Remove flanking Vulnerable from all actors (world + synthetic).
+    // Sweep by effect presence too — orphan AEs (no flag) still need cleanup.
     for (const actor of game.actors) {
-      if (actor.getFlag(MODULE_ID, "flankedBy")) {
+      const hasFlankingEffect = actor.effects.some(_isFlankingEffect);
+      if (actor.getFlag(MODULE_ID, "flankedBy") || hasFlankingEffect) {
         await this._removeFlanked(actor);
       }
       // Also clean any mirrored save effects on world actors
-      const saveEffect = actor.effects.find(e => e.origin === `module.${MODULE_ID}.flanking.saves`);
+      const saveEffect = actor.effects.find(_isFlankingSavesEffect);
       if (saveEffect) await saveEffect.delete();
     }
     // Clean synthetic token actors on the current scene
     for (const token of canvas.tokens?.placeables ?? []) {
-      if (token.actor?.isToken && token.actor.getFlag(MODULE_ID, "flankedBy")) {
-        await this._removeFlanked(token.actor);
+      const a = token.actor;
+      if (!a?.isToken) continue;
+      const hasFlankingEffect = a.effects.some(_isFlankingEffect);
+      if (a.getFlag(MODULE_ID, "flankedBy") || hasFlankingEffect) {
+        await this._removeFlanked(a);
       }
     }
   },
