@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.17.1
+
+### Magic Ward & spell cast checks — survive the system's v4.x spell-cast refactor
+
+- **Magic Ward surcharge works again.** The Vagabond system v4.x moved spell-cost calculation off `SpellHandler._calculateSpellCost` onto the static `SpellCastDialog.calculateCosts` — now the single authority for the dialog's cost preview, the mana/castingMax validation, and the actual deduction — and made `SpellHandler.castSpell` merely *open* the dialog (the real cast runs in `_executeCast`). The Crawler still wrapped the old method, so the "+N Mana to affect a warded being" surcharge silently stopped applying. Re-pointed the integration: the surcharge is added in `calculateCosts`, surfaced in the cast dialog via the system's `vagabond.spellCastMessages` hook, and the cast-check flag + ward "first affect per round" detection moved to `_executeCast`. Verified live — casting at a warded foe again deducts base + surcharge.
+- **Cast-check target modifiers and Nimble apply to spells again.** The same flag-timing bug meant a target's `incomingAttacksModifier` (Vulnerable, Prone, …) and the Nimble "can't be Favored" clamp were no longer applied to spell rolls. Holding the cast-check flag across the roll inside `_executeCast` restores both.
+
+### Flanking / Pack Instincts / Soft Underbelly — un-removable effects on Foundry v14
+
+- **Active Effects from these features could not be found or removed on v14.** v14 made `ActiveEffect.origin` a `DocumentUUIDField`; non-UUID origin strings like `"module.vagabond-crawler.flanking"` are nulled at creation, so `effects.find(e => e.origin === …)` returned nothing. Flanked Vulnerable lingered after the flanker walked away; Pack Instincts and Soft Underbelly stacked duplicate effects that cleanup couldn't reap. Fixed by stamping `flags.vagabond-crawler.<key>` on each effect and looking up by flag (with `origin` / `flags.core.originText` fallbacks for legacy effects); cleanup switched to filter-all so pre-fix duplicates get swept on next trigger.
+
 ## v1.17.0
 
 ### Loot Drops — Chat-card flow replaces canvas loot bags
