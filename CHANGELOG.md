@@ -26,6 +26,13 @@
   a `min-width`, so a narrow window scrolls the list horizontally instead of
   crushing every column. Long names (e.g. "Alligator/Crocodile, Giant") now
   ellipsize cleanly and carry the full name in their tooltip.
+- **Name column pinned at 150px** in both NPC tables. It was previously the only
+  column without a declared width, so under fixed layout it absorbed all leftover
+  space — 158px at the default window for text that is typically 78px, ballooning
+  to ~580px if you widened the window. A width-less spacer column at the end of
+  each row now soaks up the slack instead, so Name stays at 150px at any window
+  size. 26 of 297 bestiary names (8.8%) ellipsize, each with the full name on
+  hover.
 - **Encounter Roller default width 700 → 980**, which fits the filter column plus
   the full table with no horizontal scrolling.
 

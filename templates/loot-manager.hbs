@@ -137,11 +137,13 @@
           <tr>
             <th style="width:28px;"><input type="checkbox" class="loot-select-all" title="Select all" /></th>
             <th style="width:32px;"></th>
-            <th class="loot-sortable" data-sort="name">Name <i class="fas fa-sort"></i></th>
+            <th class="loot-sortable" data-sort="name" style="width:150px;">Name <i class="fas fa-sort"></i></th>
             <th class="loot-sortable" data-sort="beingType" style="width:90px;">Type <i class="fas fa-sort"></i></th>
             <th class="loot-sortable" data-sort="threatLevel" style="width:40px;">TL <i class="fas fa-sort"></i></th>
             <th style="width:130px;">Loot Table</th>
             <th style="width:42px;">%</th>
+            {{!-- Spacer: absorbs slack so Name can't balloon. See encounter-roller.hbs. --}}
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -163,6 +165,7 @@
             <td>
               <input type="number" class="npc-chance-input" data-actor-id="{{id}}" data-comp-uuid="{{compUuid}}" value="{{dropChance}}" min="-1" max="100" style="width:42px;" title="Drop chance % (-1 = global)" />
             </td>
+            <td></td>
           </tr>
           {{/each}}
         </tbody>
