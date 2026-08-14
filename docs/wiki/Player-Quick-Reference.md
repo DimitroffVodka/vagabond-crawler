@@ -51,7 +51,7 @@ PC cards can show **Weapons**, **Spells**, and situational tabs supplied by Vaga
 
 Right-click a Crawler scroll and choose **Use Scroll**. It costs no mana, skips the Cast Check, reads your targets, rolls supported damage and FX, and is consumed or decremented.
 
-Version `1.17.2` does not rebuild every stored status, critical, or explosion rider when a scroll is used.
+A scroll never crits in version `1.18.0`, so any critical rider on the spell cannot fire. The scroll also reads the spell live from the compendium, so a GM editing that spell changes what your existing scrolls do.
 
 ### Merchant Shop
 

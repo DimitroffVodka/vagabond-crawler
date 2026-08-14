@@ -127,7 +127,8 @@ Scroll Forge has no dedicated settings. It reads delivery types and their cost r
 - Created scrolls stay separate items and never merge into a stack.
 - **Use Scroll** reads the current target set, so the player should still target the intended tokens first.
 - Supported spell FX play from the user's token.
-- Version `1.17.2` stores status, critical, and explosion fields but does not reconstruct all of them during **Use Scroll**. A scroll is therefore not guaranteed to behave exactly like the source spell.
+- **Use Scroll** re-reads the spell from the compendium rather than the snapshot taken when the scroll was scribed. Editing the spell later changes what its existing scrolls do, and deleting it makes them unusable. Still true in version `1.18.0`.
+- A scroll never crits — version `1.18.0` fixes the cast to a non-critical success, so critical riders on the spell cannot fire. The status, critical, and explosion fields stored on the scroll are unused.
 - Bought, forged, and generated Crawler scrolls use the same inventory action.
 - Edit `vagabond.spells` to change the spell list shown by the Forge.
 
@@ -184,7 +185,7 @@ Crawler adjusts how Vagabond inventory stacks and counts items. New items with t
 
 **Forge & Loot → Party Inventory** opens player-owned character inventories side by side. Each column shows item quantity, slot use, equipment state, and value. The window reads live actor data, so sheet changes appear on its next render.
 
-> **Version 1.17.2 limitation:** Party Inventory is read-only. It does not implement the drag-transfer behavior described in the older guide.
+> **Version 1.18.0 limitation:** Party Inventory is read-only. It does not implement the drag-transfer behavior described in the older guide — the window has no transfer controls at all.
 
 ### Item Drops
 
