@@ -322,7 +322,11 @@ Committed dataset of every NPC across the Vagabond compendium packs. Source JSON
 
 1. Bump `"version"` in `module.json`
 2. Update `CHANGELOG.md` and the README version badge
-3. Commit and push
+3. Commit and push. Put `[wiki-ok]` in the release commit message — it bumps
+   the README version badge, and `docs/wiki/Home.md` has no badge to mirror,
+   so the wiki drift check would otherwise fail the commit. Verify with
+   `node scripts/check-wiki-drift.mjs --staged` **before** committing; with no
+   arguments the script checks the *previous* commit, not your staged changes.
 4. Build `module.zip`:
    ```bash
    python3 scripts/ci/build-module-zip.py
