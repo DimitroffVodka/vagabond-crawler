@@ -124,7 +124,7 @@ Scroll Forge has no dedicated settings. It reads delivery types and their cost r
 
 ### Scroll notes
 
-- Created scrolls remain separate items, but inventory slot accounting pools them under **Scrolls**.
+- Created scrolls stay separate items and never merge into a stack.
 - **Use Scroll** reads the current target set, so the player should still target the intended tokens first.
 - Supported spell FX play from the user's token.
 - Version `1.17.2` stores status, critical, and explosion fields but does not reconstruct all of them during **Use Scroll**. A scroll is therefore not guaranteed to behave exactly like the source spell.
@@ -178,7 +178,7 @@ Player requests go through the connected GM client and successful trades are wri
 
 ### Inventory system
 
-Crawler adjusts how Vagabond inventory stacks and counts items. New items with the same name and type can merge into one quantity unless the caller uses `skipStack`. Stacks larger than one receive quantity badges. Extra copies of slotted gear add their own slot cost, while zero-slot items pool by `gearCategory` at ten items per slot. Scrolls share a **Scrolls** pool, and items marked `trueZeroSlot` do not enter a pool.
+Crawler adjusts how Vagabond inventory stacks and counts items. New items with the same name and type can merge into one quantity unless the caller uses `skipStack`. Stacks larger than one receive quantity badges. Slot counting differs from the base system on one axis only — quantity. Vagabond charges an item its slot cost once and never reads quantity, so two torches use one slot; Crawler charges a stack of N `baseSlots × N`, so two torches use two. Everything else matches the system: zero-slot items are free, items stowed inside a container cost nothing because the container's own slots cover them, and slot cost comes from the item's `baseSlots` rather than its name — a core `Candle` is free, an alchemical `Candle, Basic` costs one. Items marked `trueZeroSlot` ("Weightless") never add slots at any quantity.
 
 ### Party Inventory
 

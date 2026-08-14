@@ -26,8 +26,10 @@ When the Token HUD offers **Rollback**, it returns the token to its turn-start p
 
 - Right-click supported items for actions such as **Light**, **Extinguish**, and **Use Scroll**.
 - Matching items can merge into a quantity stack and receive a quantity badge.
-- Zero-slot items pool by category; ten pooled units use one slot.
-- Scrolls share a **Scrolls** pool for slot accounting.
+- Zero-slot items (rations, coins, backpacks) are free, same as the core rules.
+- A stack of N costs N × the item's slot value — two torches use two slots.
+- Slot cost comes from the item, not its name: a plain **Candle** is free, an alchemical **Candle, Basic** costs one.
+- Items stowed inside a container cost nothing; the container's own slots cover them.
 
 ### Light sources
 
