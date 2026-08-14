@@ -2,6 +2,7 @@
 import { DEFAULT_ANIMATION_FX_CONFIG, buildDefaultAnimationFxConfig } from "./animation-fx-defaults.mjs";
 import { AnimationFxConfigApp } from "./animation-fx-config.mjs";
 import { AnimationFxOverrideApp } from "./animation-fx-override.mjs";
+import { isWrapped, markWrapped } from "./wrap-guard.mjs";
 
 const MODULE_ID = "vagabond-crawler";
 
@@ -292,8 +293,9 @@ export const AnimationFx = {
       return;
     }
     if (!VCC || typeof VCC.npcAction !== "function") return;
-    // Avoid double-wrapping
-    if (VCC.npcAction.__vcAnimFxWrapped) return;
+    // Avoid double-wrapping. Guard on the owner object, not the function — a
+    // later wrap by another module hides a function-level flag. See wrap-guard.mjs.
+    if (isWrapped(VCC, "npcAction")) return;
 
     const original = VCC.npcAction.bind(VCC);
     const wrapped = async function (actor, action, actionIndex, targets, ...rest) {
@@ -348,8 +350,9 @@ export const AnimationFx = {
         if (!stamped) Hooks.off("preCreateChatMessage", preHook);
       }
     };
-    wrapped.__vcAnimFxWrapped = true;
+    wrapped.__vcAnimFxWrapped = true;   // kept for debugging/introspection only
     VCC.npcAction = wrapped;
+    markWrapped(VCC, "npcAction");
     console.log(`${MODULE_ID} | AnimationFx: wrapped VagabondChatCard.npcAction (actionIndex flag)`);
   },
 
@@ -535,6 +538,13 @@ export const AnimationFx = {
 
     // NPC action path
     if (source.actor && typeof source.actionIndex === "number") {
+      // Guard that `actor` is a real Document, not just truthy. _onChatMessage
+      // always hands us one (it resolves via game.actors.get and bails on a
+      // miss), but _resolve runs off a chat hook where a throw derails the
+      // whole chat-card chain — so degrade to "no animation" rather than
+      // explode on anything unexpected.
+      if (typeof source.actor.getFlag !== "function") return null;
+
       const actorOverrides = source.actor.getFlag(MODULE_ID, "actionOverrides") ?? {};
       const ov = actorOverrides[source.actionIndex];
       if (ov) {
@@ -544,9 +554,11 @@ export const AnimationFx = {
       return this._resolveNpcAction(source.actor, source.actionIndex, config);
     }
 
-    // Item path
+    // Item path — same reasoning as above. `item?.type` alone doesn't prove
+    // it's a Document, so a plain object carrying a `type` would throw here.
     const item = source.item ?? source;
     if (!item?.type) return null;
+    if (typeof item.getFlag !== "function") return null;
     if (item.getFlag(MODULE_ID, "disabled")) return null;
     const override = item.getFlag(MODULE_ID, "animationOverride");
     if (override) return override;

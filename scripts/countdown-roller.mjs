@@ -11,6 +11,7 @@
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
+import { isWrapped, markWrapped } from "./wrap-guard.mjs";
 
 // Dice So Nice animation takes ~2 seconds; pad to avoid overlap.
 const DICE_ANIM_DELAY = 2500;
@@ -143,7 +144,8 @@ export const CountdownRoller = {
     // sibling patch: patch the helper itself by capturing the caller-scope
     // `entry` before create.
     const original = _StatusHelper._createStatusCountdown;
-    if (!original || original.__vcbPatchedFatigueOnTick) return;
+    // Guard on the owner, not the function — see wrap-guard.mjs.
+    if (!original || isWrapped(_StatusHelper, "_createStatusCountdown")) return;
     _StatusHelper._createStatusCountdown = async function (actor, entry, sourceName = "", sourceActorName = "") {
       // Temporarily stash the entry so the CountdownDice.create wrapper below
       // can pick up fatigueOnTick from it. Using a module-scope ref avoids a
@@ -155,14 +157,15 @@ export const CountdownRoller = {
         _pendingRiderEntry = null;
       }
     };
-    _StatusHelper._createStatusCountdown.__vcbPatchedFatigueOnTick = true;
+    _StatusHelper._createStatusCountdown.__vcbPatchedFatigueOnTick = true;  // debugging only
+    markWrapped(_StatusHelper, "_createStatusCountdown");
 
     // Wrap CountdownDice.create — system's create doesn't persist the
     // fatigueOnTick field (there's a literal TODO in the system code), so
     // after the journal is created, stamp the flag directly if the pending
     // rider entry has fatigueOnTick > 0.
     const createOrig = _CountdownDice.create;
-    if (createOrig && !createOrig.__vcbPatchedFatigueOnTick) {
+    if (createOrig && !isWrapped(_CountdownDice, "create")) {
       _CountdownDice.create = async function (data = {}) {
         const fot = Number(_pendingRiderEntry?.fatigueOnTick) || 0;
         const journal = await createOrig.call(this, data);
@@ -171,7 +174,8 @@ export const CountdownRoller = {
         }
         return journal;
       };
-      _CountdownDice.create.__vcbPatchedFatigueOnTick = true;
+      _CountdownDice.create.__vcbPatchedFatigueOnTick = true;  // debugging only
+      markWrapped(_CountdownDice, "create");
     }
   },
 
