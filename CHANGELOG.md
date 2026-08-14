@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## v1.18.1
+
+### Relics and inventory — five defects found by a second adversarial review
+
+- **Vicious fired on every hit.** Callers disagree on the shape of `isCritical` — `roll-handler.mjs` and `vagabond.mjs` pass a boolean, `chat-card.mjs` passes `{ isCritical }`. A raw object is truthy, so every chat-card attack was treated as a crit while the Roll Damage button, which normalises, was not. The same weapon rolled different damage depending on which path fired. Normalised inside `collectBonusParts` so every caller is covered.
+- **The wrap guard leaked across the prototype chain.** `owner[GUARD]?.[key]` walks the chain, so a subclass overriding a wrapped parent method inherited the marker and was silently skipped. `isWrapped()` is now an own-property check.
+- **`quantity: 0` desynced the sheet.** The header showed `baseSlots` while `_itemCapacity`'s `baseSlots × qty` returned 0, so the grid numbered from 1 while the header said 1 occupied. Emptying ammo without deleting the item is ordinary play. Fixed in `_itemCapacity` to keep parity with the system; negative `baseSlots` is clamped at 0 rather than crediting slots back.
+- **The chat-card damage button compounded its rider.** Buttons persist after clicking, and the handler read `damageFormula`, appended, and wrote back — a second click turned `1d8 + 1d4` into `1d8 + 1d4 + 1d4`. It now recomputes from a stashed pristine formula.
+- **Party Inventory listed different items than it counted.** It filtered on `type === "equipment"` while `getTotalOccupiedSlots` charged the full inventory set, so containers were billed but not shown. Both now share an exported `isInventoryItem()`.
+
+Also adds the repo's first `.gitignore` and untracks 8 Playwright scratch files that a `git add -A` had swept in. The blobs remain in pushed history; scrubbing them needs a force-push and is left as a decision.
 
 ### Browse NPCs — fix crushed portraits and ragged row heights
 
@@ -48,6 +58,20 @@
   bestiary actors found this as the only break.
 - **Encounter Roller default width 700 → 980**, which fits the filter column plus
   the full table with no horizontal scrolling.
+
+### Maintenance
+
+- **CI now fails when the declared system version drifts from the released one.**
+  Every bug in v1.18.0 shared a root cause: the module declared `verified: 5.8.1`
+  while 5.36.0 was installed, and across that 28-minor gap the system deleted item
+  types and reworked slot counting. `scripts/ci/check-system-drift.mjs` fetches the
+  system's published manifest and compares it against `module.json`, and also
+  asserts the manifest/download URLs still use the `latest` redirect. It runs on PRs
+  and **weekly** — the schedule is the point, since drift accumulates while nobody
+  touches the repo.
+- **Wiki source is tracked in `docs/wiki/`** with a drift check pairing each page to
+  its `docs/` counterpart, plus `scripts/publish-wiki.mjs` to publish. All 18
+  version-stamped limitations were re-verified against the shipped code.
 
 ## v1.18.0
 
