@@ -24,6 +24,11 @@ const SUITE_LOADERS = [
   () => import("./suites/merchant-recap.mjs"),
   () => import("./suites/exploration-tools.mjs"),
   () => import("./suites/animation-fx-adversarial.mjs"),
+  // Drift canary: the 7 system methods we patch and the system.* paths our
+  // AEs write. Both fail silently when the system renames them, so no other
+  // suite would notice.
+  () => import("./suites/system-contract.mjs"),
+  () => import("./suites/inventory-slots.mjs"),
 ];
 
 let _loaded = false;

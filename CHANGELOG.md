@@ -1,5 +1,45 @@
 # Changelog
 
+## v1.18.0
+
+### Compatibility
+
+- **Vagabond system `verified` bumped to 5.36.0** (from 5.8.1; minimum stays 4.1.0). The 28-minor gap was the root of every bug in this release — 5.36.0 dropped the `weapon` / `armor` / `gear` item types and moved slot counting, and the Crawler was still coded against the older shape.
+- **Foundry `verified` bumped to 14.365** (from 14.361; minimum stays 14).
+
+### Inventory slot counting — match the system everywhere except quantity
+
+- **Zero-slot items are free again.** Crawler pooled them by `gearCategory` at "10 units per slot", but `Math.ceil` ran *per pool*, so every distinct category cost a full slot even at a single item. A Backpack (`baseSlots: 0`, free in the core rules) cost a slot — so did a lone Quill, a Locket, and the Monk's `Unarmed`. Measured on a live world this inflated typical loadouts by 2–4 slots, charging characters for carrying *variety* rather than weight. The pooling is removed: Crawler now deviates from the system on **exactly one axis — quantity**. A stack of N costs `baseSlots × N`; everything else matches the system's `_calculateInventorySlots` (`module/data/actor-character.mjs:1155`).
+- **Items stowed inside a container are no longer double-counted.** The system skips anything carrying a `containerId`, since the container's own slot cost represents its contents. Crawler counted them anyway, so packing a backpack *added* encumbrance instead of organising it.
+- **Item-type filter realigned with the system.** `_INV_TYPES` was `{equipment, weapon}`. Vagabond 5.36.0 has no `weapon` type at all — weapons, armor and gear are all `equipment` discriminated by `equipmentType` — and Crawler was missing `container`, which the system does count. The set now mirrors the system's own `isInventoryItem` list.
+- **The "Weightless" flag now exempts an item at any quantity**, rather than only skipping zero-slot pooling. Note it is largely redundant now that zero-slot items cost nothing by default.
+
+### Inventory grid — free-cell numbers agree with the slot counter
+
+- **The sheet no longer contradicts itself.** The header showed Crawler's quantity-aware total while the grid numbered free cells from the system's, so a character could read `14 / 17` above a grid whose next empty cell was labelled `11`. `InventoryHandler.prepareInventoryGrid` is now wrapped and the numbering recomputed with quantity-aware sizes.
+- **Stacks occupy their true footprint.** `totalSlots` also drives `grid-column: span` in `inventory-card.hbs`, so a Torch ×2 spans two cells instead of claiming one and silently consuming two. Zero-slot items stay unnumbered and span one, as before.
+- **All three surfaces now agree.** Slot totals were being computed in three places with three different results. They now route through one exported `getTotalOccupiedSlots(actor)`:
+  - The **Character HUD** prints `{{system.inventory.occupiedSlots}}` straight off the actor and never calls `prepareInventoryGrid`, so the grid wrap could not reach it — the rendered count is corrected on `renderVagabondCharacterHud`.
+  - **Party Inventory** summed `slots × quantity` over `type === "equipment"` on its own, charging for gear stowed in containers, ignoring the Weightless flag, and skipping `container`-type items. On a test loadout it over-reported by **11 slots**.
+- The invariant `Σ itemCapacity === occupiedSlots + getExtraOccupiedSlots()` is documented at the call site and was checked against every character in a live world.
+
+### Relic damage — exploding dice survive the bonus-dice merge
+
+- **Relic weapons silently lost every exploding die.** `_patchItemRollDamage` took the base roll the system had already evaluated, then rebuilt it with `new Roll(baseRoll.formula + bonus)` and re-rolled. The system applies explosions *after* evaluation — `VagabondDamageHelper._manuallyExplodeDice` pushes extra results straight into `term.results`, and the formula string keeps no record of them (an exploding weapon's formula is a plain `4d6`). Re-rolling therefore discarded them: a 104-result roll came back as 4. Any weapon with a relic rider rolled as though it never exploded.
+- **Fixed by appending the bonus terms to the evaluated roll in place**, rather than constructing a new one. `Roll.fromTerms` was rejected because it returns a fresh instance and drops state the system hangs off the roll object — `_perDieBonusTotal`, `_perDieBonusDiceCount`, `_weaknessPreRolled`, and the dice-appearance colorset. Mutating keeps the exact instance the system returned. Verified live: `1d6 + 1d4` with 101 preserved die results and a consistent total.
+- The chat-card `rollDamageFromButton` path was never affected — it rewrites the formula string *before* the system evaluates, so explosions are applied to the combined roll.
+
+### Monkey-patch idempotency — guards survive being wrapped by other modules
+
+- **New `scripts/wrap-guard.mjs`.** Every wrap guard tested a flag on its own wrapper function. `vagabond-character-enhancer` wraps several of the same methods and, being alphabetically earlier, its `ready` hook runs first — so our flag ended up buried inside VCE's closure and read as "not patched". A second patch call then stacked another layer. Reproduced live on relic dice: `1d6 + 1d4 + 1d4`.
+- Guards now key on the **owner object** (prototype / static class / namespace), whose identity is stable however many layers wrap the method. Applied to all six wrap sites: `VagabondItem.rollDamage`, `VagabondDamageHelper.rollDamageFromButton` (which previously had **no guard at all** — a second patch would append the relic rider to `button.dataset.damageFormula` twice), `InventoryHandler.prepareInventoryGrid`, `VagabondChatCard.npcAction`, and both countdown-dice patches.
+- Inspect from the console: `VagabondItem.prototype[Symbol.for("vagabond-crawler.wraps")]`.
+
+### Tests
+
+- **New `Inventory Slots` smoke suite** (`scripts/test/suites/inventory-slots.mjs`, run via `game.vagabondCrawler.test.run("inventory")`). Pins the counting rules — zero-slot items free, stowed items excluded, stacks at `baseSlots × quantity`, the Weightless opt-out — and guards the header/grid invariant by rendering a real sheet and asserting the first empty cell is numbered `headerTotal + 1`. It asserts on the rendered DOM rather than re-implementing the math, so it can't drift in lockstep with the code it checks.
+- **Relic wrap-chain test rewritten.** The old case noticed that our marker was invisible when VCE wrapped outermost and worked around it with an `||`; it now asserts the prototype-level guard is present and that re-invoking either relic patch returns the identical function object.
+
 ## v1.17.2
 
 ### Compatibility

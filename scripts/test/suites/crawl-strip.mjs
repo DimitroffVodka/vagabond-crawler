@@ -84,9 +84,11 @@ export function register() {
           tokenId: npcTok.id, sceneId: canvas.scene.id, actorId: npcTok.actor.id,
         }]);
       }
-      await ctx.fx.settle(800);
-
-      const after = ctx.fx.fxSnapshot();
+      // Poll for the effect rather than sleeping a fixed time and sampling:
+      // getEffects() lists only effects that are CURRENTLY playing, and this
+      // FX lives ~750-800ms, so the old settle(800) sampled it exactly as it
+      // expired (~1 failure in 15 runs, always green in isolation).
+      const after = await ctx.fx.fxWaitForIncrease(before);
       const delta = after.count - before.count;
       // 1 = crawler weapon FX. >1 would mean we double-fired (system + crawler both played).
       expect(delta).toBeGreaterThan(0);

@@ -33,6 +33,7 @@ import { SessionRecap }    from "./session-recap.mjs";
 import { AnimationFx }    from "./animation-fx.mjs";
 import { HitDieConfig, HitDieConfigApp } from "./hit-die-config.mjs";
 import { StackSplit }     from "./stack-split.mjs";
+import { isWrapped, markWrapped } from "./wrap-guard.mjs";
 import { GatherFriendlies } from "./gather-friendlies.mjs";
 import { registerSettingsGroupMenus } from "./settings-group-app.mjs";
 import { resolveHitDieConfig, calculateHP, dieAvg } from "./monster-mutator.mjs";
@@ -40,39 +41,182 @@ import { resolveHitDieConfig, calculateHP, dieAvg } from "./monster-mutator.mjs"
 export const MODULE_ID = "vagabond-crawler";
 
 // ── Inventory helpers (shared with movement-tracker) ─────────────────────────
-// The system's `actor.system.inventory.occupiedSlots` counts each item as
-// `baseSlots × 1` and ignores stacking, so these helpers compute the extra
-// slots Crawler's stack/pool model adds on top.
-const _INV_TYPES = new Set(["equipment", "weapon"]);
+// The system's `actor.system.inventory.occupiedSlots` (`_calculateInventorySlots`,
+// `module/data/actor-character.mjs:1174-1198`, verified against vagabond 5.36.0):
+//
+//   if (item.system.containerId) continue;             // stowed items are free
+//   const itemSlots = item.system.slots || item.system.baseSlots || 0;
+//   if (itemSlots > 0) occupiedSlots += itemSlots;     // quantity is never read
+//
+// So the system charges nothing for zero-slot items and ignores quantity entirely
+// — two Torches occupy one slot. Crawler deviates on exactly ONE axis: quantity.
+// A stack of N costs `baseSlots × N`, so the extra to add is `baseSlots × (N - 1)`.
+//
+// Zero-slot items are free here, same as the system. Crawler used to pool them by
+// `gearCategory` at 10-per-slot, but `Math.ceil` ran per pool, so every distinct
+// category cost a full slot even at one item — a Backpack (`baseSlots: 0`, free in
+// the system) cost a slot, and characters read over capacity. Removed deliberately.
+const _INV_TYPES = new Set(["equipment", "weapon", "armor", "gear", "container"]);
+
+/**
+ * Does this item occupy inventory on its owner's sheet? Exported so any surface
+ * that LISTS inventory uses the same gate as the code that COUNTS it. Party
+ * Inventory previously hardcoded `type === "equipment"`, which dropped
+ * `container`-type items from its list while still charging their slots in the
+ * total — a column whose items didn't add up to its own number.
+ */
+export function isInventoryItem(item) {
+  if (!item?.system || !_INV_TYPES.has(item.type)) return false;
+  return !item.system.containerId;   // stowed items are represented by their container
+}
 
 export function getExtraOccupiedSlots(actor) {
   if (!actor?.items) return 0;
   let extra = 0;
-  const zeroSlotGroups = new Map();
   for (const item of actor.items) {
     if (!item.system || !_INV_TYPES.has(item.type)) continue;
-    const baseSlots = item.system.slots || item.system.baseSlots || 0;
-    const qty = item.system.quantity ?? 1;
-    if (baseSlots === 0 && qty > 0) {
-      if (item.getFlag(MODULE_ID, "trueZeroSlot")) continue;
-      const group = item.system.gearCategory || item.name;
-      zeroSlotGroups.set(group, (zeroSlotGroups.get(group) || 0) + qty);
-    } else if (qty > 1) {
-      extra += baseSlots * (qty - 1);
-    }
-  }
-  for (const total of zeroSlotGroups.values()) {
-    extra += Math.ceil(total / 10);
+    // Stowed items are excluded by the system's own slot math — the container's
+    // slots represent them. Counting them here double-charged every packed item.
+    if (item.system.containerId) continue;
+    // "Weightless" opt-out: never contribute extra slots, whatever the quantity.
+    if (item.getFlag(MODULE_ID, "trueZeroSlot")) continue;
+    const baseSlots = _slotsOf(item);
+    const qty = _qtyOf(item);
+    if (qty > 1) extra += baseSlots * (qty - 1);
   }
   return extra;
 }
 
+// Normalised readers, shared by both halves of the invariant below.
+// `baseSlots` is clamped at 0 because the schema puts no `min` on the field and
+// the system only adds it when `> 0`; a negative value must contribute nothing,
+// not subtract. `quantity` is floored and clamped for the same reason (the
+// schema says `integer: true, min: 0`, but nothing stops a module writing junk).
+function _slotsOf(item) {
+  return Math.max(0, item?.system?.slots || item?.system?.baseSlots || 0);
+}
+function _qtyOf(item) {
+  return Math.max(0, Math.floor(item?.system?.quantity ?? 1));
+}
+
+// Capacity a single item consumes under Crawler's model. MUST stay in lockstep
+// with getExtraOccupiedSlots() above, or the sheet header and the inventory grid
+// will disagree. The identity that has to hold, summed over every item:
+//
+//   Σ itemCapacity  ===  system.occupiedSlots + getExtraOccupiedSlots()
+//
+// The system contributes `baseSlots` once per item; Crawler's extra contributes
+// `baseSlots × (qty − 1)` unless the item is flagged weightless. So a weightless
+// item still costs the system's `baseSlots` — it only forgoes the stack multiplier.
+//
+// `quantity: 0` is the case worth spelling out. The system charges `baseSlots`
+// regardless of quantity, and `getExtraOccupiedSlots` adds nothing (its guard is
+// `qty > 1`), so the header shows `baseSlots`. A naive `baseSlots × qty` here
+// would return 0 and the grid would start numbering at 1 while the header said 1
+// occupied — the sheet contradicting itself. Emptying a stack to zero without
+// deleting the item is ordinary play (ammo, consumables), so this is not
+// theoretical. Charging `baseSlots` keeps parity with the system.
+function _itemCapacity(item) {
+  const baseSlots = _slotsOf(item);
+  if (item?.getFlag?.(MODULE_ID, "trueZeroSlot")) return baseSlots;
+  const qty = _qtyOf(item);
+  return qty > 1 ? baseSlots * qty : baseSlots;
+}
+
+// ── Inventory grid numbering ─────────────────────────────────────────────────
+// The system numbers the grid from its own model, which never reads `quantity`
+// (`InventoryHandler.prepareInventoryGrid`, advancing by `itemData.totalSlots`).
+// Crawler charges `baseSlots × N` for a stack, so the patched header read "12 / 17"
+// while the grid still drew free cells starting at 11 — the sheet contradicted
+// itself. Recompute the numbering with quantity-aware sizes so both agree.
+//
+// `totalSlots` also drives `grid-column: span` in inventory-card.hbs, so a stack
+// now visually occupies its true footprint instead of a single cell.
+export function renumberInventoryGrid(context, actor) {
+  const inv = actor?.system?.inventory;
+  if (!inv || !Array.isArray(context?.inventoryItems)) return;
+  const baseMaxSlots = inv.baseMaxSlots ?? 0;
+  const maxSlots = inv.maxSlots ?? 0;
+
+  let capacityNumber = 1;
+  for (const itemData of context.inventoryItems) {
+    const consumed = _itemCapacity(itemData.item);
+    itemData.totalSlots = consumed;
+    if (consumed > 0) {
+      itemData.displayNumber = capacityNumber;
+      capacityNumber += consumed;
+    } else {
+      itemData.displayNumber = null;  // zero-slot items are unnumbered, as before
+    }
+  }
+
+  const itemCount = context.inventoryItems.length;
+  const emptyCount = Math.max(0, baseMaxSlots - (capacityNumber - 1));
+  context.emptySlots = Array.from({ length: emptyCount }, (_, i) => {
+    const slotNumber = capacityNumber + i;
+    // Fatigue eats the LAST N slots — anything past the effective max is unusable.
+    const fatigueOccupied = slotNumber > maxSlots;
+    return { index: itemCount + i, displayNumber: slotNumber, unavailable: fatigueOccupied, fatigueOccupied };
+  });
+  context.gridSize = itemCount + emptyCount;
+  context.gridRows = Math.ceil(context.gridSize / 4);
+}
+
+// Wrap the system's grid builder so the renumber runs for every surface that uses
+// it — the character sheet AND the character HUD both instantiate InventoryHandler.
+async function _wrapInventoryGrid() {
+  let InventoryHandler;
+  try {
+    ({ InventoryHandler } = await import(
+      "../../../systems/vagabond/module/sheets/handlers/_module.mjs"
+    ));
+  } catch (err) {
+    console.error(`${MODULE_ID} | Inventory grid wrap: failed to import InventoryHandler`, err);
+    return;
+  }
+  const orig = InventoryHandler?.prototype?.prepareInventoryGrid;
+  if (typeof orig !== "function") {
+    console.error(`${MODULE_ID} | Inventory grid wrap: prepareInventoryGrid not found`);
+    return;
+  }
+  // Guard on the prototype, not the function — a function-level flag is hidden
+  // the moment another module wraps the same method. See wrap-guard.mjs.
+  if (isWrapped(InventoryHandler.prototype, "prepareInventoryGrid")) return;
+
+  function prepareInventoryGrid(context, ...rest) {
+    const out = orig.call(this, context, ...rest);
+    try {
+      renumberInventoryGrid(context, this.actor);
+    } catch (err) {
+      console.error(`${MODULE_ID} | Inventory grid renumber failed`, err);
+    }
+    return out;
+  }
+  prepareInventoryGrid.__vcbWrapped = true;   // kept for debugging/introspection only
+  InventoryHandler.prototype.prepareInventoryGrid = prepareInventoryGrid;
+  markWrapped(InventoryHandler.prototype, "prepareInventoryGrid");
+}
+
+/**
+ * Total slots an actor occupies under Crawler's model — the ONE number every
+ * surface must display. The sheet header, the inventory grid, Party Inventory and
+ * the system's Character HUD all route through this. They previously each did
+ * their own arithmetic and drifted apart: the HUD and Party Inventory kept
+ * reporting the system's unadjusted count while the sheet showed the real one.
+ *
+ * @returns {number|null} null when the actor has no inventory to report on.
+ */
+export function getTotalOccupiedSlots(actor) {
+  const inv = actor?.system?.inventory;
+  if (!inv || inv.maxSlots == null) return null;
+  return (inv.occupiedSlots ?? 0) + getExtraOccupiedSlots(actor);
+}
+
 export function isOverloaded(actor) {
   if (actor?.type !== "character") return false;
-  const inv = actor.system?.inventory;
-  if (!inv || inv.maxSlots == null) return false;
-  const occupied = (inv.occupiedSlots ?? 0) + getExtraOccupiedSlots(actor);
-  return occupied > inv.maxSlots;
+  const total = getTotalOccupiedSlots(actor);
+  if (total == null) return false;
+  return total > actor.system.inventory.maxSlots;
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -647,6 +791,10 @@ Hooks.once("ready", async () => {
   // Stack split/merge gestures on the inventory grid
   StackSplit.init();
 
+  // Inventory grid numbering — keep the free-cell numbers in step with the
+  // quantity-aware slot count the header shows. See renumberInventoryGrid().
+  await _wrapInventoryGrid();
+
   // "Gather Friendlies" — DEPRECATED. Replaced by VCE's GatherCompanions
   // (scripts/companion/gather-companions.mjs in vagabond-character-enhancer).
   // The VCE version uses the Party-Token snapshot pattern (compress/release)
@@ -710,7 +858,7 @@ Hooks.once("ready", async () => {
     if (!slotValue) return;
     const match = slotValue.textContent.match(/(\d+)\s*\/\s*(\d+)/);
     if (match) {
-      const newOccupied = parseInt(match[1]) + extraSlots;
+      const newOccupied = getTotalOccupiedSlots(actor) ?? (parseInt(match[1]) + extraSlots);
       const max = parseInt(match[2]);
       slotValue.textContent = `${newOccupied} / ${max}`;
       // System's Handlebars sets `.overloaded` on `.slot-field` from its own
@@ -745,6 +893,26 @@ Hooks.once("ready", async () => {
   Hooks.on("renderVagabondCharacterSheet", _patchInventory);
   Hooks.on("renderVagabondNPCSheet", _patchInventory);
   Hooks.on("renderActorSheet", _patchInventory);  // fallback
+
+  // Character HUD slot counter — the system's `character-hud.hbs` prints
+  // `{{system.inventory.occupiedSlots}}/{{system.inventory.maxSlots}}` straight
+  // off the actor and never routes through `prepareInventoryGrid`, so the grid
+  // wrap does NOT reach it. Correct the rendered text so the HUD agrees with the
+  // sheet instead of quietly showing the system's unadjusted number.
+  const _patchHudSlots = (app, element) => {
+    const actor = app?.actor;
+    if (!actor) return;
+    const total = getTotalOccupiedSlots(actor);
+    if (total == null) return;
+    const root = element instanceof HTMLElement ? element : app.element;
+    const title = root?.querySelector?.(".vh-inv-header-title");
+    if (!title) return;
+    const max = actor.system.inventory.maxSlots;
+    // Label is localized and precedes the count — rewrite only the "N/M" part.
+    const next = title.textContent.replace(/\d+\s*\/\s*\d+/, `${total}/${max}`);
+    if (next !== title.textContent) title.textContent = next;
+  };
+  Hooks.on("renderVagabondCharacterHud", _patchHudSlots);
 
   // Scroll context menu: "Use Scroll" entry on spell scroll items
   const _attachScrollCtx = (sheet) => {

@@ -198,6 +198,40 @@ export const Fixtures = {
   },
 
   /**
+   * Wait until Sequencer reports MORE live effects than `baseline`, and return
+   * that snapshot.
+   *
+   * Use this instead of `settle(n)` + `fxSnapshot()`. fxSnapshot reads
+   * `EffectManager.getEffects()`, which lists only effects that are CURRENTLY
+   * PLAYING — so sleeping a fixed time and then sampling races in BOTH
+   * directions: too early and the effect hasn't started, too late and it has
+   * already finished and been dropped from the list.
+   *
+   * That is not hypothetical. A crawler weapon FX measured alive from ~0-50ms
+   * to 750-800ms, and the test that used `settle(800)` sampled exactly as it
+   * expired — failing approximately 1 run in 15 while passing in isolation.
+   *
+   * Polling for the increase is robust at both ends: it returns as soon as the
+   * effect appears, long before it can expire.
+   *
+   * @param {{count:number}} baseline  snapshot taken before triggering the FX
+   * @param {number} timeoutMs         give up after this long
+   * @returns {Promise<object>} the snapshot showing the increase, or the last
+   *                            one polled if it never increased (lets the
+   *                            caller's own assertion produce the failure)
+   */
+  async fxWaitForIncrease(baseline, timeoutMs = 2500, stepMs = 50) {
+    const deadline = Date.now() + timeoutMs;
+    let last = this.fxSnapshot();
+    while (Date.now() < deadline) {
+      last = this.fxSnapshot();
+      if (last.count > baseline.count) return last;
+      await this.settle(stepMs);
+    }
+    return last;
+  },
+
+  /**
    * Capture all chat messages created during `fn`. Returns the array of
    * created messages plus the value `fn` resolved to.
    */

@@ -24,20 +24,10 @@ via MCP `evaluate` where possible. Paste the result.
 ## Tooling
 
 - `./verify.sh` — pre-commit grep wall + `node --check`. `--strict`
-  promotes warnings to errors. Patterns mostly come from SD module work
-  and may not all apply here; harmless when they don't match.
-- `dev/probes/*.mjs` — paste-able MCP `evaluate` snippets returning
-  `{ pass: bool, ... }` (none yet for this module; add as bugs surface).
-- `dev/fixtures/` — test data scaffold (placeholder).
-- `node scripts/ci/check-system-drift.mjs` — fails when `module.json`'s
-  declared vagabond `verified` falls behind the system's current release,
-  and when the manifest/download URLs stop using the `/releases/latest/`
-  redirect. Run by `.github/workflows/system-drift.yml` on PRs and **weekly**
-  — the schedule is the point, since drift accumulates while nobody touches
-  the repo. Compares on `major.minor` numerically (`5.8` ranks below `5.36`;
-  a string compare gets this backwards). When it fires, **re-test against the
-  new system version before bumping `verified`** — bumping it blind silences
-  the alarm without doing the work it is asking for.
+  promotes warnings to errors.
+- `dev/probes/*.mjs` — paste-able MCP `evaluate` snippets (scaffold;
+  add probes as needed).
+- `dev/fixtures/` — test data scaffold.
 
 ## Quick Reference
 
@@ -153,7 +143,7 @@ class MyApp extends HandlebarsApplicationMixin(ApplicationV2) {
 - `docs/superpowers/` — Planning system. `specs/` holds design docs, `plans/` holds implementation plans and `.tasks.json` state files.
 - `README.md` — Short landing page. Headline features grid links into `docs/`.
 
-**When changing module behavior:** update the matching guide file under `docs/` (for user-visible changes) AND the matching reference file under `docs/dev/` (for architectural changes). The two tracks should stay in sync — one is what players and GMs read, the other is what future-Claude and contributors read.
+**When changing module behavior:** update the matching guide file under `docs/` (for user-visible changes) AND the matching reference file under `docs/dev/` (for architectural changes). The two tracks should stay in sync — one is what players and GMs read, the other is what future-Codex and contributors read.
 
 ## Naming Conventions
 
@@ -313,7 +303,6 @@ The Crawler is the **authoritative provider** for weapon / alchemical / gear / N
 The `vagabond-character-enhancer` (VCE) module wraps several system methods in its `ready` hook. Since it's alphabetically before `vagabond-crawler`, VCE's ready fires first. Consequences:
 
 - **VCE wraps** `SpellHandler.castSpell`, `VagabondItem.rollAttack`, `VagabondRollBuilder.buildAndEvaluateD20WithRollData`, `VagabondDamageHelper.calculateFinalDamage`, etc.
-- **Spell-cast contract (current vagabond system)**: spell cost is computed by the *static* `SpellCastDialog.calculateCosts` (`systems/vagabond/module/applications/spell-cast-dialog.mjs`) — used by BOTH the dialog preview/validation AND the real deduction in `SpellHandler._executeCast`. `SpellHandler.castSpell` now only *opens* the dialog and returns, so wrapping it does NOT bracket the cast. To change spell cost (e.g. Magic Ward surcharge) wrap `calculateCosts`; to bracket the cast (cast-check flag, post-cast ward detection) wrap `_executeCast`; `SpellHandler._calculateSpellCost` now only feeds the inline favorited-spell row. Dialog messages → `vagabond.spellCastMessages` hook (mutate `messages`; `blocking:true` stops the cast); spell-roll mods → `vagabond.preD20Roll`/`postD20Roll` (NOT fired on bypass casts: noRollRequired/GLYPH/IMBUE/altKey). See `_wrapSystemClasses` in `scripts/npc-abilities.mjs`.
 - **`_rangeFavorHinder` pattern**: VCE's `rollAttack` wrap strips the `favorHinder` argument and re-injects it via module-scope state inside its `buildAndEvaluateD20` wrap. A wrap that modifies `favorHinder` BEFORE VCE runs its combine will be overwritten.
 - **Fix for "run after VCE's favor combine"**: wrap in `Hooks.once("setup", ...)` (fires before any `ready` hook). Our wrap becomes innermost → VCE calls through to us with the fully-combined favor. See `registerEarlyRollBuilderWrap()` in `scripts/npc-abilities.mjs`.
 - **For weapon attacks**: the system's target-side `incomingAttacksModifier` is applied inside `rollAttack` using 1-for-1 cancellation (`systems/vagabond/module/documents/item.mjs:592`). By the time `buildAndEvaluateD20` fires, target modifiers are already baked into `favorHinder`.
@@ -334,7 +323,7 @@ Committed dataset of every NPC across the Vagabond compendium packs. Source JSON
 1. Bump `"version"` in `module.json`
 2. Update `CHANGELOG.md` and the README version badge
 3. Commit and push
-4. Build `module.zip` with all files inside a `vagabond-crawler/` wrapper folder (Foundry requires this structure). No `.git`, `.claude`, `docs`, or `data` dirs:
+4. Build `module.zip` with all files inside a `vagabond-crawler/` wrapper folder (Foundry requires this structure). No `.git`, `.Codex`, `docs`, or `data` dirs:
    ```python
    python -c "
    import zipfile, os
@@ -344,7 +333,7 @@ Committed dataset of every NPC across the Vagabond compendium packs. Source JSON
                for f in files:
                    fp = os.path.join(root, f)
                    zf.write(fp, 'vagabond-crawler/' + fp.replace(os.sep, '/'))
-       for f in ['module.json', 'CHANGELOG.md', 'README.md', 'CLAUDE.md']:
+       for f in ['module.json', 'CHANGELOG.md', 'README.md', 'AGENTS.md']:
            if os.path.exists(f): zf.write(f, 'vagabond-crawler/' + f)
    "
    ```
@@ -368,3 +357,59 @@ Both use the `latest` redirect so existing users always find the newest release.
 5. If it needs sync: add a socket action in the socket handler
 6. If it has UI: add CSS with `vcb-` prefix to `vagabond-crawler.css`, add `--vcb-*` variables for any colors
 7. If it needs a window: extend `HandlebarsApplicationMixin(ApplicationV2)`, add `.hbs` template in `templates/`
+
+
+<claude-mem-context>
+# Memory Context
+
+# [vagabond-crawler] recent context, 2026-05-13 9:30am CDT
+
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
+Format: ID TIME TYPE TITLE
+Fetch details: get_observations([IDs]) | Search: mem-search skill
+
+Stats: 25 obs (11,487t read) | 331,688t work | 97% savings
+
+### May 4, 2026
+10 7:26a 🔵 Vagabond Crawler FoundryVTT Module Structure
+11 7:27a 🔵 Crawl State Management Architecture
+12 " 🔵 Module Initialization and Subsystem Architecture
+13 " 🔵 Crawl Bar: GM Control Panel and Combat Flow Management
+14 " 🔵 Crawl Strip: Party Tracker with Combat Duality and Orphan Token Resilience
+15 " 🔵 Crawl Clock: System API Wrapper with Persistent Configuration
+16 " ✅ Dialog Migration: ApplicationV2 Replacements for Deprecated Dialog API
+17 " 🔵 Icons Registry: Centralized Icon Management with FontAwesome and Custom SVGs
+18 7:28a 🔵 Vagabond Crawler Loot System Architecture
+S4 Install fvtt-hooks skill from impropersubset/hh-agentics for Foundry VTT module development (May 4, 7:34 AM)
+S3 Understanding how the memory system works for future sessions in the FoundryVTT Vagabond Crawler project (May 4, 7:34 AM)
+19 8:38a 🟣 Installed fvtt-hooks skill for Foundry VTT development
+S531 Fix flanking effect that persists after hero/NPC is no longer flanked in v14 Crawled module (May 4, 8:38 AM)
+### May 12, 2026
+1281 8:14p 🔵 Flanking removal mechanism inspection: flag-based tracking and effect cleanup
+1283 8:16p 🔵 Prior flanking fixes in changelog reveal unlinked token save handling and cleanup patterns
+1285 8:17p 🔵 Flanking test suite defines expected behavior for apply/remove lifecycle and idempotency
+1295 8:18p 🔵 Foundry v14 ActiveEffect origin field migrated to DocumentUUIDField; non-UUID strings rejected and moved to flags
+1297 8:21p 🔴 Root cause identified: v14 ActiveEffect origin validation rejects module-namespaced strings, breaking effect lookup
+1303 8:23p ✅ Added flag-based effect matching to handle v14 origin field migration
+1305 " ✅ Added effect-presence check to evaluation logic for orphaned flanking effect cleanup
+1306 " ✅ Completed flanking effect fix: flag-stamping, consistent lookup, and ungated removal
+1307 8:24p ✅ Extended cleanup to remove orphaned flanking effects without flags at combat end
+1308 " ✅ Updated flanking tests to use flag-based effect matching for v14 compatibility
+S532 Fix v14 Foundry compatibility issue: flanking effects not removing after conditions no longer met, then systematically identify and fix all similar issues across the codebase (May 12, 8:24 PM)
+1313 8:27p 🔵 v14 origin field bug affects Pack Instincts and Soft Underbelly NPC abilities — same pattern as flanking
+1314 8:28p 🔵 Pack Instincts and Soft Underbelly fully affected by v14 origin field bug — identical architecture to flanking
+1315 " ✅ Added v14-compatible flag-based matching for Pack Instincts effect lookup
+1316 " ✅ Completed Pack Instincts v14 compatibility: effect stamping, helper-based lookup, and duplicate cleanup
+1317 8:29p ✅ Added v14-compatible flag-based matching for Soft Underbelly effect lookup
+S536 Fix Foundry v14 ActiveEffect.origin compatibility issues across all affected features (Flanking, Pack Instincts, Soft Underbelly) and preserve fixes in version control (May 12, 8:30 PM)
+**Investigated**: Discovered that v14 fixes existed only in live Foundry installation (E:\FoundryVTTv14\Data\modules\vagabond-crawler), while canonical git repository is in v13 installation (/e/FoundryVTTv13/data/Data/modules/vagabond-crawler). Verified all three fixed files differed between installations and that v13 repo contained unfixed pre-v14 versions. Examined git history to understand commit message conventions.
+
+**Learned**: v14 origin field fixes must be explicitly synced from live installation to git repository. The fix pattern (module-namespaced flags with three-tier matching fallback + filter-based cleanup) successfully addresses all three features' vulnerability to origin-field nulling. Repository uses conventional commit format (fix(v14): ..., feat(...): ..., etc.). Working directory can have multiple unrelated changes; git allows selective staging by file.
+
+**Completed**: Synced three v14-fixed files from live v14 installation to v13 git repository (cp commands for flanking-checker.mjs, npc-abilities.mjs, flanking-countdown.mjs). Staged all three files in git. Created comprehensive commit (6e5d456) documenting the root cause, impact on all three features, and the fix strategy. Commit is now in repository history on main branch. Only the three fix files were committed; other unrelated working changes (docs, relic-effects.mjs) remain unstaged.
+
+**Next Steps**: User will reload Foundry to test that previously-stuck flanking effects now properly clear when conditions no longer apply. Any orphaned duplicates from pre-fix v14 sessions will be swept when combat ends. Both v13 git repo and v14 live installation now have matching fixed code.
+
+
+Access 332k tokens of past work via get_observations([IDs]) or mem-search skill.
+</claude-mem-context>

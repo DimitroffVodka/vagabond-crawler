@@ -164,18 +164,100 @@ export function register() {
       expect(r.formula).not.toContain("1d4");
     });
 
-    case_("Wrap chain: VCE's rollDamage wrap remains outermost, Crawler injects dice inside it", async (ctx) => {
-      // VCE wraps prototype.rollDamage in its own ready hook. Crawler also
-      // wraps it. We don't care about the order — only that AT LEAST one
-      // wrap chain is in place AND end-to-end damage on a relic weapon
-      // correctly includes the bonus dice (proving the chain composes).
+    case_("Wrap guard survives VCE's outer wrap — re-patching cannot double-apply", async (ctx) => {
+      // VCE wraps prototype.rollDamage in its own ready hook, on top of ours.
+      // The guard therefore CANNOT live on our wrapper function: once VCE wraps
+      // it, a function-level flag is buried in a closure and reads as "not
+      // patched", so a second _patchItemRollDamage() stacked another layer and
+      // relic dice applied twice (reproduced live as `1d6 + 1d4 + 1d4`).
+      // wrap-guard.mjs keys the marker on the prototype instead.
       const { VagabondItem } = await import("/systems/vagabond/module/documents/item.mjs");
-      const fnSrc = VagabondItem.prototype.rollDamage.toString();
-      const wrappedByVCE     = fnSrc.includes("GunslingerFeatures") || fnSrc.includes("MonkFeatures");
-      const wrappedByCrawler = !!VagabondItem.prototype.rollDamage.__vcRelicWrapped;
-      // At least one wrap should be present. (When VCE is innermost it sets
-      // __vcRelicWrapped on its inner closure rather than the prototype.)
-      expect(wrappedByVCE || wrappedByCrawler).toBe(true);
+      const { RelicEffects } = await import("/modules/vagabond-crawler/scripts/relic-effects.mjs");
+      const GUARD = Symbol.for("vagabond-crawler.wraps");
+
+      // Visible on the prototype no matter how many layers wrap the method.
+      expect(!!VagabondItem.prototype[GUARD]?.rollDamage).toBe(true);
+
+      // Re-invoking the patch must be a no-op — same function object after.
+      const before = VagabondItem.prototype.rollDamage;
+      await RelicEffects._patchItemRollDamage();
+      expect(VagabondItem.prototype.rollDamage).toBe(before);
+
+      // Same for the chat-card button patch, which previously had no guard.
+      const DamageHelper = (await import("/systems/vagabond/module/helpers/damage-helper.mjs")).VagabondDamageHelper;
+      const beforeBtn = DamageHelper.rollDamageFromButton;
+      await RelicEffects._patchDamageHelper();
+      expect(DamageHelper.rollDamageFromButton).toBe(beforeBtn);
+    });
+
+    case_("Vicious fires only on real crits, whatever shape isCritical arrives in", async (ctx) => {
+      // Callers disagree: roll-handler.mjs:352 and vagabond.mjs:2448 pass a
+      // boolean, chat-card.mjs:743 passes `{ isCritical }`. Forwarding the object
+      // raw made `if (isCritical)` truthy on every hit, so Vicious added crit
+      // dice to every chat-card auto-rolled attack.
+      const { RelicEffects } = await import("/modules/vagabond-crawler/scripts/relic-effects.mjs");
+      const { actor } = await ctx.fx.createTestPC(ctx);
+      const [w] = await actor.createEmbeddedDocuments("Item", [{
+        name: "VCTest Vicious Blade", type: "equipment",
+        system: { equipmentType: "weapon", baseSlots: 1, damageType: "physical", equipmentState: "oneHand" },
+        flags: { "vagabond-crawler": { relicForge: { forged: true } } },
+        effects: [{ name: "Vicious", changes: [], flags: { "vagabond-crawler": { relicPower: "vicious" } } }],
+      }], { skipStack: true });
+
+      const labels = v => RelicEffects.collectBonusParts(actor, w, { isCritical: v, targets: [] }).map(p => p.label);
+      expect(labels(false).length).toBe(0);
+      expect(labels(true).length).toBeGreaterThan(0);
+      // The regression: an object with isCritical:false must NOT count as a crit.
+      expect(labels({ isCritical: false }).length).toBe(0);
+      expect(labels({ isCritical: true }).length).toBeGreaterThan(0);
+    });
+
+    case_("wrap guard does not leak across the prototype chain", async (ctx) => {
+      // `owner[GUARD]?.[key]` walks the prototype chain, so a subclass that
+      // OVERRIDES a wrapped parent method inherited the marker and was silently
+      // skipped. isWrapped() must be an own-property check.
+      const { isWrapped, markWrapped } = await import("/modules/vagabond-crawler/scripts/wrap-guard.mjs");
+      class Parent { foo() {} }
+      class Child extends Parent { foo() {} }
+
+      markWrapped(Parent.prototype, "foo");
+      expect(isWrapped(Parent.prototype, "foo")).toBe(true);
+      expect(isWrapped(Child.prototype, "foo")).toBe(false);   // the leak
+
+      // ...and marking a key on the child must not shadow the parent's record.
+      markWrapped(Child.prototype, "bar");
+      expect(isWrapped(Parent.prototype, "foo")).toBe(true);
+      expect(isWrapped(Child.prototype, "bar")).toBe(true);
+    });
+
+    case_("chat-card damage button does not compound the relic rider across clicks", async (ctx) => {
+      // Chat-card buttons persist after being clicked. The handler used to read
+      // `damageFormula`, append the bonus, and write it back — so a second click
+      // turned "1d8 + 1d4" into "1d8 + 1d4 + 1d4", and so on.
+      const DamageHelper = (await import("/systems/vagabond/module/helpers/damage-helper.mjs")).VagabondDamageHelper;
+      const { actor } = await ctx.fx.createTestPC(ctx);
+      const [relic] = await actor.createEmbeddedDocuments("Item", [{
+        name: "VCTest Striking Blade", type: "equipment",
+        system: { equipmentType: "weapon", baseSlots: 1, damageType: "physical", equipmentState: "oneHand" },
+        flags: { "vagabond-crawler": { relicForge: { forged: true } } },
+        effects: [{ name: "Striking", changes: [], flags: { "vagabond-crawler": {
+          relicPower: "strike-1", bonusDamageDice: "1d4", bonusDamageLabel: "Striking" } } }],
+      }], { skipStack: true });
+
+      const btn = document.createElement("button");
+      btn.dataset.actorId = actor.id;
+      btn.dataset.itemId = relic.id;
+      btn.dataset.damageFormula = "1d8";
+      btn.dataset.context = "{}";
+
+      for (let i = 0; i < 3; i++) {
+        // The original needs a real chat message; we only care about the dataset
+        // mutation the wrapper performs before delegating.
+        try { await DamageHelper.rollDamageFromButton(btn, null); } catch { /* expected */ }
+      }
+      const riders = (btn.dataset.damageFormula.match(/1d4/g) ?? []).length;
+      expect(riders).toBe(1);
+      expect(btn.dataset.damageFormula).toBe("1d8 + 1d4");
     });
 
   });
