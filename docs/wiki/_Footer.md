@@ -1,0 +1,1 @@
+[Source](https://github.com/DimitroffVodka/vagabond-crawler) · [Latest release](https://github.com/DimitroffVodka/vagabond-crawler/releases/latest) · [Report an issue](https://github.com/DimitroffVodka/vagabond-crawler/issues)
