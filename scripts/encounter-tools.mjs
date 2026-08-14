@@ -32,6 +32,15 @@ function parseDieFormula(formula) {
   return { count, faces, min: count, max: count * faces, slotCount: count * faces - count + 1 };
 }
 
+/** The die type as an explicit Foundry roll formula — "d6" → "1d6", "2d6" →
+ *  "2d6". Table creation used to build this as `1${dieType}`, which is only
+ *  correct when the type carries no count: picking 2d6 saved "12d6", so the
+ *  table rolled 12-72 against slots numbered 2-12 and every roll missed. */
+function dieFormula(dieType) {
+  const { count, faces } = parseDieFormula(dieType);
+  return `${count}d${faces}`;
+}
+
 /** Parse the free-text `system.senses` field into a normalized array of
  *  base sense names. Drops parenthetical annotations ("(only in labyrinth)")
  *  and dedupes case/whitespace variants ("All-Sight" / "Allsight" → "Allsight").
@@ -759,7 +768,7 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
       // Update in-place to avoid losing the table if creation fails
       await existing.deleteEmbeddedDocuments("TableResult", existing.results.map(r => r.id));
       await existing.update({
-        formula: this._dieType,
+        formula: dieFormula(this._dieType),
         flags: { [MODULE_ID]: { isEncounterTable: true } },
       });
       await existing.createEmbeddedDocuments("TableResult", results);
@@ -767,7 +776,7 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
     } else {
       table = await RollTable.create({
         name,
-        formula:     `1${this._dieType}`,
+        formula:     dieFormula(this._dieType),
         results,
         replacement: true,
         displayRoll: true,
