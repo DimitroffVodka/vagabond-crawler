@@ -2188,14 +2188,22 @@ body.theme-light .vcb-phase-badge {
   table-layout: fixed;
 }
 
-/* 11 columns: 34+84+46+44+48+88+62+62+62+34 fixed, plus ~160 for the name. */
+/* Every real column now declares a width, including Name (150px — covers ~90%
+ * of bestiary names; the rest ellipsize and carry the full name in `title`).
+ * A width-less spacer <th>/<td> at the end of each row soaks up any leftover
+ * width, so widening the window grows the spacer rather than ballooning Name.
+ *
+ * min-width = the sum of the declared columns, so the table never compresses
+ * below the point where its content still fits.
+ *
+ * 11 columns: 34+150+84+46+44+48+88+62+62+62+34 = 714 */
 #vagabond-crawler-encounter-roller .loot-npc-table {
-  min-width: 720px;
+  min-width: 714px;
 }
-/* 7 columns: 28+32+90+40+130+42 fixed, plus ~160 for the name. Kept well under
- * the 563px panel at the default 820px window so no scrollbar appears. */
+/* 7 columns: 28+32+150+90+40+130+42 = 512. Well under the 563px panel at the
+ * default 820px window, so no scrollbar appears. */
 #vagabond-crawler-loot-manager .loot-npc-table {
-  min-width: 520px;
+  min-width: 512px;
 }
 
 /* Narrow windows scroll the table instead of crushing its columns. */

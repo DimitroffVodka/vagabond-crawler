@@ -160,7 +160,7 @@
         <thead>
           <tr>
             <th style="width:34px;"></th>
-            <th class="loot-sortable" data-sort="name">Name <i class="fas fa-sort"></i></th>
+            <th class="loot-sortable" data-sort="name" style="width:150px;">Name <i class="fas fa-sort"></i></th>
             <th class="loot-sortable" data-sort="beingType" style="width:84px;">Type <i class="fas fa-sort"></i></th>
             <th class="loot-sortable" data-sort="threatLevel" style="width:46px;">TL <i class="fas fa-sort"></i></th>
             <th class="loot-sortable" data-sort="hp"  style="width:44px; text-align:center;">HP <i class="fas fa-sort"></i></th>
@@ -170,6 +170,10 @@
             <th style="width:62px; text-align:center;" title="Weaknesses">Wk</th>
             <th style="width:62px; text-align:center;" title="Immunities">Imm</th>
             <th style="width:34px;"></th>
+            {{!-- Spacer: the only width-less column, so under `table-layout:
+                  fixed` it absorbs all slack. Without it the extra width is
+                  distributed across the real columns and Name balloons. --}}
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -202,6 +206,7 @@
               {{/each}}
             </td>
             <td><button type="button" class="browse-add-btn" title="Add to encounter table" aria-label="Add {{name}} to encounter table"><i class="fas fa-plus" aria-hidden="true"></i></button></td>
+            <td></td>
           </tr>
           {{/each}}
         </tbody>
