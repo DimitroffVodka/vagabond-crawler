@@ -1,0 +1,68 @@
+name: System drift
+
+# Catches the failure mode behind v1.18.0: the module drifted 28 minor versions
+# behind the vagabond system, which had removed item types and reworked slot
+# counting underneath it. Nothing noticed until players reported wrong numbers.
+#
+# The schedule matters more than the push trigger — drift happens while nobody
+# touches the repo, so a push-only check would never fire.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Mondays 09:00 UTC. Drift is slow; weekly is enough to catch it early.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: vagabond verified version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check declared vs released system version
+        run: node scripts/ci/check-system-drift.mjs
+
+  syntax:
+    name: module scripts parse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # `node --check` is weak — it catches syntax only, not the ReferenceError
+      # that shipped in this module's relic patch — but it is free and would have
+      # caught a truncated or half-saved file.
+      - name: node --check every .mjs
+        run: |
+          set -e
+          fail=0
+          while IFS= read -r f; do
+            if ! node --check "$f" >/dev/null 2>&1; then
+              echo "::error file=$f::failed node --check"
+              fail=1
+            fi
+          done < <(find scripts -name '*.mjs' -type f)
+          exit $fail
+
+      - name: module.json is valid and uses the latest redirect
+        run: |
+          node -e '
+            const m = require("./module.json");
+            const bad = ["manifest","download"].filter(k => !String(m[k]).includes("/releases/latest/download/"));
+            if (bad.length) { console.error("module.json must use the /releases/latest/ redirect for: " + bad.join(", ")); process.exit(1); }
+            console.log("module.json ok — version " + m.version);
+          '

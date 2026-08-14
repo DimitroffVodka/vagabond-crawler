@@ -29,6 +29,15 @@ via MCP `evaluate` where possible. Paste the result.
 - `dev/probes/*.mjs` — paste-able MCP `evaluate` snippets returning
   `{ pass: bool, ... }` (none yet for this module; add as bugs surface).
 - `dev/fixtures/` — test data scaffold (placeholder).
+- `node scripts/ci/check-system-drift.mjs` — fails when `module.json`'s
+  declared vagabond `verified` falls behind the system's current release,
+  and when the manifest/download URLs stop using the `/releases/latest/`
+  redirect. Run by `.github/workflows/system-drift.yml` on PRs and **weekly**
+  — the schedule is the point, since drift accumulates while nobody touches
+  the repo. Compares on `major.minor` numerically (`5.8` ranks below `5.36`;
+  a string compare gets this backwards). When it fires, **re-test against the
+  new system version before bumping `verified`** — bumping it blind silences
+  the alarm without doing the work it is asking for.
 
 ## Quick Reference
 
