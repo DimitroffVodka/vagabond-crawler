@@ -61,10 +61,18 @@ function _getWeaponRelicFlags(item) {
 export const RelicEffects = {
 
   init() {
-    // Monkey-patch the damage helper once the system is ready. This stays
-    // because Bane / Vicious / Strike-elemental are flag-driven (changes:[])
-    // and never go through the system's AE pipeline — the damage helper
-    // patch is what reads their flags and injects bonus dice at roll time.
+    // Two patches keep relic dice on every damage path:
+    //  1. VagabondItem.rollDamage  → covers item.roll(), Crawl Strip, macros,
+    //                                 the system's "auto-roll damage" path,
+    //                                 and any caller that pre-rolls damage
+    //                                 before posting a chat card.
+    //  2. VagabondDamageHelper.rollDamageFromButton → covers the chat-card
+    //                                 "Roll Damage" button click.
+    // Both patches share `collectBonusParts` so the formula stays in sync.
+    // Bane / Vicious / Strike I-III ride on flags (changes:[]) because the
+    // system's AE overlay can't carry dice strings — these patches read the
+    // flags and inject the dice at roll time, scoped to the firing item.
+    this._patchItemRollDamage();
     this._patchDamageHelper();
 
     // Hook into actor updates to detect kills for lifesteal / manasteal.
@@ -79,6 +87,113 @@ export const RelicEffects = {
     // migration in vagabond-crawler.mjs for the data shape.
 
     console.log(`${MODULE_ID} | Relic Effects initialized.`);
+  },
+
+  /**
+   * Collect every relic-driven bonus die/flat that should be appended to a
+   * weapon damage roll. Pure function — no side effects, no DOM access — so
+   * both the item-roll patch and the chat-card-button patch can share it.
+   *
+   * @param {Actor} actor
+   * @param {Item} item   The firing weapon (relic flags are scoped to it)
+   * @param {object} ctx
+   * @param {boolean} [ctx.isCritical=false]
+   * @param {Actor[]} [ctx.targets=[]]  World actors of the targeted tokens
+   * @returns {{formula:string,label:string}[]}
+   */
+  collectBonusParts(actor, item, { isCritical = false, targets = [] } = {}) {
+    const relicFlags = _getWeaponRelicFlags(item);
+    if (relicFlags.length === 0) return [];
+    const parts = [];
+
+    // Bane: only fires when at least one targeted actor's beingType matches
+    for (const { flags } of relicFlags) {
+      if (!flags.baneTarget || !flags.baneDice) continue;
+      for (const t of targets) {
+        const bt = t?.system?.beingType || "";
+        if (bt.toLowerCase().includes(flags.baneTarget.toLowerCase())) {
+          parts.push({ formula: flags.baneDice, label: `Bane (${flags.baneTarget})` });
+          break;
+        }
+      }
+    }
+
+    // Strike (typed): elemental damage rider
+    for (const { flags } of relicFlags) {
+      if (flags.strikeDice && flags.strikeType) {
+        parts.push({ formula: flags.strikeDice, label: `${flags.strikeType} Strike` });
+      }
+    }
+
+    // Strike I/II/III: untyped bonus damage dice (bonusDamageDice flag)
+    for (const { flags } of relicFlags) {
+      if (flags.bonusDamageDice) {
+        parts.push({
+          formula: flags.bonusDamageDice,
+          label:   flags.bonusDamageLabel || "Bonus Damage",
+        });
+      }
+    }
+
+    // Fabled Vicious: extra crit damage scaled to actor's hit die
+    if (isCritical) {
+      for (const { flags } of relicFlags) {
+        if (flags.relicPower === "vicious") {
+          const hd = actor?.system?.hitDie || "d6";
+          parts.push({ formula: `2${hd}`, label: "Vicious (Crit)" });
+        }
+      }
+    }
+
+    return parts;
+  },
+
+  /* -------------------------------------------- */
+  /*  Monkey-patch: VagabondItem.rollDamage        */
+  /* -------------------------------------------- */
+
+  /**
+   * Wrap the system's `VagabondItem.prototype.rollDamage` so any path that
+   * calls `item.rollDamage(...)` directly (Crawl Strip action menu, macros,
+   * the system's auto-roll-damage setting, character sheet flows that
+   * pre-roll instead of posting a button) still picks up relic-flag bonuses.
+   *
+   * Mutual exclusion with the chat-card button patch: only ONE of the two
+   * paths fires per attack (the chat card either has a pre-rolled damage OR
+   * a Roll Damage button, never both), so there's no double-application.
+   */
+  async _patchItemRollDamage() {
+    let VagabondItem;
+    try {
+      ({ VagabondItem } = await import("/systems/vagabond/module/documents/item.mjs"));
+    } catch (e) {
+      console.warn(`${MODULE_ID} | Could not import VagabondItem — relic dice on item.rollDamage skipped:`, e);
+      return;
+    }
+    if (!VagabondItem?.prototype?.rollDamage) return;
+    if (VagabondItem.prototype.rollDamage.__vcRelicWrapped) return;  // idempotent
+
+    const original = VagabondItem.prototype.rollDamage;
+    const self = this;
+    async function wrapped(actor, isCritical = false, statKey = null) {
+      const baseRoll = await original.call(this, actor, isCritical, statKey);
+      // Base may be null (no damage formula — Grapple, Net, etc.) — pass through
+      if (!baseRoll) return baseRoll;
+
+      const targets = Array.from(game.user.targets).map(t => t.actor).filter(Boolean);
+      const parts = self.collectBonusParts(actor, this, { isCritical, targets });
+      if (parts.length === 0) return baseRoll;
+
+      const bonusFormula = parts.map(p => p.formula).join(" + ");
+      const augmented = new Roll(`${baseRoll.formula} + ${bonusFormula}`, actor.getRollData());
+      await augmented.evaluate();
+      const labels = parts.map(p => p.label).join(", ");
+      console.log(`${MODULE_ID} | Relic dice merged into item.rollDamage: ${labels} (${bonusFormula})`);
+      return augmented;
+    }
+    wrapped.__vcRelicWrapped = true;
+    VagabondItem.prototype.rollDamage = wrapped;
+    console.log(`${MODULE_ID} | Patched VagabondItem.prototype.rollDamage for relic effects.`);
   },
 
   /* -------------------------------------------- */
@@ -111,68 +226,15 @@ export const RelicEffects = {
       const item = actor?.items.get(itemId);
 
       if (actor && item) {
-        const relicFlags = _getWeaponRelicFlags(item);
-        if (relicFlags.length > 0) {
-          const targets = Array.from(game.user.targets).map(t => t.actor).filter(Boolean);
-          const context = JSON.parse((button.dataset.context || "{}").replace(/&quot;/g, '"'));
-          const bonusParts = [];
-
-          // Bane: check target creature type
-          for (const { flags } of relicFlags) {
-            const baneTarget = flags.baneTarget;
-            const baneDice = flags.baneDice;
-            if (!baneTarget || !baneDice) continue;
-
-            for (const target of targets) {
-              const beingType = target.system?.beingType || "";
-              if (beingType.toLowerCase().includes(baneTarget.toLowerCase())) {
-                bonusParts.push({ formula: baneDice, label: `Bane (${baneTarget})` });
-                break;
-              }
-            }
-          }
-
-          // Strike: add elemental damage (typed Strike — strikeDice + strikeType)
-          for (const { flags } of relicFlags) {
-            if (flags.strikeDice && flags.strikeType) {
-              bonusParts.push({ formula: flags.strikeDice, label: `${flags.strikeType} Strike` });
-            }
-          }
-
-          // Strike I/II/III: untyped bonus damage dice (bonusDamageDice flag).
-          // Drives the Striking-relic line — see relic-powers.mjs `strike-1/2/3`.
-          // The system's getRollDataWithItemEffects overlay can't carry dice
-          // strings (Number('1d4') = NaN), so the dice ride on a flag and we
-          // inject them here at damage-roll time, scoped to the firing weapon.
-          for (const { flags } of relicFlags) {
-            if (flags.bonusDamageDice) {
-              bonusParts.push({
-                formula: flags.bonusDamageDice,
-                label:   flags.bonusDamageLabel || "Bonus Damage",
-              });
-            }
-          }
-
-          // Fabled Vicious: extra crit damage
-          if (context.isCritical) {
-            for (const { flags } of relicFlags) {
-              if (flags.relicPower === "vicious") {
-                const hd = actor.system?.hitDie || "d6";
-                bonusParts.push({ formula: `2${hd}`, label: "Vicious (Crit)" });
-              }
-            }
-          }
-
-          // Inject bonus into the damage formula
-          if (bonusParts.length > 0) {
-            const bonusFormula = bonusParts.map(b => b.formula).join(" + ");
-            const origFormula = button.dataset.damageFormula;
-            button.dataset.damageFormula = `${origFormula} + ${bonusFormula}`;
-
-            // Post a notification about the bonus
-            const labels = bonusParts.map(b => b.label).join(", ");
-            console.log(`${MODULE_ID} | Relic bonus injected: ${labels} (${bonusFormula})`);
-          }
+        const context = JSON.parse((button.dataset.context || "{}").replace(/&quot;/g, '"'));
+        const targets = Array.from(game.user.targets).map(t => t.actor).filter(Boolean);
+        const bonusParts = RelicEffects.collectBonusParts(actor, item, { isCritical: !!context.isCritical, targets });
+        if (bonusParts.length > 0) {
+          const bonusFormula = bonusParts.map(b => b.formula).join(" + ");
+          const origFormula = button.dataset.damageFormula;
+          button.dataset.damageFormula = `${origFormula} + ${bonusFormula}`;
+          const labels = bonusParts.map(b => b.label).join(", ");
+          console.log(`${MODULE_ID} | Relic bonus injected: ${labels} (${bonusFormula})`);
         }
       }
 
