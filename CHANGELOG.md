@@ -33,6 +33,19 @@
   each row now soaks up the slack instead, so Name stays at 150px at any window
   size. 26 of 297 bestiary names (8.8%) ellipsize, each with the full name on
   hover.
+- **Missing compendium art falls back to an icon instead of rendering blank.**
+  The core bestiary's "Leech, Giant" points at
+  `modules/too-many-tokens-dnd/Giant Worm/`, a folder that no longer ships in
+  too-many-tokens-dnd (v1.1.1 has 375 creature folders, none of them Giant
+  Worm), so its portrait cell was empty. Both NPC tables now swap in
+  `icons/svg/mystery-man.svg` when an image fails to load.
+
+  This is a workaround, not a data fix: `vagabond.bestiary` is a system-owned
+  pack and Foundry v14 silently rejects writes to it (`doc.update()` returns
+  with no error and no change), and a system update would overwrite any edit
+  regardless. The underlying broken reference needs fixing upstream in the
+  Vagabond system. An audit of all 594 asset references across the 297
+  bestiary actors found this as the only break.
 - **Encounter Roller default width 700 → 980**, which fits the filter column plus
   the full table with no horizontal scrolling.
 
