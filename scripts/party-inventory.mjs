@@ -5,7 +5,7 @@
  * GM tool for redistributing loot and seeing who's carrying what.
  */
 
-import { MODULE_ID, getTotalOccupiedSlots } from "./vagabond-crawler.mjs";
+import { MODULE_ID, getTotalOccupiedSlots, isInventoryItem } from "./vagabond-crawler.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -62,8 +62,11 @@ class PartyInventoryApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const columns = members.map(actor => {
       const currency = actor.system.currency ?? { gold: 0, silver: 0, copper: 0 };
+      // Same gate the slot counter uses — see isInventoryItem(). Filtering on
+      // `type === "equipment"` here dropped containers from the list while
+      // getTotalOccupiedSlots() still charged them.
       const items = actor.items
-        .filter(i => i.type === "equipment")
+        .filter(isInventoryItem)
         .map(i => ({
           id: i.id,
           actorId: actor.id,

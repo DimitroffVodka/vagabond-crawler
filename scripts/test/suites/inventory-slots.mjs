@@ -26,6 +26,7 @@ import { suite, case_, expect } from "../harness.mjs";
 import {
   MODULE_ID,
   getExtraOccupiedSlots,
+  getTotalOccupiedSlots,
   isOverloaded,
 } from "../../vagabond-crawler.mjs";
 
@@ -116,6 +117,47 @@ export function register() {
       expect(headerTotal(actor)).toBe(1);
     });
 
+    case_("realistic loadout of quantity-1 items matches system occupiedSlots with 100% parity", async (ctx) => {
+      const { actor } = await ctx.fx.createTestPC(ctx);
+      // Mixed realistic loadout: weapons, armor, containers, stowed items, and zero-slot trinkets
+      await addGear(actor, { name: "VCTest Longsword", baseSlots: 1, quantity: 1 });
+      await addGear(actor, { name: "VCTest Chainmail", baseSlots: 2, quantity: 1 });
+      await addGear(actor, { name: "VCTest Shield", baseSlots: 1, quantity: 1 });
+      await addGear(actor, { name: "VCTest Backpack", baseSlots: 0, quantity: 1, gearCategory: "Outdoors" });
+      await addGear(actor, { name: "VCTest Stowed Torch", baseSlots: 1, quantity: 1, containerId: "vctest-backpack" });
+      await addGear(actor, { name: "VCTest Holy Symbol", baseSlots: 0, quantity: 1, gearCategory: "Books & Magic" });
+
+      // When all quantities are 1, Crawler must add 0 extra slots and match system occupiedSlots exactly.
+      expect(getExtraOccupiedSlots(actor)).toBe(0);
+      expect(getTotalOccupiedSlots(actor)).toBe(actor.system.inventory.occupiedSlots);
+      expect(headerTotal(actor)).toBe(4); // Longsword(1) + Chainmail(2) + Shield(1) = 4
+    });
+
+    case_("quantity 0 still costs baseSlots, matching the system", async (ctx) => {
+      const { actor } = await ctx.fx.createTestPC(ctx);
+      // Emptying a stack without deleting the item is ordinary play (ammo,
+      // consumables). The system charges baseSlots regardless of quantity, so a
+      // naive `baseSlots × qty` in _itemCapacity returned 0 and the grid started
+      // numbering at 1 while the header said 1 occupied.
+      await addGear(actor, { name: "VCTest Emptied Quiver", baseSlots: 1, quantity: 0 });
+
+      expect(actor.system.inventory.occupiedSlots).toBe(1);
+      expect(getExtraOccupiedSlots(actor)).toBe(0);
+      expect(headerTotal(actor)).toBe(1);
+    });
+
+    case_("negative baseSlots contributes nothing rather than subtracting", async (ctx) => {
+      const { actor } = await ctx.fx.createTestPC(ctx);
+      // The schema puts no `min` on baseSlots. The system only adds it when > 0,
+      // so a negative value must contribute 0 on our side too — never a credit
+      // that masks other items' weight.
+      await addGear(actor, { name: "VCTest Impossible", baseSlots: -3, quantity: 2 });
+      await addGear(actor, { name: "VCTest Real Torch", baseSlots: 1, quantity: 2 });
+
+      expect(getExtraOccupiedSlots(actor)).toBe(1);   // only the torch's second unit
+      expect(headerTotal(actor)).toBe(2);             // system counts torch once + 1 extra
+    });
+
     case_("overload flips once a stack exceeds capacity", async (ctx) => {
       const { actor } = await ctx.fx.createTestPC(ctx);
       const max = actor.system.inventory.maxSlots;
@@ -167,6 +209,23 @@ export function register() {
       expect(emptyNums[emptyNums.length - 1]).toBe(actor.system.inventory.baseMaxSlots);
     });
 
+    case_("header and grid agree for a quantity-0 item", async (ctx) => {
+      const { actor } = await ctx.fx.createTestPC(ctx);
+      await addGear(actor, { name: "VCTest Emptied Pouch", baseSlots: 1, quantity: 0 });
+      const total = headerTotal(actor);
+
+      await actor.sheet.render(true);
+      ctx.cleanup(async () => { try { await actor.sheet.close(); } catch {} });
+      await ctx.fx.settle(800);
+
+      const el = actor.sheet.element;
+      const emptyNums = [...el.querySelectorAll(".empty-slot .slot-number")]
+        .map(n => parseInt(n.textContent.trim(), 10)).filter(Number.isFinite);
+      expect(emptyNums.length).toBeGreaterThan(0);
+      // The regression: grid used to start at 1 while the header said 1 occupied.
+      expect(emptyNums[0]).toBe(total + 1);
+    });
+
     case_("a stack spans its true footprint in the grid", async (ctx) => {
       const { actor } = await ctx.fx.createTestPC(ctx);
       await addGear(actor, { name: "VCTest WideStack", baseSlots: 1, quantity: 3 });
@@ -183,6 +242,23 @@ export function register() {
       // totalSlots drives `grid-column: span N` in inventory-card.hbs. A 1-slot
       // item at qty 3 occupies 3 cells, so it must not claim just one.
       expect(card.style.gridColumn).toContain("3");
+    });
+
+    case_("Weightless stack spans single slot in rendered grid", async (ctx) => {
+      const { actor } = await ctx.fx.createTestPC(ctx);
+      await addGear(actor, { name: "VCTest Weightless Feathers", baseSlots: 1, quantity: 4, weightless: true });
+
+      await actor.sheet.render(true);
+      ctx.cleanup(async () => { try { await actor.sheet.close(); } catch {} });
+      await ctx.fx.settle(800);
+
+      const el = actor.sheet.element;
+      const card = [...el.querySelectorAll(".inventory-card")]
+        .find(c => actor.items.get(c.dataset.itemId)?.name === "VCTest Weightless Feathers");
+      expect(card).toBeTruthy();
+
+      // Weightless items opt out of the quantity multiplier, so totalSlots is 1 instead of 4
+      expect(card.style.gridColumn).toContain("1");
     });
 
   });

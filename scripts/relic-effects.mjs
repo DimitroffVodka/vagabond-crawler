@@ -107,6 +107,13 @@ export const RelicEffects = {
     if (relicFlags.length === 0) return [];
     const parts = [];
 
+    // Normalise here rather than trusting callers. The system is inconsistent
+    // about this argument: roll-handler.mjs:352 and vagabond.mjs:2448 pass a
+    // boolean, but chat-card.mjs:743 (the auto-roll path) passes `{ isCritical }`.
+    // A raw object is truthy, so Vicious was adding its crit dice to EVERY
+    // chat-card attack while the Roll Damage button — which normalises — did not.
+    const crit = isCritical === true || isCritical?.isCritical === true;
+
     // Bane: only fires when at least one targeted actor's beingType matches
     for (const { flags } of relicFlags) {
       if (!flags.baneTarget || !flags.baneDice) continue;
@@ -137,7 +144,7 @@ export const RelicEffects = {
     }
 
     // Fabled Vicious: extra crit damage scaled to actor's hit die
-    if (isCritical) {
+    if (crit) {
       for (const { flags } of relicFlags) {
         if (flags.relicPower === "vicious") {
           const hd = actor?.system?.hitDie || "d6";
@@ -186,6 +193,8 @@ export const RelicEffects = {
       if (!baseRoll) return baseRoll;
 
       const targets = Array.from(game.user.targets).map(t => t.actor).filter(Boolean);
+      // `isCritical` may arrive as a boolean or as `{ isCritical }` depending on
+      // the caller — collectBonusParts normalises it, don't pre-flatten here.
       const parts = self.collectBonusParts(actor, this, { isCritical, targets });
       if (parts.length === 0) return baseRoll;
 
@@ -268,12 +277,24 @@ export const RelicEffects = {
         const context = JSON.parse((button.dataset.context || "{}").replace(/&quot;/g, '"'));
         const targets = Array.from(game.user.targets).map(t => t.actor).filter(Boolean);
         const bonusParts = RelicEffects.collectBonusParts(actor, item, { isCritical: !!context.isCritical, targets });
+
+        // Always recompute from the PRISTINE formula. Chat-card buttons persist
+        // in the DOM after being clicked, so reading `damageFormula`, appending,
+        // and writing it back compounded on every click: "1d8 + 1d4" became
+        // "1d8 + 1d4 + 1d4" on the second press. Stash the untouched formula on
+        // first sight and derive from that instead.
+        const pristine = button.dataset.vcbPristineDamageFormula ?? button.dataset.damageFormula;
+        button.dataset.vcbPristineDamageFormula = pristine;
+
         if (bonusParts.length > 0) {
           const bonusFormula = bonusParts.map(b => b.formula).join(" + ");
-          const origFormula = button.dataset.damageFormula;
-          button.dataset.damageFormula = `${origFormula} + ${bonusFormula}`;
+          button.dataset.damageFormula = `${pristine} + ${bonusFormula}`;
           const labels = bonusParts.map(b => b.label).join(", ");
           console.log(`${MODULE_ID} | Relic bonus injected: ${labels} (${bonusFormula})`);
+        } else {
+          // Bonuses can disappear between clicks (targets changed, effect
+          // removed) — restore rather than leaving a stale rider attached.
+          button.dataset.damageFormula = pristine;
         }
       }
 

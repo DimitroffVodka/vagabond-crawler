@@ -58,6 +58,18 @@ export const MODULE_ID = "vagabond-crawler";
 // the system) cost a slot, and characters read over capacity. Removed deliberately.
 const _INV_TYPES = new Set(["equipment", "weapon", "armor", "gear", "container"]);
 
+/**
+ * Does this item occupy inventory on its owner's sheet? Exported so any surface
+ * that LISTS inventory uses the same gate as the code that COUNTS it. Party
+ * Inventory previously hardcoded `type === "equipment"`, which dropped
+ * `container`-type items from its list while still charging their slots in the
+ * total — a column whose items didn't add up to its own number.
+ */
+export function isInventoryItem(item) {
+  if (!item?.system || !_INV_TYPES.has(item.type)) return false;
+  return !item.system.containerId;   // stowed items are represented by their container
+}
+
 export function getExtraOccupiedSlots(actor) {
   if (!actor?.items) return 0;
   let extra = 0;
@@ -68,11 +80,23 @@ export function getExtraOccupiedSlots(actor) {
     if (item.system.containerId) continue;
     // "Weightless" opt-out: never contribute extra slots, whatever the quantity.
     if (item.getFlag(MODULE_ID, "trueZeroSlot")) continue;
-    const baseSlots = item.system.slots || item.system.baseSlots || 0;
-    const qty = item.system.quantity ?? 1;
+    const baseSlots = _slotsOf(item);
+    const qty = _qtyOf(item);
     if (qty > 1) extra += baseSlots * (qty - 1);
   }
   return extra;
+}
+
+// Normalised readers, shared by both halves of the invariant below.
+// `baseSlots` is clamped at 0 because the schema puts no `min` on the field and
+// the system only adds it when `> 0`; a negative value must contribute nothing,
+// not subtract. `quantity` is floored and clamped for the same reason (the
+// schema says `integer: true, min: 0`, but nothing stops a module writing junk).
+function _slotsOf(item) {
+  return Math.max(0, item?.system?.slots || item?.system?.baseSlots || 0);
+}
+function _qtyOf(item) {
+  return Math.max(0, Math.floor(item?.system?.quantity ?? 1));
 }
 
 // Capacity a single item consumes under Crawler's model. MUST stay in lockstep
@@ -84,11 +108,19 @@ export function getExtraOccupiedSlots(actor) {
 // The system contributes `baseSlots` once per item; Crawler's extra contributes
 // `baseSlots × (qty − 1)` unless the item is flagged weightless. So a weightless
 // item still costs the system's `baseSlots` — it only forgoes the stack multiplier.
+//
+// `quantity: 0` is the case worth spelling out. The system charges `baseSlots`
+// regardless of quantity, and `getExtraOccupiedSlots` adds nothing (its guard is
+// `qty > 1`), so the header shows `baseSlots`. A naive `baseSlots × qty` here
+// would return 0 and the grid would start numbering at 1 while the header said 1
+// occupied — the sheet contradicting itself. Emptying a stack to zero without
+// deleting the item is ordinary play (ammo, consumables), so this is not
+// theoretical. Charging `baseSlots` keeps parity with the system.
 function _itemCapacity(item) {
-  const baseSlots = item?.system?.slots || item?.system?.baseSlots || 0;
-  const qty = item?.system?.quantity ?? 1;
+  const baseSlots = _slotsOf(item);
   if (item?.getFlag?.(MODULE_ID, "trueZeroSlot")) return baseSlots;
-  return baseSlots * qty;
+  const qty = _qtyOf(item);
+  return qty > 1 ? baseSlots * qty : baseSlots;
 }
 
 // ── Inventory grid numbering ─────────────────────────────────────────────────

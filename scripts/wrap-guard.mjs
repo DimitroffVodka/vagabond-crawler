@@ -36,7 +36,13 @@ const GUARD = Symbol.for("vagabond-crawler.wraps");
  */
 export function isWrapped(owner, key) {
   if (!owner) return false;
-  return !!owner[GUARD]?.[key];
+  // OWN property only. A plain `owner[GUARD]` lookup walks the prototype chain,
+  // which breaks two ways: a subclass that OVERRIDES a wrapped parent method
+  // inherits the parent's marker and is silently skipped, and once that subclass
+  // marks any key of its own, its fresh dictionary shadows the parent's and the
+  // parent's methods stop being detected on it.
+  if (!Object.prototype.hasOwnProperty.call(owner, GUARD)) return false;
+  return !!owner[GUARD][key];
 }
 
 /**
