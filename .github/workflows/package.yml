@@ -1,0 +1,43 @@
+name: Package
+
+# v1.18.0 shipped scripts/ci/check-system-drift.mjs to every user's Foundry
+# install, and v1.18.1 was about to ship seven more dev-only files plus 30KB of
+# internal agent instructions. Both got through because the packaging rules
+# lived in prose that a human followed by hand.
+#
+# scripts/ci/build-module-zip.py self-verifies, but a check nobody runs is not a
+# check. This puts it somewhere a machine looks, on every change that could
+# alter what ships.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - "styles/**"
+      - "templates/**"
+      - "languages/**"
+      - "icons/**"
+      - "module.json"
+      - ".github/workflows/package.yml"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build module.zip and verify its layout
+        run: python3 scripts/ci/build-module-zip.py
+
+      - name: Upload the archive for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: module-zip
+          path: module.zip
+          retention-days: 14

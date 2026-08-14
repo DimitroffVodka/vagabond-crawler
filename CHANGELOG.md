@@ -61,6 +61,25 @@ Also adds the repo's first `.gitignore` and untracks 8 Playwright scratch files 
 
 ### Maintenance
 
+- **The release archive no longer ships developer tooling.** v1.18.0 shipped
+  `scripts/ci/check-system-drift.mjs` into every install, and v1.18.1 was about to
+  ship seven more files — the two wiki CLIs, four `scripts/audit` generators, and
+  30KB of internal agent instructions in `CLAUDE.md`. `module.zip` drops from 99
+  entries to 91. `scripts/test/` still ships on purpose (lazy-loaded), as does
+  `scripts/audit/status-vocabulary.mjs`, which Monster Creator imports at runtime.
+- **`scripts/ci/build-module-zip.py` replaces the inline build recipe** that was
+  duplicated in `CLAUDE.md` and `AGENTS.md` and drifted between them. Its
+  self-check previously tested only the path segment directly under the wrapper —
+  always one of the shipped folders — so the forbidden-directory guard never fired
+  for the nested case it existed to catch, and reported success anyway. It now
+  checks every segment, derives the leak check from the exclusion lists rather
+  than a hardcoded path, skips symlinks (which `zipfile` would otherwise
+  dereference into an archive entry the exclusion rules never see), and walks in
+  sorted order.
+- **`.github/workflows/package.yml` runs the build on every change that alters
+  what ships.** Both prior leaks got through because the packaging rules lived in
+  prose a human followed by hand; a self-verifying script nobody runs is not a
+  check.
 - **CI now fails when the declared system version drifts from the released one.**
   Every bug in v1.18.0 shared a root cause: the module declared `verified: 5.8.1`
   while 5.36.0 was installed, and across that 28-minor gap the system deleted item

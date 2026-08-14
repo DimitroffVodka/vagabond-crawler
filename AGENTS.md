@@ -330,7 +330,11 @@ Committed dataset of every NPC across the Vagabond compendium packs. Source JSON
    Every path must sit inside a `vagabond-crawler/` wrapper folder or Foundry's
    install silently fails, so the script asserts that itself and exits non-zero
    if the layout is wrong. It also refuses to ship `docs/`, `dev/`, `.git`,
-   `.planning` or agent scratch dirs.
+   `.planning` or agent scratch dirs at any depth, skips symlinks, and excludes
+   dev-only files that sit beside shipped code (`scripts/ci`, the wiki CLIs, and
+   the four `scripts/audit` generators — but not `status-vocabulary.mjs`, which
+   Monster Creator imports at runtime). `CLAUDE.md` is not shipped.
+   `.github/workflows/package.yml` runs it on every change that alters what ships.
 
    Build tooling under `scripts/ci/` is excluded — v1.18.0 shipped the drift
    canary to users because this step used to be an inline snippet duplicated in
