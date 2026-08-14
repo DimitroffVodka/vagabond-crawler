@@ -2135,18 +2135,30 @@ body.theme-light .vcb-phase-badge {
 .loot-npc-atk .atk-ranged { color: var(--vcb-accent, #c9aa58); }
 .loot-npc-atk .atk-cast   { color: var(--vcb-action-cast, #b46ad8); }
 
-/* Senses / Weak / Imm columns: small FontAwesome tokens with hover tooltips */
+/* Senses / Weak / Imm columns: small FontAwesome tokens with hover tooltips.
+ * Fixed-width icon boxes + line-height 1 keep the per-line cost predictable
+ * (18px each, 2 lines max) so a monster with many immunities can't inflate
+ * its row past the uniform row height set below. */
 .loot-npc-tokens {
   text-align: center;
   vertical-align: middle;
   white-space: normal;
-  line-height: 1.4;
+  line-height: 1;
+  overflow: hidden;
+  /* font-size:0 collapses the newlines between the <i> tags. At the inherited
+   * 18px those render as ~4.5px spaces each, which pushed 3 icons over the
+   * column width and wrapped them one-per-line. Each icon re-declares its own
+   * font-size below, so only the whitespace is zeroed. */
+  font-size: 0;
 }
 
 .loot-npc-tokens .token-icon {
   display: inline-block;
-  margin: 0 2px;
-  font-size: 16px;
+  width: 16px;
+  margin: 0 1px;
+  font-size: 14px;
+  text-align: center;
+  vertical-align: middle;
   cursor: help;
 }
 
@@ -2155,6 +2167,41 @@ body.theme-light .vcb-phase-badge {
 .token-icon--imm   { color: var(--vcb-accent, #c9aa58); }
 .vagabond-encounter-roller .browse-list-fill {
   flex: 1 1 auto;
+}
+
+/* ── Browse NPCs: column discipline ───────────────────────────────────────
+ * The 11-column browse table demands ~720px. Under the default `table-layout:
+ * auto` the declared <th> widths are only suggestions, so once demand exceeded
+ * the panel width the browser squeezed every column that could shrink — the
+ * portrait column collapsed to 12px and the token columns to ~32px, which in
+ * turn wrapped one icon per line and blew row heights out to 36-108px.
+ *
+ * `table-layout: fixed` makes the declared widths binding, and the min-width +
+ * overflow-x pair means a narrow window scrolls the table instead of crushing
+ * it. Scoped to the encounter roller so the Loot Manager's 7-column table
+ * keeps its auto layout. */
+.vagabond-encounter-roller .loot-npc-table {
+  table-layout: fixed;
+  min-width: 720px;
+}
+.vagabond-encounter-roller .loot-list-panel {
+  overflow-x: auto;
+}
+
+/* Uniform row height — 40px fits a 28px portrait and two 14px token lines,
+ * so every row lands on the same rhythm for one-second scanning. */
+.vagabond-encounter-roller .loot-npc-table tbody tr {
+  height: 40px;
+}
+.vagabond-encounter-roller .loot-npc-table td {
+  overflow: hidden;
+}
+.vagabond-encounter-roller .loot-npc-atk {
+  white-space: nowrap;
+}
+.vagabond-encounter-roller .loot-npc-type {
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .loot-npc-table {
@@ -2191,7 +2238,28 @@ body.theme-light .vcb-phase-badge {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 200px;
+}
+
+/* Portrait cell: give the <img> a real CSS box.
+ *
+ * The markup only carries width="28" height="28" HTML *attributes*, which are
+ * defaults — Foundry core's `img { max-width: 100% }` outranks the width
+ * attribute, so the image collapses to whatever the table column happens to
+ * grant it while the height attribute holds at 28px. In the Browse NPCs table
+ * that produced 4px-wide slivers of 256x256 art. Pin both axes explicitly and
+ * use object-fit so non-square portraits crop instead of distorting. */
+.loot-npc-img {
+  width: 34px;
+  min-width: 34px;
+}
+.loot-npc-img img {
+  display: block;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  max-width: none;
+  object-fit: cover;
+  border-radius: 3px;
 }
 .browse-add-btn {
   background: rgba(76,175,80,0.2);

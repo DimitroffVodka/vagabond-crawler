@@ -193,7 +193,10 @@ class EncounterRollerApp extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     id:       `vagabond-crawler-encounter-roller`,
     window:   { title: "Random Encounter", resizable: true },
-    position: { width: 700, height: "auto" },
+    // 980 fits the Browse tab's 200px filter column plus the 720px NPC table
+    // without horizontal scrolling. Narrower windows still work — the table
+    // holds its column widths and the list panel scrolls.
+    position: { width: 980, height: "auto" },
   };
 
   static PARTS = {

@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Browse NPCs — fix crushed portraits and ragged row heights
+
+- **Monster portraits no longer collapse into slivers.** The markup only carried
+  `width="28"` / `height="28"` HTML *attributes*, which Foundry core's
+  `img { max-width: 100% }` outranks. Once the 11-column table's ~720px demand
+  exceeded the panel width, the browser squeezed the portrait column to 12px and
+  the images rendered 4.4×28 — a 6.4:1 horizontal crush. The `<img>` now has a
+  real CSS box (28×28, `object-fit: cover`), so non-square art crops instead of
+  distorting. Also fixes the same latent issue in the Loot Manager's NPC list.
+- **Uniform 40px rows.** Row heights previously ranged 36–159px because the
+  squeezed Senses/Weaknesses/Immunities columns wrapped one icon per line. The
+  token columns are now sized to fit three icons per line and the whitespace
+  between the inline `<i>` tags is collapsed, so all 297 bestiary rows land on
+  the same 40px rhythm.
+- **Columns hold their widths.** The browse table uses `table-layout: fixed` with
+  a `min-width`, so a narrow window scrolls the list horizontally instead of
+  crushing every column. Long names (e.g. "Alligator/Crocodile, Giant") now
+  ellipsize cleanly and carry the full name in their tooltip.
+- **Encounter Roller default width 700 → 980**, which fits the filter column plus
+  the full table with no horizontal scrolling.
+
 ## v1.17.2
 
 ### Compatibility
