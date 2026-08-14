@@ -41,7 +41,7 @@ import { resolveHitDieConfig, calculateHP, dieAvg } from "./monster-mutator.mjs"
 export const MODULE_ID = "vagabond-crawler";
 
 // ── Inventory helpers (shared with movement-tracker) ─────────────────────────
-// The system's `actor.system.inventory.occupiedSlots` (`_calculateSlots`,
+// The system's `actor.system.inventory.occupiedSlots` (`_calculateInventorySlots`,
 // `module/data/actor-character.mjs:1174-1198`, verified against vagabond 5.36.0):
 //
 //   if (item.system.containerId) continue;             // stowed items are free
