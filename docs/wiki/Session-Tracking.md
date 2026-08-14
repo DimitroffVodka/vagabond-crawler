@@ -46,7 +46,7 @@ The recap has no public Module Settings toggles. Crawl start and end prompts con
 - Saving or pausing flushes an open combat's latest snapshot into the recap first.
 - The Markdown copy uses ordinary GFM headings and tables.
 
-> **Version 1.17.2 tracking limitation:** most hook-driven data checks for an active session, but several direct loggers do not enforce that state themselves. Loot, XP, encounter checks, combat entries, or player-stat updates can therefore append while the recap is paused or inactive. Treat **No Tracking** and **Pause Session** as partial controls and inspect the recap before saving.
+> **Version 1.18.0 tracking limitation:** most hook-driven data checks for an active session, but several direct loggers do not enforce that state themselves. Loot, XP, encounter checks, combat entries, or player-stat updates can therefore append while the recap is paused or inactive. Treat **No Tracking** and **Pause Session** as partial controls and inspect the recap before saving.
 
 > **Archive limitation:** **End & Save** does not copy `encounterChecks` into the history snapshot. Copy the current recap before ending if those checks need to be retained.
 
@@ -54,4 +54,4 @@ The recap has no public Module Settings toggles. Crawl start and end prompts con
 
 ### XP Counter Patch
 
-Crawler changes Vagabond's **Level Up Dialog** from yes/no checks to numeric counters. Left-click a question to add one; right-click to subtract one, with a minimum of zero. The badge, per-question subtotal, and total award update with the count. Confirming the dialog adds the character and question breakdown to **Session Recap → XP**. Because the XP logger has no state guard in version `1.17.2`, it can add an entry while the recap is inactive or paused.
+Crawler changes Vagabond's **Level Up Dialog** from yes/no checks to numeric counters. Left-click a question to add one; right-click to subtract one, with a minimum of zero. The badge, per-question subtotal, and total award update with the count. Confirming the dialog adds the character and question breakdown to **Session Recap → XP**. Because the XP logger has no state guard in version `1.18.0`, it can add an entry while the recap is inactive or paused.

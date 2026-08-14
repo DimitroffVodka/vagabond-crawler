@@ -20,7 +20,7 @@ On a hit, Crawler can pause the world, open the roller, and roll the active tabl
 
 **Place Token(s)** needs an active scene and a table result that resolves to an Actor UUID. Text-only results can be rolled and posted, but Crawler cannot turn them into tokens.
 
-> **Version 1.17.2 limitation:** when Crawler creates a new table, it prefixes the selected die type with `1`. Choosing `2d6` therefore saves `12d6`. Use a single-die type for a new table or correct the world RollTable formula afterward.
+> **Version 1.18.0 limitation:** when Crawler creates a new table, it prefixes the selected die type with `1`. Choosing `2d6` therefore saves `12d6`. Use a single-die type for a new table or correct the world RollTable formula afterward.
 
 ### Settings
 
@@ -34,7 +34,7 @@ On a hit, Crawler can pause the world, open the roller, and roll the active tabl
 
 ### Encounter notes
 
-- Version `1.17.2` offers World NPCs, Scene NPCs, Bestiary, and Humanlike sources. The older guide's claim that arbitrary module or VCE packs appear in the source list is stale.
+- Version `1.18.0` offers World NPCs, Scene NPCs, Bestiary, and Humanlike sources. The older guide's claim that arbitrary module or VCE packs appear in the source list is stale.
 - Filters survive tab changes, so opening Build Table and returning to Browse NPCs keeps the current search.
 - Without an active table, Encounter Check reports the hit or miss but has nothing to preroll.
 - Monster Creator saves a new world actor and never edits the source compendium.
@@ -52,7 +52,7 @@ The old Monster Mutator now lives inside this window. Its 64 mutations can chang
 1. Open **Encounter → Monster Creator** as GM.
 2. Optionally load a monster from Bestiary or Humanlike. Filter the list, then click a row to prefill the form. Portrait, token image, senses, speed modes, actions, and abilities come across when available.
 3. Fill in name, size, being type, zone, Hit Dice, morale, appearing, speed, senses, armor, portrait, and token image.
-4. Review the derived values. Version `1.17.2` does not expose editable Might, Dexterity, Awareness, Reason, Presence, or Luck controls here. New actors receive 8 in all six base stats.
+4. Review the derived values. Version `1.18.0` does not expose editable Might, Dexterity, Awareness, Reason, Presence, or Luck controls here. New actors receive 8 in all six base stats.
 5. Add damage immunities, weaknesses, and status immunities.
 6. Build actions from Quick Picks or fill in name, damage, range, status, countdown, drain, and target fields yourself.
 7. Add abilities and check their automation badges.
@@ -120,9 +120,9 @@ Lighting one item from a stack splits it into an independent lit item.
 
 Right-click **Lights** to change a source's radius, color, intensity, angle, animation, or longevity.
 
-> **Version 1.17.2 limitation:** Crawler still uses the built-in longevity for burn clamping and percentage calculations. A custom **Longevity (secs)** value is not reliable.
+> **Version 1.18.0 limitation:** a custom **Longevity (secs)** applies when a source is lit or refuelled, but burn clamping and the tracker's remaining-time percentage still read the built-in value. Setting a longevity above the built-in one therefore gets clamped back down on the first burn tick, and the percentage is measured against the wrong maximum.
 
-**Real-Time Light Burn** is off by default. The Light Tracker also has a time input with plus and minus controls. In version `1.17.2`, the minus path burns light but passes negative minutes into crawl elapsed time. Prefer normal crawl-turn advancement or real-time tracking when elapsed-time accuracy matters.
+**Real-Time Light Burn** is off by default. The Light Tracker also has a time input with plus and minus controls. In version `1.18.0`, the minus path burns light but passes negative minutes into crawl elapsed time. Prefer normal crawl-turn advancement or real-time tracking when elapsed-time accuracy matters.
 
 ### Light notes
 

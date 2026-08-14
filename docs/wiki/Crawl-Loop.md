@@ -36,7 +36,7 @@ Cards brighten or dim with the phase. Hero cards glow during the Heroes phase, a
 
 #### Movement Tracker
 
-Movement is budgeted and color-coded on the token ruler. During an active crawl the budget is the actor's **crawl speed**; exceed it and the move is blocked with a warning. Terrain difficulty multiplies distance when crossing a Scene Region with a **Modify Movement Cost** behavior (up to 3× for walk). The "Treads Lightly" perk bypasses walk terrain difficulty. Version `1.17.2` does not check the Heroes/GM phase before enforcing that budget, so the phase remains a table-workflow indicator rather than a hard movement lock.
+Movement is budgeted and color-coded on the token ruler. During an active crawl the budget is the actor's **crawl speed**; exceed it and the move is blocked with a warning. Terrain difficulty multiplies distance when crossing a Scene Region with a **Modify Movement Cost** behavior (up to 3× for walk). The "Treads Lightly" perk bypasses walk terrain difficulty. Version `1.18.0` does not check the Heroes/GM phase before enforcing that budget, so the phase remains a table-workflow indicator rather than a hard movement lock.
 
 In combat, the budget uses the fastest available movement mode: walk, fly, swim, climb, phase, or cling. A Bat with walk 5 and fly 30 gets 30; a Dragon with walk 40 and fly 80 gets 80. The GM can pin a mode from the Token HUD, and the strip uses the same icon. A combatant can move up to twice that speed by Rushing. The ruler turns red after base speed and blocks movement past twice the speed. A negative `moveRemaining` value shows how much Rush movement was spent.
 

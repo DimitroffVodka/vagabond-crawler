@@ -18,7 +18,7 @@ Target the intended enemy before an attack, spell, or target-side save. Crawler 
 - Hover a card you own during combat to open its available action tabs.
 - Your card can show HP, Luck, status, movement, movement mode, defeated state, and turn highlighting.
 
-During a crawl, move within the budget shown on your card. Version `1.17.2` does not use the Heroes/GM phase as a hard movement lock, so follow the GM's phase call even though the ruler can still enforce movement during GM Turn. In combat, Rush can extend movement to twice the active speed unless the actor is overloaded.
+During a crawl, move within the budget shown on your card. Version `1.18.0` does not use the Heroes/GM phase as a hard movement lock, so follow the GM's phase call even though the ruler can still enforce movement during GM Turn. In combat, Rush can extend movement to twice the active speed unless the actor is overloaded.
 
 When the Token HUD offers **Rollback**, it returns the token to its turn-start position and restores the movement budget. A player request needs a connected GM client.
 
@@ -57,7 +57,7 @@ A scroll never crits in version `1.18.0`, so any critical rider on the spell can
 
 When the GM makes a shop available, open it from the chat card or the Crawl Strip. Choose the correct owned character before buying, selling, browsing the Catalog, or gambling. A connected GM client processes the request.
 
-The shop does not force itself open for every player. Use it only with trusted players in version `1.17.2`; its GM socket handlers do not independently re-check every ownership and pricing input.
+The shop does not force itself open for every player. Use it only with trusted players in version `1.18.0`; its GM socket handlers do not independently re-check every ownership and pricing input.
 
 ### Session Recap
 

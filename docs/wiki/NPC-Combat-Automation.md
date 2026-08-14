@@ -38,11 +38,11 @@ During combat, two allied tokens within 5 feet can flank a foe no more than one 
 
 At the start of each round, Crawler rolls non-recharge countdown documents such as burning, poison, and bleeding. A roll of 1 shrinks or expires the die, and supported tick damage applies through Vagabond. Crawler spaces the rolls out when Dice So Nice is active so their animations do not overlap. **Auto-Roll Countdown Dice** is on by default and can be disabled in Crawler's Combat settings.
 
-> **Version 1.17.2 limitation:** the round-start and combat-end queries do not check whether a countdown belongs to the active combat. An unrelated non-recharge countdown elsewhere in the world may roll or be removed.
+> **Version 1.18.0 limitation:** the round-start and combat-end queries do not check whether a countdown belongs to the active combat. An unrelated non-recharge countdown elsewhere in the world may roll or be removed.
 
 ### Morale Check
 
-Crawler checks morale after the first enemy death in a group, when half the original enemy group has fallen, or when a solo enemy drops to half HP. It rolls `2d6` against the surviving leader's Morale and whispers **HOLDS** or **FAILS** to the GMs. Version `1.17.2` does not ask for confirmation first. What a failed check means at the table is still the GM's call.
+Crawler checks morale after the first enemy death in a group, when half the original enemy group has fallen, or when a solo enemy drops to half HP. It rolls `2d6` against the surviving leader's Morale and whispers **HOLDS** or **FAILS** to the GMs. Version `1.18.0` does not ask for confirmation first. What a failed check means at the table is still the GM's call.
 
 ### Animation FX
 

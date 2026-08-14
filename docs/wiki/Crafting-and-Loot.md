@@ -50,11 +50,11 @@ The current implementation does not create the labelled canvas loot bags describ
 | Setting | Effect | Default |
 |---|---|---|
 | Loot Drops | Offer per-player loot from eligible defeated NPCs at combat end | Off |
-| Loot Drop Chance (%) | Registered global value; not used by the version `1.17.2` fallback path | 50 |
+| Loot Drop Chance (%) | Registered global value; not used by the version `1.18.0` fallback path | 50 |
 
 Per-NPC table and chance values live on actor flags or in the compendium loot configuration. Edit them through Loot Manager.
 
-> **Version 1.17.2 limitation:** when an NPC has no explicit chance, combat-end resolution derives one from the NPC's appearing formula instead of using the registered global 50% value. Set the NPC percentage yourself when the chance matters.
+> **Version 1.18.0 limitation:** when an NPC has no explicit chance, combat-end resolution derives one from the NPC's appearing formula instead of using the registered global 50% value. Set the NPC percentage yourself when the chance matters.
 
 ### Loot notes
 
@@ -91,7 +91,7 @@ Relic Forge has no world settings. The power catalog and categories live in `scr
 - Prefixes, suffixes, and wrap templates build the final name in the order shown.
 - Custom Active Effect changes use Foundry's `{ key, mode, value }` shape. The Forge replaces `"{input}"` with the text entered for that power.
 - Forged items do not stay linked to the catalog. Editing `RELIC_POWERS` later does not update them.
-- The displayed power total is reference information in version `1.17.2`; forging does not write it to `system.baseCost`.
+- The displayed power total is reference information in version `1.18.0`; forging does not write it to `system.baseCost`.
 - Crawler does not currently add a Relic Forge button to equipment sheets.
 - For the full catalog of powers (names, descriptions, costs, application modes), see [`scripts/relic-powers.mjs`](https://github.com/DimitroffVodka/vagabond-crawler/blob/main/scripts/relic-powers.mjs).
 
@@ -106,7 +106,7 @@ The value is **5g + 5g × mana equivalent**. A zero-mana spell is worth 5 gold, 
 ### Create and use a scroll
 
 1. Open via **Forge & Loot** → **Scroll Forge**, or `game.vagabondCrawler.scrollForge.open()`.
-2. Confirm that **Target** shows **World Items**. The ordinary Crawl Bar path does not accept an actor drop in version `1.17.2`.
+2. Confirm that **Target** shows **World Items**. The ordinary Crawl Bar path does not accept an actor drop in version `1.18.0`.
 3. Pick a spell from the sorted dropdown (populated from `vagabond.spells`).
 4. Configure:
    - **Delivery type:** touch, ranged, area, cone, and the other types supplied by Vagabond.
@@ -170,10 +170,10 @@ Player requests go through the connected GM client and successful trades are wri
 - A GM must remain connected to process player transactions.
 - Actor inventory changes appear the next time the shop renders.
 - Changing the sell ratio affects later sales, not transactions already logged.
-- Purchases in version `1.17.2` do not use `skipStack`, despite the older guide's claim.
+- Purchases in version `1.18.0` do not use `skipStack`, despite the older guide's claim.
 - Shop activity can appear in Session Recap and its Markdown copy.
 
-> **Version 1.17.2 security limitation:** the GM socket handlers do not independently re-check actor ownership, shop availability, or every client-supplied pricing input. Use Merchant Shop only with trusted players until those checks are tightened.
+> **Version 1.18.0 security limitation:** the GM socket handlers do not independently re-check actor ownership, shop availability, or every client-supplied pricing input. Use Merchant Shop only with trusted players until those checks are tightened.
 
 ---
 
