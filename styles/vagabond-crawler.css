@@ -2169,37 +2169,52 @@ body.theme-light .vcb-phase-badge {
   flex: 1 1 auto;
 }
 
-/* ── Browse NPCs: column discipline ───────────────────────────────────────
- * The 11-column browse table demands ~720px. Under the default `table-layout:
- * auto` the declared <th> widths are only suggestions, so once demand exceeded
- * the panel width the browser squeezed every column that could shrink — the
+/* ── NPC tables: column discipline ────────────────────────────────────────
+ * Under the default `table-layout: auto` the declared <th> widths are only
+ * suggestions, so once a table's demand exceeded its panel width the browser
+ * squeezed every column that could shrink — in the 11-column browse table the
  * portrait column collapsed to 12px and the token columns to ~32px, which in
- * turn wrapped one icon per line and blew row heights out to 36-108px.
+ * turn wrapped one icon per line and blew row heights out to 36-159px.
  *
- * `table-layout: fixed` makes the declared widths binding, and the min-width +
- * overflow-x pair means a narrow window scrolls the table instead of crushing
- * it. Scoped to the encounter roller so the Loot Manager's 7-column table
- * keeps its auto layout. */
-.vagabond-encounter-roller .loot-npc-table {
+ * `table-layout: fixed` makes the declared widths binding. Both NPC tables get
+ * it; the min-width that pairs with it is per-app, because the two tables have
+ * very different column counts.
+ *
+ * NOTE: do NOT scope these with `.vagabond-encounter-roller` — despite the
+ * name, BOTH templates open with <form class="vagabond-encounter-roller">
+ * (templates/loot-manager.hbs:1, templates/encounter-roller.hbs:1), so that
+ * selector hits the Loot Manager too. Scope by the ApplicationV2 root id. */
+.loot-npc-table {
   table-layout: fixed;
+}
+
+/* 11 columns: 34+84+46+44+48+88+62+62+62+34 fixed, plus ~160 for the name. */
+#vagabond-crawler-encounter-roller .loot-npc-table {
   min-width: 720px;
 }
-.vagabond-encounter-roller .loot-list-panel {
+/* 7 columns: 28+32+90+40+130+42 fixed, plus ~160 for the name. Kept well under
+ * the 563px panel at the default 820px window so no scrollbar appears. */
+#vagabond-crawler-loot-manager .loot-npc-table {
+  min-width: 520px;
+}
+
+/* Narrow windows scroll the table instead of crushing its columns. */
+.loot-list-panel {
   overflow-x: auto;
 }
 
 /* Uniform row height — 40px fits a 28px portrait and two 14px token lines,
  * so every row lands on the same rhythm for one-second scanning. */
-.vagabond-encounter-roller .loot-npc-table tbody tr {
+.loot-npc-table tbody tr {
   height: 40px;
 }
-.vagabond-encounter-roller .loot-npc-table td {
+.loot-npc-table td {
   overflow: hidden;
 }
-.vagabond-encounter-roller .loot-npc-atk {
+.loot-npc-atk {
   white-space: nowrap;
 }
-.vagabond-encounter-roller .loot-npc-type {
+.loot-npc-type {
   white-space: nowrap;
   text-overflow: ellipsis;
 }

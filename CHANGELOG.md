@@ -10,7 +10,13 @@
   exceeded the panel width, the browser squeezed the portrait column to 12px and
   the images rendered 4.4×28 — a 6.4:1 horizontal crush. The `<img>` now has a
   real CSS box (28×28, `object-fit: cover`), so non-square art crops instead of
-  distorting. Also fixes the same latent issue in the Loot Manager's NPC list.
+  distorting.
+- **The Loot Manager's NPC list had the same bug**, confirmed live: at its
+  default 820px window the portraits already rendered 24×28 (a 14% horizontal
+  squash), and below ~700px they collapsed to the same 4×28 sliver. Both tables
+  now share the fix. Note that `.vagabond-encounter-roller` is *not* a usable
+  scoping hook — despite the name, `templates/loot-manager.hbs` opens with the
+  same class — so the per-app rules key off the ApplicationV2 root id instead.
 - **Uniform 40px rows.** Row heights previously ranged 36–159px because the
   squeezed Senses/Weaknesses/Immunities columns wrapped one icon per line. The
   token columns are now sized to fit three icons per line and the whitespace
