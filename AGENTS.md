@@ -323,20 +323,21 @@ Committed dataset of every NPC across the Vagabond compendium packs. Source JSON
 1. Bump `"version"` in `module.json`
 2. Update `CHANGELOG.md` and the README version badge
 3. Commit and push
-4. Build `module.zip` with all files inside a `vagabond-crawler/` wrapper folder (Foundry requires this structure). No `.git`, `.Codex`, `docs`, or `data` dirs:
-   ```python
-   python -c "
-   import zipfile, os
-   with zipfile.ZipFile('module.zip', 'w', zipfile.ZIP_DEFLATED) as zf:
-       for folder in ['scripts', 'styles', 'templates', 'languages', 'icons']:
-           for root, dirs, files in os.walk(folder):
-               for f in files:
-                   fp = os.path.join(root, f)
-                   zf.write(fp, 'vagabond-crawler/' + fp.replace(os.sep, '/'))
-       for f in ['module.json', 'CHANGELOG.md', 'README.md', 'AGENTS.md']:
-           if os.path.exists(f): zf.write(f, 'vagabond-crawler/' + f)
-   "
+4. Build `module.zip`:
+   ```bash
+   python3 scripts/ci/build-module-zip.py
    ```
+   Every path must sit inside a `vagabond-crawler/` wrapper folder or Foundry's
+   install silently fails, so the script asserts that itself and exits non-zero
+   if the layout is wrong. It also refuses to ship `docs/`, `dev/`, `.git`,
+   `.planning` or agent scratch dirs.
+
+   Build tooling under `scripts/ci/` is excluded — v1.18.0 shipped the drift
+   canary to users because this step used to be an inline snippet duplicated in
+   two documents, and neither copy knew the directory existed. To change what
+   ships, edit `FOLDERS` / `ROOT_FILES` / `EXCLUDE_DIRS` in that one script.
+   `scripts/test/` IS shipped on purpose: it is lazy-loaded and only imports
+   when a GM calls `game.vagabondCrawler.test.run()`.
 5. Create the GitHub release with **both** `module.json` and `module.zip` as assets:
    ```bash
    gh release create vX.Y.Z module.json module.zip --title "vX.Y.Z" --notes "..."
