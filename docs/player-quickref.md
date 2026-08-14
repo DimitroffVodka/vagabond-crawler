@@ -112,7 +112,9 @@ Click the appropriate save button. Shift+click for Favor, Ctrl+click for Hinder.
 ### Inventory
 - **Right-click** an item in inventory for context menu (Light, Use Scroll, etc.)
 - **Stacking**: Duplicate items auto-merge when added. Quantity shown as ×N badge.
-- **Zero-slot items** (rations, scrolls, candles): 10 units per slot.
+- **Zero-slot items** (rations, coins, backpacks): free, same as the core rules.
+- **Stacks cost slots**: a stack of N costs N × the item's slot value (2 torches = 2 slots).
+- Slot cost comes from the item, not its name — a plain **Candle** is zero-slot (free), an alchemical **Candle, Basic** costs 1.
 - **Spell Scrolls**: Right-click → "Use Scroll" to cast. No mana, no roll. Scroll is consumed.
 
 ### Light Sources

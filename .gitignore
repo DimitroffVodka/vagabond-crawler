@@ -1,0 +1,16 @@
+# Agent / tooling scratch — never belongs in the repo.
+# `.playwright-mcp/` holds browser console dumps and page snapshots that can
+# contain Foundry session ids and world data; 8 of them were committed in
+# db680e7 before this file existed.
+.playwright-mcp/
+.repowise/
+.gemini/
+.claude/settings.local.json
+
+# Build output
+module.zip
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
