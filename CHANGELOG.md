@@ -2,6 +2,11 @@
 
 ## v1.18.0
 
+### Compatibility
+
+- **Vagabond system `verified` bumped to 5.36.0** (from 5.8.1; minimum stays 4.1.0). The 28-minor gap was the root of every bug in this release — 5.36.0 dropped the `weapon` / `armor` / `gear` item types and moved slot counting, and the Crawler was still coded against the older shape.
+- **Foundry `verified` bumped to 14.365** (from 14.361; minimum stays 14).
+
 ### Inventory slot counting — match the system everywhere except quantity
 
 - **Zero-slot items are free again.** Crawler pooled them by `gearCategory` at "10 units per slot", but `Math.ceil` ran *per pool*, so every distinct category cost a full slot even at a single item. A Backpack (`baseSlots: 0`, free in the core rules) cost a slot — so did a lone Quill, a Locket, and the Monk's `Unarmed`. Measured on a live world this inflated typical loadouts by 2–4 slots, charging characters for carrying *variety* rather than weight. The pooling is removed: Crawler now deviates from the system on **exactly one axis — quantity**. A stack of N costs `baseSlots × N`; everything else matches the system's `_calculateSlots`.
