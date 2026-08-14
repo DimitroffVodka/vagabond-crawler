@@ -28,6 +28,7 @@ const SUITE_LOADERS = [
   // AEs write. Both fail silently when the system renames them, so no other
   // suite would notice.
   () => import("./suites/system-contract.mjs"),
+  () => import("./suites/inventory-slots.mjs"),
 ];
 
 let _loaded = false;

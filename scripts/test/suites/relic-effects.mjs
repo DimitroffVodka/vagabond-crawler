@@ -164,18 +164,30 @@ export function register() {
       expect(r.formula).not.toContain("1d4");
     });
 
-    case_("Wrap chain: VCE's rollDamage wrap remains outermost, Crawler injects dice inside it", async (ctx) => {
-      // VCE wraps prototype.rollDamage in its own ready hook. Crawler also
-      // wraps it. We don't care about the order — only that AT LEAST one
-      // wrap chain is in place AND end-to-end damage on a relic weapon
-      // correctly includes the bonus dice (proving the chain composes).
+    case_("Wrap guard survives VCE's outer wrap — re-patching cannot double-apply", async (ctx) => {
+      // VCE wraps prototype.rollDamage in its own ready hook, on top of ours.
+      // The guard therefore CANNOT live on our wrapper function: once VCE wraps
+      // it, a function-level flag is buried in a closure and reads as "not
+      // patched", so a second _patchItemRollDamage() stacked another layer and
+      // relic dice applied twice (reproduced live as `1d6 + 1d4 + 1d4`).
+      // wrap-guard.mjs keys the marker on the prototype instead.
       const { VagabondItem } = await import("/systems/vagabond/module/documents/item.mjs");
-      const fnSrc = VagabondItem.prototype.rollDamage.toString();
-      const wrappedByVCE     = fnSrc.includes("GunslingerFeatures") || fnSrc.includes("MonkFeatures");
-      const wrappedByCrawler = !!VagabondItem.prototype.rollDamage.__vcRelicWrapped;
-      // At least one wrap should be present. (When VCE is innermost it sets
-      // __vcRelicWrapped on its inner closure rather than the prototype.)
-      expect(wrappedByVCE || wrappedByCrawler).toBe(true);
+      const { RelicEffects } = await import("/modules/vagabond-crawler/scripts/relic-effects.mjs");
+      const GUARD = Symbol.for("vagabond-crawler.wraps");
+
+      // Visible on the prototype no matter how many layers wrap the method.
+      expect(!!VagabondItem.prototype[GUARD]?.rollDamage).toBe(true);
+
+      // Re-invoking the patch must be a no-op — same function object after.
+      const before = VagabondItem.prototype.rollDamage;
+      await RelicEffects._patchItemRollDamage();
+      expect(VagabondItem.prototype.rollDamage).toBe(before);
+
+      // Same for the chat-card button patch, which previously had no guard.
+      const DamageHelper = (await import("/systems/vagabond/module/helpers/damage-helper.mjs")).VagabondDamageHelper;
+      const beforeBtn = DamageHelper.rollDamageFromButton;
+      await RelicEffects._patchDamageHelper();
+      expect(DamageHelper.rollDamageFromButton).toBe(beforeBtn);
     });
 
   });

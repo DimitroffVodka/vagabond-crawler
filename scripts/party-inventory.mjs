@@ -5,7 +5,7 @@
  * GM tool for redistributing loot and seeing who's carrying what.
  */
 
-import { MODULE_ID } from "./vagabond-crawler.mjs";
+import { MODULE_ID, getTotalOccupiedSlots } from "./vagabond-crawler.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -81,7 +81,11 @@ class PartyInventoryApp extends HandlebarsApplicationMixin(ApplicationV2) {
           return a.name.localeCompare(b.name);
         });
 
-      const totalSlots = items.reduce((s, i) => s + i.slots * i.quantity, 0);
+      // Use the shared count, not a local sum. The old `slots × quantity` reduce
+      // over `type === "equipment"` disagreed with the sheet on three counts: it
+      // charged for gear stowed in containers, ignored the Weightless flag, and
+      // skipped `container`-type items entirely.
+      const totalSlots = getTotalOccupiedSlots(actor) ?? 0;
       const maxSlots = actor.system.inventory?.maxSlots ?? actor.system.inventory?.slots ?? "?";
 
       return {

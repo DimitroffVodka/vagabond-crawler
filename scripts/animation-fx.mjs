@@ -2,6 +2,7 @@
 import { DEFAULT_ANIMATION_FX_CONFIG, buildDefaultAnimationFxConfig } from "./animation-fx-defaults.mjs";
 import { AnimationFxConfigApp } from "./animation-fx-config.mjs";
 import { AnimationFxOverrideApp } from "./animation-fx-override.mjs";
+import { isWrapped, markWrapped } from "./wrap-guard.mjs";
 
 const MODULE_ID = "vagabond-crawler";
 
@@ -292,8 +293,9 @@ export const AnimationFx = {
       return;
     }
     if (!VCC || typeof VCC.npcAction !== "function") return;
-    // Avoid double-wrapping
-    if (VCC.npcAction.__vcAnimFxWrapped) return;
+    // Avoid double-wrapping. Guard on the owner object, not the function — a
+    // later wrap by another module hides a function-level flag. See wrap-guard.mjs.
+    if (isWrapped(VCC, "npcAction")) return;
 
     const original = VCC.npcAction.bind(VCC);
     const wrapped = async function (actor, action, actionIndex, targets, ...rest) {
@@ -348,8 +350,9 @@ export const AnimationFx = {
         if (!stamped) Hooks.off("preCreateChatMessage", preHook);
       }
     };
-    wrapped.__vcAnimFxWrapped = true;
+    wrapped.__vcAnimFxWrapped = true;   // kept for debugging/introspection only
     VCC.npcAction = wrapped;
+    markWrapped(VCC, "npcAction");
     console.log(`${MODULE_ID} | AnimationFx: wrapped VagabondChatCard.npcAction (actionIndex flag)`);
   },
 

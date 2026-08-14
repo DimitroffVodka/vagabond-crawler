@@ -10,6 +10,7 @@
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
+import { isWrapped, markWrapped } from "./wrap-guard.mjs";
 
 /* -------------------------------------------- */
 /*  Helper: Get relic flags from equipped items */
@@ -171,7 +172,11 @@ export const RelicEffects = {
       return;
     }
     if (!VagabondItem?.prototype?.rollDamage) return;
-    if (VagabondItem.prototype.rollDamage.__vcRelicWrapped) return;  // idempotent
+    // Guard on the PROTOTYPE, not the function. VCE wraps this same method in
+    // its own ready hook; once it does, a marker stamped on our wrapper is
+    // buried inside its closure and reads as "not patched" — so we'd wrap again
+    // and apply relic dice twice. See wrap-guard.mjs.
+    if (isWrapped(VagabondItem.prototype, "rollDamage")) return;
 
     const original = VagabondItem.prototype.rollDamage;
     const self = this;
@@ -185,14 +190,44 @@ export const RelicEffects = {
       if (parts.length === 0) return baseRoll;
 
       const bonusFormula = parts.map(p => p.formula).join(" + ");
-      const augmented = new Roll(`${baseRoll.formula} + ${bonusFormula}`, actor.getRollData());
-      await augmented.evaluate();
+
+      // Evaluate ONLY the bonus, then splice its terms onto the ALREADY-EVALUATED
+      // base roll. Do not rebuild from `baseRoll.formula` — that re-rolls the base
+      // and silently discards the system's post-evaluation work. The killer case is
+      // `VagabondDamageHelper._manuallyExplodeDice` (damage-helper.mjs:21), which
+      // pushes extra results straight into `term.results` after evaluation; the
+      // formula string keeps no record of them, since an exploding weapon's formula
+      // is a plain "4d6". Re-rolling dropped every explosion — a 104-result roll
+      // came back as 4.
+      const bonusRoll = new Roll(bonusFormula, actor.getRollData());
+      await bonusRoll.evaluate();
+
+      // Append in place rather than building a new Roll via `Roll.fromTerms`.
+      // fromTerms produces a fresh instance and drops anything the system hung
+      // off the roll OBJECT — `_perDieBonusTotal`, `_perDieBonusDiceCount`,
+      // `_weaknessPreRolled` (damage-helper.mjs) and the dice-appearance colorset
+      // applied in item.mjs. Mutating keeps the exact instance the system
+      // returned, so every reference to it stays consistent.
+      const OperatorTerm = foundry.dice?.terms?.OperatorTerm ?? globalThis.OperatorTerm;
+      try {
+        const totalBefore = baseRoll.total;   // may already include system adjustments
+        baseRoll.terms.push(new OperatorTerm({ operator: "+" }), ...bonusRoll.terms);
+        baseRoll._formula = Roll.getFormula(baseRoll.terms);
+        baseRoll._total = totalBefore + bonusRoll.total;
+      } catch (err) {
+        // Degrade to the base roll untouched: losing the relic rider is far
+        // better than losing the weapon's own damage and its explosions.
+        console.error(`${MODULE_ID} | Relic dice merge failed — base roll left unmodified:`, err);
+        return baseRoll;
+      }
+
       const labels = parts.map(p => p.label).join(", ");
       console.log(`${MODULE_ID} | Relic dice merged into item.rollDamage: ${labels} (${bonusFormula})`);
-      return augmented;
+      return baseRoll;   // mutated in place — same instance the system returned
     }
-    wrapped.__vcRelicWrapped = true;
+    wrapped.__vcRelicWrapped = true;   // kept for debugging/introspection only
     VagabondItem.prototype.rollDamage = wrapped;
+    markWrapped(VagabondItem.prototype, "rollDamage");
     console.log(`${MODULE_ID} | Patched VagabondItem.prototype.rollDamage for relic effects.`);
   },
 
@@ -215,6 +250,10 @@ export const RelicEffects = {
       console.warn(`${MODULE_ID} | VagabondDamageHelper not found in module export.`);
       return;
     }
+    // Previously unguarded entirely. A second patch would stack another layer,
+    // each appending the bonus dice to `button.dataset.damageFormula` — so the
+    // chat-card "Roll Damage" button would roll the relic rider twice.
+    if (isWrapped(DamageHelper, "rollDamageFromButton")) return;
 
     const origRollDamage = DamageHelper.rollDamageFromButton.bind(DamageHelper);
 
@@ -242,6 +281,7 @@ export const RelicEffects = {
       return origRollDamage(button, messageId);
     };
 
+    markWrapped(DamageHelper, "rollDamageFromButton");
     console.log(`${MODULE_ID} | Patched VagabondDamageHelper.rollDamageFromButton for relic effects.`);
   },
 
