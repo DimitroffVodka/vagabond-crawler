@@ -277,5 +277,25 @@ export function register() {
       expect(pTok.getFlag(MODULE_ID, "partyLights")).toBe(undefined);
     });
 
+
+    case_("the tracker lists system lights, burns their clocks from Time controls, and douses them", async (ctx) => {
+      if (!LS()) return;
+      stubHourMode(ctx);
+      const { actor: pc, tokenDoc: tok } = await ctx.fx.createTestPC(ctx);
+      const [torch] = await pc.createEmbeddedDocuments("Item", [sysTorch()]);
+      await LS().use({ actor: pc, item: torch, token: tok, light: { bright: 25, dim: 30 } });
+      const row = () => game.vagabondCrawler.lightTracker._systemLightRows().find(r => r.tdoc?.uuid === tok.uuid);
+      expect(row()?.pct).toBe(100);
+      expect(row()?.formattedTime).toContain("1h");
+
+      await game.vagabondCrawler.lightTracker.tickSystemLightClocks(20, { realtime: true });
+      expect(clocksWhere(ls => ls.itemUuid === torch.uuid)[0].getFlag("vagabond", "progressClock").filled).toBe(4);
+      await game.vagabondCrawler.lightTracker.tickSystemLightClocks(-10, { realtime: true });
+      expect(clocksWhere(ls => ls.itemUuid === torch.uuid)[0].getFlag("vagabond", "progressClock").filled).toBe(5);
+
+      await LS()._deleteClock(row().clockId);
+      expect(await until(() => !tok.light.dim && !row())).toBe(true);
+    });
+
   });
 }

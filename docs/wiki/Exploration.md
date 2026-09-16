@@ -89,7 +89,7 @@ Open Hit Die Configuration by right-clicking **Forge & Loot** or from the Vagabo
 
 Light Tracker records carried sources, applies their Foundry token light, and reduces their remaining burn time. Twelve source types ship with their own radii, colors, animations, and fuel rules. With real-time burn off, returning from GM to Heroes adds crawl time and burns active sources. With it on, unpaused world time drives the countdown. Lanterns refuel from supported oil when they run dry; torches and candles go out.
 
-System compendium light items (vagabond 5.23+) light through the system's **Use** instead of the right-click entry. The Crawler still makes lanterns and lamps need and burn oil, keeps a burned-out lantern, ticks hour clocks on crawl turns, and plays the light FX. A lit system light dropped on the canvas keeps its light and remaining burn clock, and relights whoever picks it up. Gathering into a party token carries the light and clock along and hands them back on release. The tracker window lists only the Crawler's own lights.
+System compendium light items (vagabond 5.23+) light through the system's **Use** instead of the right-click entry. The Crawler still makes lanterns and lamps need and burn oil, keeps a burned-out lantern, ticks hour clocks on crawl turns, and plays the light FX. A lit system light dropped on the canvas keeps its light and remaining burn clock, and relights whoever picks it up. Gathering into a party token carries the light and clock along and hands them back on release. The Light Tracker window lists system lights too: their time bars, the + / − time controls and the douse button all work on the system's clocks.
 
 ### Use a light source
 

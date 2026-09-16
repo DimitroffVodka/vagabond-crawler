@@ -553,8 +553,10 @@ async function _pickupSystemLight(lightActor, droppedTdoc, targetActor, sys) {
     }
     relit = true;
   }
-  if (clock) await clock.delete();
+  // Token before clock: the system's clock-delete hook restores its token's
+  // light asynchronously, and would update a token we'd just deleted.
   if (droppedTdoc) await droppedTdoc.delete();
+  if (clock) await clock.delete();
   await lightActor.delete();
 
   await ChatMessage.create({
@@ -788,16 +790,58 @@ export const LightTracker = {
    * an "hour" clock is 6 segments = 60 minutes, so one segment per 10 minutes.
    * The system deletes the clock (restoring the light) when it reaches 0.
    */
-  async tickSystemLightClocks(minutes) {
-    if (!game.user.isGM) return;
-    const steps = Math.round(minutes / 10);
-    if (steps <= 0) return;
-    for (const j of game.vagabond?.clocks?.getAll?.() ?? []) {
-      if (j.getFlag("vagabond", "lightSource")?.mode !== "clock") continue;
+  async tickSystemLightClocks(minutes, { realtime = false } = {}) {
+    if (!game.user.isGM || !minutes) return;
+    for (const j of _systemClocks(() => true)) {
+      const ls = j.getFlag("vagabond", "lightSource");
       const pc = j.getFlag("vagabond", "progressClock");
-      if (pc?.segments !== 6) continue;
-      await j.update({ "flags.vagabond.progressClock.filled": Math.max(0, (pc.filled ?? 0) - steps) });
+      if (ls.mode === "clock") {
+        // 6-segment hour clock: 10 min a segment; 1-segment quarter clock: a 6-hour shift.
+        const perSegment = pc.segments === 6 ? 10 : 360;
+        const steps = Math.round(minutes / perSegment);
+        if (!steps) continue;
+        const filled = Math.max(0, Math.min(pc.segments, (pc.filled ?? 0) - steps));
+        if (filled !== pc.filled) await j.update({ "flags.vagabond.progressClock.filled": filled });
+      } else if (realtime && ls.mode === "realtime") {
+        // Burning time moves the start earlier; adding time moves it later (never past now).
+        const startTime = Math.min(Date.now(), (ls.startTime ?? Date.now()) - minutes * 60000);
+        await j.setFlag("vagabond", "lightSource", { ...ls, startTime });
+      }
     }
+    if (realtime) await game.vagabond?.lightSource?.tickRealtime?.();
+  },
+
+  /** Tracker rows for the system's light sources: every light clock, plus
+   *  manual (no-clock) lights recorded in a token's litItems. */
+  _systemLightRows() {
+    const rows = [];
+    const clocked = new Set();
+    for (const j of _systemClocks(() => true)) {
+      const ls = j.getFlag("vagabond", "lightSource");
+      const pc = j.getFlag("vagabond", "progressClock");
+      const tdoc = fromUuidSync(ls.tokenUuid ?? "");
+      const item = ls.itemUuid ? fromUuidSync(ls.itemUuid) : null;
+      if (ls.itemUuid) clocked.add(ls.itemUuid);
+      let mins, pct;
+      if (ls.mode === "realtime") {
+        mins = Math.max(0, (ls.durationMin ?? 0) - (Date.now() - (ls.startTime ?? Date.now())) / 60000);
+        pct = ls.durationMin ? mins / ls.durationMin : 0;
+      } else {
+        const perSegment = pc.segments === 6 ? 10 : 360;
+        mins = (pc.filled ?? 0) * perSegment;
+        pct = pc.segments ? (pc.filled ?? 0) / pc.segments : 0;
+      }
+      rows.push({ tdoc, clockId: j.id, name: item?.name ?? tdoc?.name ?? j.name,
+        formattedTime: this._formatTime(Math.round(mins * 60)) + (ls.mode === "realtime" ? " (real)" : ""),
+        pct: Math.round(pct * 100) });
+    }
+    for (const tdoc of canvas.scene?.tokens ?? []) {
+      for (const uuid of tdoc.flags?.vagabond?.litItems ?? []) {
+        if (clocked.has(uuid)) continue;
+        rows.push({ tdoc, clockId: null, name: fromUuidSync(uuid)?.name ?? "Light", formattedTime: "no timer", pct: 100 });
+      }
+    }
+    return rows;
   },
 
   init() {
@@ -913,6 +957,9 @@ export const LightTracker = {
     });
 
     Hooks.on("updateItem", () => { if (this._trackerApp?.rendered) this._trackerApp.render(); });
+    for (const hook of ["createJournalEntry", "updateJournalEntry", "deleteJournalEntry"]) {
+      Hooks.on(hook, j => { if (j.flags?.vagabond?.lightSource && this._trackerApp?.rendered) this._trackerApp.render(); });
+    }
   },
 
   openTracker() {
@@ -1209,6 +1256,21 @@ class LightTrackerApp extends HbsMixin(AppV2) {
         }),
       });
     }
+    // System light sources, grouped under the token's actor (dropped lights and
+    // party tokens get their own entries).
+    for (const row of LightTracker._systemLightRows()) {
+      const actor = row.tdoc?.actor;
+      const dropped = actor?.getFlag(MODULE_ID, VLT_LIGHT_ACTOR_FLAG);
+      const key = actor?.id ?? row.name;
+      let entry = entries.find(e => e.actorId === key && !e.dropped === !dropped);
+      if (!entry) {
+        entry = { actorId: key, dropped, name: dropped ? "🔦 Dropped" : (actor?.name ?? row.tdoc?.name ?? "Light"),
+          img: dropped ? (actor.getFlag(MODULE_ID, "itemImg") ?? actor.img) : (actor?.img ?? row.tdoc?.texture.src), lights: [] };
+        entries.push(entry);
+      }
+      entry.lights.push({ id: null, actorId: key, name: row.name, formattedTime: row.formattedTime, pct: row.pct,
+        clockId: row.clockId, tokenUuid: row.tdoc?.uuid ?? null });
+    }
     const defaultMins = game.settings.get(MODULE_ID, "timePassesMinutes");
     return { entries, defaultMins };
   }
@@ -1235,6 +1297,7 @@ class LightTrackerApp extends HbsMixin(AppV2) {
       // Positive adjusted = add time to torches (rewind burn), negative = burn torches down
       // advanceTime(secs) subtracts secs from remaining, so negate: adding mins means negative secs
       await LightTracker.advanceTime(-adjusted * 60);
+      await LightTracker.tickSystemLightClocks(-adjusted, { realtime: true });
       const label = multiplier > 0 ? "Time Added" : "Time Passes";
       const icon  = multiplier > 0 ? "fa-hourglass-start" : "fa-hourglass-half";
       await ChatMessage.create({
@@ -1250,9 +1313,15 @@ class LightTrackerApp extends HbsMixin(AppV2) {
     // Douse buttons
     this.element.querySelectorAll(".vlt-douse").forEach(btn => {
       btn.addEventListener("click", async ev => {
-        const { actorId, itemId } = ev.currentTarget.dataset;
-        const item = game.actors.get(actorId)?.items.get(itemId);
-        if (item) await LightTracker._douseLight(item);
+        const { actorId, itemId, clockId, tokenUuid } = ev.currentTarget.dataset;
+        const LS = game.vagabond?.lightSource;
+        if (clockId) await LS?._deleteClock(clockId);            // system clock: its delete hook restores the light
+        else if (tokenUuid) await LS?.douse(fromUuidSync(tokenUuid));  // system light with no timer
+        else {
+          const item = game.actors.get(actorId)?.items.get(itemId);
+          if (item) await LightTracker._douseLight(item);
+        }
+        this.render();
       }, { signal });
     });
   }

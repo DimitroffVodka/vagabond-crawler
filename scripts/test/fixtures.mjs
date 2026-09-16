@@ -93,7 +93,7 @@ export const Fixtures = {
     );
     foundry.utils.setProperty(data, `flags.${TEST_FLAG_NS}.created`, Date.now());
     const actor = await Actor.create(data);
-    ctx.cleanup(async () => { try { await actor.delete(); } catch {} });
+    ctx.cleanup(async () => { if (game.actors.has(actor.id)) try { await actor.delete(); } catch {} });
 
     const token = await this._dropToken(ctx, actor, pos);
     return { actor, token, tokenDoc: token.document };
@@ -111,7 +111,7 @@ export const Fixtures = {
     );
     foundry.utils.setProperty(data, `flags.${TEST_FLAG_NS}.created`, Date.now());
     const actor = await Actor.create(data);
-    ctx.cleanup(async () => { try { await actor.delete(); } catch {} });
+    ctx.cleanup(async () => { if (game.actors.has(actor.id)) try { await actor.delete(); } catch {} });
 
     const token = await this._dropToken(ctx, actor, pos);
     return { actor, token, tokenDoc: token.document };
@@ -175,7 +175,9 @@ export const Fixtures = {
     };
     const tdData = await actor.getTokenDocument({ x: center.x, y: center.y });
     const [tokenDoc] = await scene.createEmbeddedDocuments("Token", [tdData]);
-    ctx.cleanup(async () => { try { await tokenDoc.delete(); } catch {} });
+    // Guard: a test may already have deleted it, and deleting a missing id
+    // pops a server error notification even when the rejection is caught.
+    ctx.cleanup(async () => { if (scene.tokens.has(tokenDoc.id)) try { await tokenDoc.delete(); } catch {} });
 
     // Resolve the placeable on canvas — needed for `token.actor`, control(), etc.
     const token = canvas.tokens.get(tokenDoc.id);

@@ -108,7 +108,7 @@ Tracks burn time and Foundry light settings for every torch, candle, and lantern
 - **Drop a lit one on the canvas.** It lands as a light token with the same light and the rest of its burn clock; the holder goes dark and nothing is consumed. Pick it up from the Token HUD and the new holder lights up with the remaining clock. An unlit system light drops like any other item. A dropped torch that burns out disappears; a dropped lantern that runs dry stays on the floor.
 - **Party tokens.** Gathering a member with a lit system light moves the light and its clock onto the party token; releasing hands them back. If it burns out while gathered, the member comes back with it out.
 
-The Light Tracker window still only lists the Crawler's own lights (items without the system macro).
+- **Light Tracker window.** System lights are listed under their token's character (or "Dropped" / the party token) with a time bar: real-time clocks count down in minutes, hour clocks show 10 minutes per segment, quarter clocks 6 hours. **+ / −** add or burn that much time on their clocks too, and the douse button puts the light out (deleting its clock, or dousing a no-timer light).
 
 ### How to use
 
