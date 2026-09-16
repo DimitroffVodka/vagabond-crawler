@@ -842,7 +842,9 @@ export const AnimationFx = {
       if (!actor || actor.type !== "npc") return;
       const el = sheet.element;
       if (!el) return;
-      const rows = el.querySelectorAll("[data-action-index]");
+      // Only the action rows themselves: on an unlocked sheet the remove button,
+      // caused-status lists and status chips carry data-action-index too.
+      const rows = el.querySelectorAll(".npc-action-view[data-action-index], .npc-action-edit[data-action-index]");
       rows.forEach(row => {
         if (row.querySelector(".vcfx-action-override")) return;
         const idx = Number(row.dataset.actionIndex);
