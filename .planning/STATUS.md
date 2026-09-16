@@ -18,12 +18,15 @@ Entry format: `- [agent, YYYY-MM-DD HH:MM CT] description`
   2. Fabled Vicious crit dice read actor.system.hitDie (no such field) → always 2d6.
   3. VCE Monk Martial Arts Cleave still uses the pre-5.38 half-damage split (and its damage-total regex no longer matches, so it's inert).
   4. VCE Imbue replaces the system's new native Imbue (imbue-helper, weapon.system.imbuedSpell) — decide which owns it.
+  5. Two light-source systems: the system's native LightSource (torch/lantern/candle Use macros, burn clocks) and the Crawler light tracker (right-click Light, fuel, party transfer). They don't share state — Crawler Extinguish sets the token dark even while a system-lit torch burns. Decide which owns lights.
 
 ## Blocked
 
 (nothing)
 
 ## Recently Completed (last 7 days)
+
+- [claude, 2026-09-16] Metal item prices: merchant buy/sell/restock, party inventory and loot/gamble cards now use the system's derived cost (baseCost × metal multiplier); relic loot no longer multiplies power value by the metal. Live: silver Longsword sold at 50% for 2g (400s cost), loot itemValue matched derived cost on 12/12 items, suite 107/107.
 
 - [claude, 2026-09-16] Vagabond 5.38.1 drift audit + fixes, Crawler and VCE, each verified live. Crawler: rollAttack/rollDamage wraps forward all args; strip weapon attacks (favor/hinder, roll-damage setting, targets/skill, Cleave), strip spell cost via SpellCastDialog.calculateCosts, Place Template via Regions; relic Roll Damage UUID, Manasteal mana.current, Cold Iron metal key, rest maxLuck, delivery label i18n, weapon damage types, Bane vs PCs, loot prices; flanking defers to native `flanked`; Pack Instincts on token actor; FX hit/miss + NPC ⚡ placement; v14 deprecations (AE type strings, displace). Crawler suite 107/107. VCE fixes on its v14 branch (see its log).
 - [claude, 2026-09-16] Inventory slots on vagabond 5.38.1: system now counts stacks natively, Crawler was double-counting; Weightless items excluded from the zero-slot pool; converted VCE Materials cost 1 slot per 1g (ceil). Live-tested: inventory-slots suite 15/15.
