@@ -18,6 +18,7 @@ import { ItemDrops }        from "./item-drops.mjs";
 import { LootDrops }        from "./loot-drops.mjs";
 import { RelicForge }       from "./relic-forge.mjs";
 import { RelicEffects }     from "./relic-effects.mjs";
+import { RelicActivations } from "./relic-activations.mjs";
 import { RELIC_POWERS, getRelicPower, getPowersByCategory, METAL_DISPLAY_NAMES } from "./relic-powers.mjs";
 import { LootManager }      from "./loot-manager.mjs";
 import { LootTracker }      from "./loot-tracker.mjs";
@@ -612,6 +613,7 @@ Hooks.once("ready", async () => {
     lootDrops: LootDrops,
     relicForge: RelicForge,
     relicEffects: RelicEffects,
+    relicActivations: RelicActivations,
     lootManager: LootManager,
     lootTracker: LootTracker,
     lootGenerator: LootGenerator,
@@ -778,6 +780,7 @@ Hooks.once("ready", async () => {
   MonsterCreator.init();
   RelicForge.init();
   RelicEffects.init();
+  RelicActivations.init();
   // One-time migration: stamp `flags.vagabond.applicationMode` onto every
   // pre-existing relic AE so the system-native filter (permanent /
   // when-equipped / on-use) takes over from Crawler's old `disabled:!equipped`

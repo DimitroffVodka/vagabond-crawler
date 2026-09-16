@@ -319,5 +319,41 @@ export function register() {
       expect(await until(() => tdoc.light.dim === relicDim)).toBe(true);
     });
 
+
+    // ── Activated relic powers (relic-activations.mjs) ─────────────────────
+    const RA = () => game.vagabondCrawler.relicActivations;
+    const forgeOn = async (item, ids) => {
+      const { RelicForge } = await import(`/modules/${MODULE_ID}/scripts/relic-forge.mjs`);
+      const { getRelicPower } = await import(`/modules/${MODULE_ID}/scripts/relic-powers.mjs`);
+      await RelicForge.forgeItem(item, ids.map(getRelicPower));
+    };
+
+    case_("Precision forces exactly one hit, then disarms", async (ctx) => {
+      const { actor: pc } = await ctx.fx.createTestPC(ctx);
+      const weapon = await ctx.fx.addWeapon(pc, { name: "VCTest Precise" });
+      await forgeOn(weapon, ["fabled-precision"]);
+      await RA().menuEntries(weapon).find(e => e.label === "Precision").run();
+      const first = await weapon.rollAttack(pc, "none", 999, { allowUnequipped: true });
+      const second = await weapon.rollAttack(pc, "none", 999, { allowUnequipped: true });
+      expect(first?.isHit).toBe(true);
+      expect(second?.isHit).toBe(false);
+      expect(RA().usesLeft(weapon, "precision")).toBe(0);
+    });
+
+    case_("Benediction keeps the wearer at 1 HP once, and a Rest doesn't restore it", async (ctx) => {
+      const { actor: pc } = await ctx.fx.createTestPC(ctx);
+      const [ring] = await pc.createEmbeddedDocuments("Item", [{ name: "VCTest Ring", type: "equipment", system: { equipmentType: "gear", equipmentState: "worn" } }]);
+      await forgeOn(ring, ["fabled-benediction", "fabled-blasting"]);
+      await pc.update({ "system.health.value": 1 });
+      await pc.update({ "system.health.value": 0 });
+      expect(pc.system.health.value).toBe(1);
+      await pc.update({ "system.health.value": 0 });
+      expect(pc.system.health.value).toBe(0);
+      await RA()._spend(ring, "blasting");
+      await RA().onRest([pc]);
+      expect(RA().usesLeft(ring, "blasting")).toBe(1);
+      expect(RA().usesLeft(ring, "benediction")).toBe(0);
+    });
+
   });
 }

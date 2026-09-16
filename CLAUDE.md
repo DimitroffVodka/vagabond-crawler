@@ -131,6 +131,7 @@ class MyApp extends HandlebarsApplicationMixin(ApplicationV2) {
 | `relic-forge.mjs` | Relic crafting ApplicationV2 window |
 | `relic-effects.mjs` | Relic power consumers: bonus dice (Strike/Bane/Vicious), lifesteal/manasteal, cursed auto-fail saves, Resistance/Protection/Doom damage-helper wraps, relic senses + light synced onto tokens (`flags.vagabond-crawler.relicToken`) |
 | `relic-powers.mjs` | Relic power definitions |
+| `relic-activations.mjs` | Activated relic powers on the item context menu (Blast, Precision, After-Image, Wish, Store Spell), Benediction preUpdateActor save, per-day/week use tracking (`flags.vagabond-crawler.relicUses`), reset on Rest |
 | `loot-drops.mjs` | Automatic loot assignment on NPC defeat (Owner permission for all players) |
 | `loot-manager.mjs` | Loot distribution ApplicationV2 window |
 | `loot-tracker.mjs` | Session loot tracking ApplicationV2 window |

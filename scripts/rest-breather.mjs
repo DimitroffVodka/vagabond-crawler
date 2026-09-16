@@ -7,6 +7,7 @@
 
 import { MODULE_ID }    from "./vagabond-crawler.mjs";
 import { waitDialog }   from "./dialog-helpers.mjs";
+import { RelicActivations } from "./relic-activations.mjs";
 
 export const RestBreather = {
 
@@ -71,6 +72,7 @@ export const RestBreather = {
   },
 
   async _doRest(characters) {
+    await RelicActivations.onRest(characters);
     const results = [];
     for (const actor of characters) {
       const s = actor.system, hp = s.health, updates = {}, desc = [];
