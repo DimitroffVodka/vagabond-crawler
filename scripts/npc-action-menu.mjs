@@ -44,6 +44,12 @@ let _SpellCastDialog = null;
 import("/systems/vagabond/module/applications/spell-cast-dialog.mjs")
   .then(m => { _SpellCastDialog = m.SpellCastDialog ?? null; })
   .catch(() => {});
+// 5.38 cast gates the sheet enforces: the Trinket requirement (world setting
+// trinketCastRequirement) lives on SpellHandler and only reads this.actor.
+let _SpellHandler = null;
+import("/systems/vagabond/module/sheets/handlers/spell-handler.mjs")
+  .then(m => { _SpellHandler = m.SpellHandler ?? null; })
+  .catch(() => {});
 
 function _calcSpellCost(actor, spell, state) {
   if (_SpellCastDialog?.calculateCosts) return _SpellCastDialog.calculateCosts(spell, actor, state);
@@ -308,6 +314,12 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
     const costs = _calcSpellCost(actor, spell, s);
 
     if (!s.deliveryType)                                          { ui.notifications.warn("Select a delivery type first!"); return; }
+    const trinketGate = _SpellHandler?.prototype?._trinketGateStatus?.call({ actor }) ?? { status: "ok" };
+    if (trinketGate.status !== "ok") {
+      const suffix = trinketGate.status === "block" ? "GateBlocked" : "GateWarned";
+      ui.notifications.warn(game.i18n.localize(`VAGABOND.SpellCast.${trinketGate.reason}${suffix}`));
+      if (trinketGate.status === "block") return;
+    }
     if (costs.totalCost > (actor.system?.mana?.current   ?? 0))  { ui.notifications.error(`Not enough mana! Need ${costs.totalCost}.`); return; }
     if (costs.totalCost > (actor.system?.mana?.castingMax ?? 0)) { ui.notifications.error(`Exceeds casting max of ${actor.system?.mana?.castingMax}!`); return; }
 
@@ -369,6 +381,15 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
         isCritical = (d20?.results?.[0]?.result ?? 0) >= critNum;
       }
 
+      // A failed Cast Check pays per the 5.38 spellManaOnCastFail world setting
+      // (successOnly / fullOnFail / halfOnFail), as SpellHandler._executeCast does.
+      if (!isSuccess) {
+        let failMode = "successOnly";
+        try { failMode = game.settings.get("vagabond", "spellManaOnCastFail"); } catch (e) { /* pre-5.38 */ }
+        const failCost = failMode === "fullOnFail" ? costs.totalCost
+          : failMode === "halfOnFail" ? Math.ceil(costs.totalCost / 2) : 0;
+        if (failCost > 0) await actor.update({ "system.mana.current": Math.max(0, actor.system.mana.current - failCost) });
+      }
       if (isSuccess) {
         await actor.update({ "system.mana.current": Math.max(0, actor.system.mana.current - costs.totalCost) });
 
