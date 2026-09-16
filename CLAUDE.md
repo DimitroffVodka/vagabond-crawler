@@ -129,7 +129,7 @@ class MyApp extends HandlebarsApplicationMixin(ApplicationV2) {
 | `countdown-roller.mjs` | Auto-rolls countdown dice at round start, applies tick damage, cleans up on combat end |
 | `scroll-forge.mjs` | Spell Scroll Forge ApplicationV2 — create consumable scrolls from compendium, use via context menu |
 | `relic-forge.mjs` | Relic crafting ApplicationV2 window |
-| `relic-effects.mjs` | Relic power application and active effects |
+| `relic-effects.mjs` | Relic power consumers: bonus dice (Strike/Bane/Vicious), lifesteal/manasteal, cursed auto-fail saves, Resistance/Protection/Doom damage-helper wraps, relic senses + light synced onto tokens (`flags.vagabond-crawler.relicToken`) |
 | `relic-powers.mjs` | Relic power definitions |
 | `loot-drops.mjs` | Automatic loot assignment on NPC defeat (Owner permission for all players) |
 | `loot-manager.mjs` | Loot distribution ApplicationV2 window |

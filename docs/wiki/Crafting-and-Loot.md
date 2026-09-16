@@ -71,7 +71,7 @@ Relic Forge adds powers to a weapon, armor, trinket, or other equipment. The lef
 
 Forging can rename the item, add properties, stamp Crawler metadata, and create transfer Active Effects. Effects marked **when equipped** stay inactive while the relic is in a backpack.
 
-Status powers ride the system's rules: Bravery, Clarity and Repulsing give Favor on the save, Burning puts Burning on the weapon's hit, and the cursed Anger, Cowardice and Gullibility make the save fail.
+Status powers ride the system's rules: Bravery, Clarity and Repulsing give Favor on the save, Burning puts Burning on the weapon's hit, and the cursed Anger, Cowardice and Gullibility make the save fail. Resistance halves damage of its type, Protection gives Favor on saves vs its Being type, and Doom caps chat-card healing at 1 per die. Sense and light powers change the wearer's token (darkvision, detection modes, emitted light or darkness) while equipped. Movement, communication and once-per-day powers are left to the GM.
 
 ### Forge a relic
 

@@ -13,16 +13,15 @@ Entry format: `- [agent, YYYY-MM-DD HH:MM CT] description`
 
 ## Awaiting Review
 
-- [claude, 2026-09-16 13:55 CT] Relic powers still without mechanics (user to pick which to build):
-  - Mechanical, buildable: Resistance (typed, half damage — needs a damage-calc wrap), Protection niche/specific/general (Favor on saves vs a Being type — needs a save wrap keyed on the attacker's beingType), Cursed Doom (healing cap per die — the system's restorative apply only sees the total), Nightvision/Truesight/Tremors/Echolocation/Sense Life (Foundry token vision/detection modes), Darkness/Moonlit/Radiant I-III (token light while equipped), Jumping I-III.
-  - Once-per-day / GM-run: Blasting, Precision, After-Image, Wish-granting, Benediction, Store Spell.
-  - Flavor for the GM to adjudicate: Climbing, Clinging, Flying, Levitation, Blinking, Water/Web walk, Telepathy, Detection, Sense Valuables, Ambassador, Aqua-Lung, Warning, Soul Eater, Vorpal, Loyalty, Infinite.
+(nothing)
 
 ## Blocked
 
 (nothing)
 
 ## Recently Completed (last 7 days)
+
+- [claude, 2026-09-16] Mechanical relic powers built: Resistance (typed, half before Armor), Protection (Favor on saves vs Being type), Cursed Doom (restorative cap per die), Nightvision/Truesight/Tremors/Echolocation/Sense Life (token vision/detection modes), Darkness/Moonlit/Radiant (token light, Far = 60 ft). Left to the GM: movement, Telepathy/Detection/Valuables/Ambassador/Aqua-Lung/Warning, once-per-day powers, Jumping (system has no jump field). Live: suite 113/113; Drako's real Darksight shield + Darkening trinket now apply.
 
 - [claude, 2026-09-16] User's design calls implemented. Vicious crit = 2×HD (NPC) / 2×Level (PC). Relic Bravery/Clarity/Repulsing → system.statusResistances, Burning I-III → item causedStatuses, cursed auto-fail saves → StatusHelper.applyStatus wrap; Loot Generator relics now carry relicForge/applicationMode/properties (shared buildRelicPowerData). Strip Imbue casts through the system's native Imbue (VCE ImbueManager removed). System light items (5.23+ macro) light through game.vagabond.lightSource; Crawler adds oil, keeps burned-out lanterns, ticks hour clocks on crawl turns, drives light FX. VCE Monk Martial Arts Cleave borrows the Cleave property (5.38 rule). Live: suite 109/109, VCE smoke 230/0/2.
 

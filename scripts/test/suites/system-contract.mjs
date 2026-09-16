@@ -100,6 +100,9 @@ const BACKED_AE_PATHS = [
  * 2026-09-16: Bravery/Clarity/Repulsing moved to system.statusResistances,
  * Burning I-III to item causedStatuses, and the cursed auto-fail saves to a
  * StatusHelper.applyStatus wrap (relic-effects) — removed from this list.
+ * Nightvision/Truesight/Tremors/Echolocation/Sense Life (token vision and
+ * detection modes) and Cursed Doom (restorative cap) likewise moved to flag
+ * consumers in relic-effects.
  *
  * This list PINS the damage rather than blessing it. The growth check below
  * fails if a new dead path appears, so the set cannot quietly expand while the
@@ -109,7 +112,6 @@ const BACKED_AE_PATHS = [
 const KNOWN_DEAD_AE_PATHS = [
   "system.breatheUnderwater",
   "system.cannotBeSurprised",
-  "system.healingCappedPerDie",
   "system.movement.blink",
   "system.movement.climb",
   "system.movement.cling",
@@ -117,14 +119,9 @@ const KNOWN_DEAD_AE_PATHS = [
   "system.movement.levitate",
   "system.movement.waterwalk",
   "system.movement.webwalk",
-  "system.senses.allsight",
-  "system.senses.darksight",
   "system.senses.detection",
-  "system.senses.echolocation",
-  "system.senses.senseLife",
   "system.senses.senseValuables",
   "system.senses.telepathy",
-  "system.senses.tremorsense",
   "system.speakAllLanguages",
 ];
 

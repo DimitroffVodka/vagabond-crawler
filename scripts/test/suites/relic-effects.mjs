@@ -259,5 +259,65 @@ export function register() {
       expect(btn.dataset.damageFormula).toBe("1d8 + 1d4");
     });
 
+
+    // ── Defensive / token relic powers ─────────────────────────────────────
+    const forgeRing = async (actor, ids, userInputs = {}) => {
+      const { RelicForge } = await import(`/modules/${MODULE_ID}/scripts/relic-forge.mjs`);
+      const { getRelicPower } = await import(`/modules/${MODULE_ID}/scripts/relic-powers.mjs`);
+      const [ring] = await actor.createEmbeddedDocuments("Item", [{ name: "VCTest Ring", type: "equipment", system: { equipmentType: "gear", equipmentState: "worn" } }]);
+      await RelicForge.forgeItem(ring, ids.map(getRelicPower), { userInputs });
+      return ring;
+    };
+    const DH = async () => (await import("/systems/vagabond/module/helpers/damage-helper.mjs")).VagabondDamageHelper;
+    const until = async (fn, ms = 2000) => { const t = Date.now(); while (!fn() && Date.now() - t < ms) await new Promise(r => setTimeout(r, 50)); return fn(); };
+
+    case_("Resistance (Fire) halves fire damage before armor, not other types", async (ctx) => {
+      const { actor: pc } = await ctx.fx.createTestPC(ctx);
+      await forgeRing(pc, ["resistance-typed"], { "resistance-typed": "Fire" });
+      const D = await DH();
+      expect(D.calculateFinalDamageDetailed(pc, 10, "fire", null).final).toBe(5);
+      expect(D.calculateFinalDamageDetailed(pc, 10, "cold", null).final).toBe(10);
+    });
+
+    case_("Protection (Undead) grants the save Favor vote vs Undead only", async (ctx) => {
+      const { actor: pc } = await ctx.fx.createTestPC(ctx);
+      const { actor: undead } = await ctx.fx.createTestNPC(ctx, { system: { beingType: "Undead" } });
+      const { actor: beast } = await ctx.fx.createTestNPC(ctx, { system: { beingType: "Beasts" } });
+      await forgeRing(pc, ["protection-general"], { "protection-general": "Undead" });
+      const D = await DH();
+      expect(await D._hasStatusResistanceForSave(pc, "will", { sourceActor: undead })).toBe(true);
+      expect(await D._hasStatusResistanceForSave(pc, "will", { sourceActor: beast })).toBe(false);
+    });
+
+    case_("Nightvision + Tremors + Radiant apply to the token and clear on unequip", async (ctx) => {
+      const { actor: pc, token } = await ctx.fx.createTestPC(ctx);
+      const tdoc = token.document ?? token;
+      const ring = await forgeRing(pc, ["senses-nightvision", "senses-tremors", "utility-radiant-1"]);
+      expect(await until(() => tdoc.sight.visionMode === "darkvision" && tdoc.light.dim > 0)).toBe(true);
+      expect(tdoc.toObject().detectionModes.feelTremor?.enabled).toBe(true);
+      await ring.update({ "system.equipmentState": "unequipped" });
+      expect(await until(() => tdoc.sight.visionMode !== "darkvision" && !tdoc.light.dim)).toBe(true);
+      expect(tdoc.toObject().detectionModes.feelTremor).toBe(undefined);
+    });
+
+    case_("A relic light comes back after a system torch on the same token is doused", async (ctx) => {
+      const LS = game.vagabond?.lightSource;
+      if (!LS) return;
+      const { actor: pc, token } = await ctx.fx.createTestPC(ctx);
+      const tdoc = token.document ?? token;
+      await forgeRing(pc, ["utility-moonlit-1"]);
+      expect(await until(() => tdoc.light.dim > 0)).toBe(true);
+      const relicDim = tdoc.light.dim;
+      const [torch] = await pc.createEmbeddedDocuments("Item", [{ name: "Torch", type: "equipment",
+        system: { equipmentType: "gear", macro: { command: "game.vagabond.lightSource.use({ actor, item, token })" } } }]);
+      const origPrompt = LS._promptMode;
+      LS._promptMode = async () => "lit";
+      ctx.cleanup(() => { LS._promptMode = origPrompt; });
+      await LS.use({ actor: pc, item: torch, token: tdoc, light: { bright: 25, dim: 40 }, durationMin: 60 });
+      expect(tdoc.light.dim).toBe(40);
+      await LS.douse(tdoc);
+      expect(await until(() => tdoc.light.dim === relicDim)).toBe(true);
+    });
+
   });
 }

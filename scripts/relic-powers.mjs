@@ -368,7 +368,7 @@ export const RELIC_POWERS = [
     cost: 0,
     nameFormat: { position: 'prefix', text: 'Doomed' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.healingCappedPerDie', mode: 5, value: '1' }],
+    changes: [],
     flags: { relicPower: 'cursed-doom', healingCappedPerDie: 1 }
   },
   {
@@ -861,7 +861,7 @@ export const RELIC_POWERS = [
     cost: 100,
     nameFormat: { position: 'suffix', text: 'of Darksight' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.senses.darksight', mode: 5, value: 'true' }],
+    changes: [],
     flags: { relicPower: 'nightvision', grantedSense: 'darksight' }
   },
   {
@@ -873,7 +873,7 @@ export const RELIC_POWERS = [
     cost: 250,
     nameFormat: { position: 'suffix', text: 'of Echolocation' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.senses.echolocation', mode: 5, value: 'true' }],
+    changes: [],
     flags: { relicPower: 'echolocation', grantedSense: 'echolocation' }
   },
   {
@@ -885,7 +885,7 @@ export const RELIC_POWERS = [
     cost: 10000,
     nameFormat: { position: 'prefix', text: 'Life Sensing' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.senses.senseLife', mode: 5, value: 'true' }],
+    changes: [],
     flags: { relicPower: 'sense-life', grantedSense: 'senseLife' }
   },
   {
@@ -909,7 +909,7 @@ export const RELIC_POWERS = [
     cost: 1000,
     nameFormat: { position: 'suffix', text: 'of Seismic Sense' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.senses.tremorsense', mode: 5, value: 'true' }],
+    changes: [],
     flags: { relicPower: 'tremors', grantedSense: 'tremorsense' }
   },
   {
@@ -933,7 +933,7 @@ export const RELIC_POWERS = [
     cost: 20000,
     nameFormat: { position: 'prefix', text: 'True-Seeing' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.senses.allsight', mode: 5, value: 'true' }],
+    changes: [],
     flags: { relicPower: 'true-seeing', grantedSense: 'allsight' }
   },
 
