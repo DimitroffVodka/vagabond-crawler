@@ -81,11 +81,12 @@ export function register() {
       await applyPackInstincts(attackerTok.actor);
       ctx.cleanup(async () => { await cleanupPackInstincts(); });
 
-      // Pack Instincts mirrors the AE to the WORLD actor (game.actors.get(id))
-      // so the save system — which resolves the source via game.actors —
-      // sees the modifier even for unlinked synthetic tokens.
-      const piEffect = attackerWorld.effects.find(e => e.name === "Pack Instincts (active)");
+      // Vagabond 5.38 resolves the save source from the card's actor UUID — the
+      // attacking token's own actor — so the AE belongs there. It must NOT land on
+      // the world actor: that leaked the Hinder to every other token of the NPC.
+      const piEffect = attackerTok.actor.effects.find(e => e.name === "Pack Instincts (active)");
       expect(piEffect).not.toBeUndefined();
+      expect(attackerWorld.effects.find(e => e.name === "Pack Instincts (active)")).toBeUndefined();
       const change = piEffect?.changes?.[0];
       expect(change?.key).toBe("system.outgoingSavesModifier");
       expect(change?.value).toBe("hinder");
