@@ -1,5 +1,63 @@
 # Changelog
 
+## Unreleased
+
+### Vagabond 5.38.1 compatibility
+
+Verified live against vagabond 5.38.1 on Foundry 14.367: 118/118 smoke cases.
+
+- **Wraps forward every argument.** `rollAttack` / `rollDamage` wraps dropped 5.38's new targets, die-override and skill arguments.
+- **Crawl Strip matches the sheet.**
+  - Weapon attacks: favor/hinder, the roll-damage setting, targets and skill, 5.38 Cleave (die steps down per extra target).
+  - Spell costs use `SpellCastDialog.calculateCosts`.
+  - Place Template creates Regions.
+  - Casting honours the Trinket gate and `spellManaOnCastFail`.
+  - Imbue casts go through the system's native Imbue.
+- **Combat.** Flanking defers to the native `flanked` status. Pack Instincts applies to the token actor (5.38 resolves actor UUIDs). v14 deprecations removed (AE `type` strings, `displace` movement).
+- **Field and key drift.**
+  - Relic Roll Damage resolves UUID actor refs.
+  - Manasteal writes `mana.current`.
+  - Loot metal keys are camelCase ("Cold Iron" → `coldIron`).
+  - Rest uses `maxLuck`; delivery labels are localised; weapon damage types read `currentDamageType`.
+  - Bane matches player targets.
+  - Animation FX reads hit/miss from the roll banner, and the NPC ⚡ button only goes on action rows.
+- **Prices.** Merchant buy/sell/restock, party inventory and loot cards use the system's derived cost (base × metal multiplier). Relic loot no longer multiplies the power's value by the metal.
+
+### Relic powers
+
+- **Vicious** crit damage is 2 × HD (NPCs) / 2 × Level (PCs); it read a field no actor has.
+- **Loot Generator relics** now carry the same data as forged ones (relic flag, equip-gating, added properties, on-hit statuses). Before, Strike/Bane/Vicious never fired on them and on-use bonuses applied to every roll.
+- **Status powers use native fields.**
+  - Bravery/Clarity/Repulsing → `statusResistances`.
+  - Burning I–III → item `causedStatuses`.
+  - Cursed Anger/Cowardice/Gullibility skip the save.
+- **Defensive and token powers.**
+  - Resistance halves typed damage before Armor.
+  - Protection gives Favor on saves vs its Being type.
+  - Cursed Doom caps chat-card healing per die.
+  - Nightvision/Truesight/Tremors/Echolocation/Sense Life set token vision and detection modes.
+  - Darkness/Moonlit/Radiant shed light while equipped.
+- **Activated powers** on the relic's right-click menu (`relic-activations.mjs`):
+  - Blast, Precision, After-Image, Wish-Granting and Store Spell.
+  - Benediction saves the wearer at 1 HP once a week.
+  - Uses reset on Rest or after world time passes.
+
+### Light sources
+
+Vagabond 5.23+ light items (Use macro → `game.vagabond.lightSource`) light through the system. The Crawler's right-click Light only handles its own lights. On top of the system:
+- **Oil:** lanterns and lamps need oil, and a burned-out lantern is kept.
+- **Clocks:** crawl turns tick hour clocks.
+- **FX:** the light FX follows the token.
+- **Drop and pickup:** a lit system light can be dropped on the canvas and picked up again, carrying its light and remaining clock.
+- **Party tokens:** gathering moves the light and clock onto the party token and hands them back on release.
+- **Tracker window:** the Light Tracker lists system lights, and its time controls and douse button work on them.
+
+### Tests
+
+- The system-contract canary now covers every system method the Crawler patches or calls (34).
+- Fixtures skip tokens and actors a test already deleted.
+- The animation FX case uses a JB2A file from the free pack.
+
 ## v1.18.2
 
 ### Vagabond 5.38 compatibility
