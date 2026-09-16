@@ -247,49 +247,43 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
     if (!s.deliveryType) { ui.notifications.warn("Select a delivery type first!"); return; }
     const noTemplate = ['touch', 'remote', 'imbue', 'glyph'];
     if (noTemplate.includes(s.deliveryType)) { ui.notifications.info(`${s.deliveryType} delivery does not use an area template.`); return; }
-    // If preview exists, make it permanent
+    // Vagabond 5.38 draws spell areas as Regions via its template manager:
+    // sheet previews live in activePreviews, placed areas in chatRegions, and
+    // any untracked spell Region is deleted as an orphan on the next preview.
     const mgr = globalThis.vagabond?.managers?.templates;
+    if (!mgr?._constructRegionData) { ui.notifications.warn("Spell area templates are unavailable."); return; }
+    const track = (region) => mgr.chatRegions?.set(`crawler-${region.id}`, region.id);
+
+    // If preview exists, make it permanent
     const key = `${this.actor.id}-${this.spell.id}`;
-    const previewId = mgr?.activePreviews?.get(key);
-    if (previewId) {
-      const template = canvas.scene.templates.get(previewId);
-      if (template) {
-        await template.update({ "flags.vagabond.isPreview": false });
-        mgr.activePreviews.delete(key);
-        this.spellState.previewActive = false;
-        _saveSpellState(this.actor, this.spell, this.spellState);
-        this.render();
-        ui.notifications.info("Template placed.");
-        return;
-      }
+    const preview = canvas.scene.regions.get(mgr.activePreviews?.get(key));
+    if (preview) {
+      await preview.update({ "flags.vagabond.isPreview": false, "flags.vagabond.deliveryType": s.deliveryType });
+      mgr.activePreviews.delete(key);
+      track(preview);
+      this.spellState.previewActive = false;
+      _saveSpellState(this.actor, this.spell, this.spellState);
+      this.render();
+      ui.notifications.info("Template placed.");
+      return;
     }
-    // No preview — create from caster position
+    // No preview — build the area from the caster/targets the way the system does
     const base = CONFIG.VAGABOND.deliveryBaseRanges?.[s.deliveryType];
     const inc  = CONFIG.VAGABOND.deliveryIncrement?.[s.deliveryType];
     const dist = base?.value ? base.value + inc * s.deliveryIncrease : 0;
     if (!dist) return;
     const token = this.actor.token?.object || this.actor.getActiveTokens()[0];
-    const templateData = {
-      distance: dist, fillColor: game.user.color || '#FF0000',
-      direction: token?.document?.rotation || 0,
-      flags: { vagabond: { spellId: this.spell.id, actorId: this.actor.id } },
-    };
-    switch (s.deliveryType) {
-      case 'aura':   templateData.t = 'circle'; templateData.x = token?.center?.x ?? 0; templateData.y = token?.center?.y ?? 0; break;
-      case 'cone':   templateData.t = 'cone'; templateData.angle = 90; templateData.x = token?.center?.x ?? 0; templateData.y = token?.center?.y ?? 0; break;
-      case 'line':   templateData.t = 'ray'; templateData.width = canvas.scene?.grid?.distance ?? 5; templateData.x = token?.center?.x ?? 0; templateData.y = token?.center?.y ?? 0; break;
-      case 'sphere': { templateData.t = 'circle'; const tgt = game.user.targets.first(); templateData.x = tgt?.center?.x ?? token?.center?.x ?? 0; templateData.y = tgt?.center?.y ?? token?.center?.y ?? 0; break; }
-      case 'cube': {
-        templateData.t = 'rect'; templateData.distance = dist * Math.sqrt(2); templateData.direction = 45;
-        const tgt2 = game.user.targets.first();
-        const cx = tgt2?.center?.x ?? token?.center?.x ?? 0; const cy = tgt2?.center?.y ?? token?.center?.y ?? 0;
-        const gridPx = canvas.grid?.size ?? 100; const gridDist = canvas.scene?.grid?.distance ?? 5;
-        const sidePx = (dist / gridDist) * gridPx;
-        templateData.x = cx - sidePx / 2; templateData.y = cy - sidePx / 2; break;
-      }
-      default: ui.notifications.warn(`No template for delivery type: ${s.deliveryType}`); return;
+    const targets = Array.from(game.user.targets);
+    const regionData = mgr._constructRegionData({
+      type: s.deliveryType, distance: dist, token, targets: game.user.targets,
+      centroid: targets.length ? mgr._calculateTargetCentroid(targets) : null, notify: true,
+    });
+    if (!regionData) return;
+    regionData.flags = { vagabond: { deliveryType: s.deliveryType } };
+    try {
+      const [region] = await canvas.scene.createEmbeddedDocuments("Region", [regionData]);
+      if (region) { track(region); ui.notifications.info("Template placed."); }
     }
-    try { await canvas.scene.createEmbeddedDocuments('MeasuredTemplate', [templateData]); ui.notifications.info("Template placed."); }
     catch (err) { console.error("Vagabond Crawler | Template placement failed:", err); }
   }
   async _cast() {

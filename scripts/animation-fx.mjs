@@ -496,7 +496,12 @@ export const AnimationFx = {
     const flag = message.flags?.vagabond?.rollOutcome;
     if (flag === "hit" || flag === "miss") return flag;
     const content = message.content ?? "";
-    if (/\bMISS\b/i.test(content) && !/\bHIT\b/i.test(content)) return "miss";
+    // 5.38 writes no rollOutcome flag; the roll banner carries result-hit / result-miss.
+    // Prefer that over word matching, which read any "hit" in the card text (e.g.
+    // "on hit") as a hit.
+    if (content.includes("result-miss")) return "miss";
+    if (content.includes("result-hit")) return "hit";
+    if (/\bMISS\b/.test(content) && !/\bHIT\b/.test(content)) return "miss";
     return "hit";
   },
 
