@@ -88,7 +88,9 @@ export const ItemDrops = {
     if (item.type !== "equipment") return;
 
     // Exclude light sources — handled by LightTracker
-    if (_isLightSource(item.name)) return;
+    // Crawler-managed lights drop as light actors (light-tracker); system
+    // light items drop like any other item.
+    if (_isLightSource(item.name) && !game.vagabond?.lightSource?.isLightItem?.(item)) return;
 
     // Prevent dropping if not owned
     const sourceActor = item.actor;

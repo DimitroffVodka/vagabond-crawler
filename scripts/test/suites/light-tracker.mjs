@@ -170,5 +170,45 @@ export function register() {
       expect(remainingOil?.system.quantity).toBe(1);
     });
 
+
+    // ── System light sources (vagabond 5.23+ game.vagabond.lightSource) ────
+    const LS = () => game.vagabond?.lightSource;
+    const sysLantern = (qty = 1) => ({
+      name: "Lantern, hooded", type: "equipment",
+      system: { equipmentType: "gear", quantity: qty, macro: { command: "game.vagabond.lightSource.use({ actor, item, token, light: { bright: 25, dim: 30 } })" } },
+    });
+
+    case_("system light items light through the system, and a lantern with no oil won't light", async (ctx) => {
+      if (!LS()) return;  // pre-5.23 system: legacy path only
+      const { actor: pc, token: pcTok } = await ctx.fx.createTestPC(ctx);
+      const [lantern] = await pc.createEmbeddedDocuments("Item", [sysLantern()]);
+      expect(LS().isLightItem(lantern)).toBe(true);
+      const before = JSON.stringify(pcTok.document.light);
+      await LS().use({ actor: pc, item: lantern, token: pcTok, light: { bright: 25, dim: 30 } });
+      expect(JSON.stringify(pcTok.document.light)).toBe(before);
+    });
+
+    case_("lighting a system lantern burns one oil; burning out keeps the lantern", async (ctx) => {
+      if (!LS()) return;
+      const { actor: pc, token: pcTok } = await ctx.fx.createTestPC(ctx);
+      const [lantern, oil] = await pc.createEmbeddedDocuments("Item", [sysLantern(), {
+        name: "Oil, flask", type: "equipment", system: { equipmentType: "gear", quantity: 2 },
+      }]);
+      const origPrompt = LS()._promptMode;
+      LS()._promptMode = async () => "hour";
+      ctx.cleanup(async () => { LS()._promptMode = origPrompt; await LS().douse(pcTok.document); });
+      await LS().use({ actor: pc, item: lantern, token: pcTok, light: { bright: 25, dim: 30 } });
+      expect(pc.items.get(oil.id)?.system.quantity).toBe(1);
+      const clock = game.vagabond.clocks.getAll().find(j => j.getFlag("vagabond", "lightSource")?.itemUuid === lantern.uuid);
+      expect(!!clock).toBe(true);
+
+      // A crawl turn of 10 minutes ticks the 6-segment hour clock down one.
+      await game.vagabondCrawler.lightTracker.tickSystemLightClocks(10);
+      expect(clock.getFlag("vagabond", "progressClock").filled).toBe(5);
+
+      await LS()._consumeLitItem(lantern.uuid);
+      expect(!!pc.items.get(lantern.id)).toBe(true);
+    });
+
   });
 }

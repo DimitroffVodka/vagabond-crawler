@@ -11,6 +11,7 @@
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
+import { isWrapped, markWrapped } from "./wrap-guard.mjs";
 
 const LIGHT_SOURCES = {
   torch: {
@@ -171,7 +172,26 @@ function _getLightDef(itemName) {
   return null;
 }
 
-function _isLightSource(item) { return !!_getLightDef(item.name); }
+/** Crawler-managed light: a known light name the system doesn't own. Items
+ *  whose Use macro calls game.vagabond.lightSource.use (vagabond 5.23+) light,
+ *  douse and burn out through the system instead. */
+function _isLightSource(item) {
+  if (game.vagabond?.lightSource?.isLightItem?.(item)) return false;
+  return !!_getLightDef(item.name);
+}
+
+// ── System light sources (game.vagabond.lightSource) ─────────────────────────
+
+/** System lights that burn oil. The system has no fuel concept and consumes
+ *  the lantern itself on burn-out. */
+const _OIL_LIGHT = name => /^(lantern|lamp)\b/i.test(name?.trim() ?? "");
+const _OIL_DEF = { fuel: name => /^oil/i.test(name.trim()) };
+
+/** Every gear FX preset a light can start — stopped wholesale on douse,
+ *  since the lit item may already be gone by then. */
+function _allLightPresets(fx) {
+  return Object.values(fx.getConfig().gear ?? {});
+}
 
 /** Find the party token that contains this actor as a gathered member. */
 function _findPartyToken(actor) {
@@ -511,7 +531,89 @@ export const LightTracker = {
     }
   },
 
+  /**
+   * Layer the Crawler's extras onto the system's native light sources:
+   * lanterns/lamps need and burn oil, burning out a lantern doesn't destroy
+   * it, and the persistent light FX follows the token's system light.
+   */
+  _integrateSystemLights() {
+    const LS = game.vagabond?.lightSource;
+    if (!LS?.use || isWrapped(LS, "use")) return;
+
+    const origUse = LS.use;
+    LS.use = async function (opts = {}) {
+      const item = opts.item;
+      const owner = item?.parent ?? opts.actor;
+      if (!item || !_OIL_LIGHT(item.name) || !owner) return origUse.call(this, opts);
+      const fuel = _findFuel(owner, _OIL_DEF);
+      if (!fuel) return ui.notifications.warn(`${item.name} needs fuel (oil) to light.`);
+      const tdoc = LS._resolveTokenDoc?.(opts.token, opts.actor);
+      const lightBefore = JSON.stringify(tdoc?.light ?? null);
+      const result = await origUse.call(this, opts);
+      // use() returns nothing; it lit if the item now reads lit or the token's light changed.
+      if (LS.isItemLit(item) || JSON.stringify(tdoc?.light ?? null) !== lightBefore) {
+        await _consumeFuel(fuel);
+      }
+      return result;
+    };
+    markWrapped(LS, "use");
+
+    if (LS._consumeLitItem && !isWrapped(LS, "_consumeLitItem")) {
+      const origConsume = LS._consumeLitItem;
+      LS._consumeLitItem = async function (itemUuid) {
+        const item = itemUuid ? fromUuidSync(itemUuid) : null;
+        if (item && _OIL_LIGHT(item.name)) {
+          ChatMessage.create({ content: `<p><i class="fas fa-oil-can"></i> <strong>${item.name}</strong> has burned through its oil.</p>`,
+            speaker: ChatMessage.getSpeaker({ actor: item.parent }) });
+          return;
+        }
+        return origConsume.call(this, itemUuid);
+      };
+      markWrapped(LS, "_consumeLitItem");
+    }
+
+    // Light FX: the system writes flags.vagabond.prevLight when it lights a
+    // token and removes it when the light goes out.
+    Hooks.on("updateToken", (tdoc, changes, _opts, userId) => {
+      if (userId !== game.userId) return;
+      // Only react when prevLight itself was set or removed ("-=prevLight" / _del).
+      const vg = foundry.utils.getProperty(changes, "flags.vagabond");
+      if (!vg || !Object.keys(vg).some(k => k.includes("prevLight"))) return;
+      const token = tdoc.object;
+      const fx = game.vagabondCrawler?.animationFx;
+      if (!token || !fx) return;
+      if (tdoc.flags?.vagabond?.prevLight) {
+        const itemUuid = tdoc.flags.vagabond.litItems?.[0]
+          ?? game.vagabond.clocks?.getAll?.().find(j => j.getFlag("vagabond", "lightSource")?.tokenUuid === tdoc.uuid)
+            ?.getFlag("vagabond", "lightSource")?.itemUuid;
+        const name = itemUuid ? fromUuidSync(itemUuid)?.name : null;
+        const preset = fx.resolveGearPresetByLightType(_getLightDef(name ?? "")?.key ?? "torch");
+        fx.startPersistent(preset, token);
+      } else {
+        for (const preset of _allLightPresets(fx)) fx.stopPersistent(preset, token);
+      }
+    });
+  },
+
+  /**
+   * A new crawl turn advances time on the system's manual light clocks too:
+   * an "hour" clock is 6 segments = 60 minutes, so one segment per 10 minutes.
+   * The system deletes the clock (restoring the light) when it reaches 0.
+   */
+  async tickSystemLightClocks(minutes) {
+    if (!game.user.isGM) return;
+    const steps = Math.round(minutes / 10);
+    if (steps <= 0) return;
+    for (const j of game.vagabond?.clocks?.getAll?.() ?? []) {
+      if (j.getFlag("vagabond", "lightSource")?.mode !== "clock") continue;
+      const pc = j.getFlag("vagabond", "progressClock");
+      if (pc?.segments !== 6) continue;
+      await j.update({ "flags.vagabond.progressClock.filled": Math.max(0, (pc.filled ?? 0) - steps) });
+    }
+  },
+
   init() {
+    this._integrateSystemLights();
     for (const hookName of ["renderVagabondCharacterSheet", "renderVagabondActorSheet", "renderActorSheet"]) {
       Hooks.on(hookName, (app, html) => {
         const actor = app.actor ?? app.document;

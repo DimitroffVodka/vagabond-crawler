@@ -101,6 +101,8 @@ Per-monster Hit Die selector authored in the Monster Creator (Stats section), pl
 
 ## Light Tracker
 
+**System light items.** Items whose `system.macro.command` calls `game.vagabond.lightSource.use` are owned by the system (`_isLightSource` returns false for them). `LightTracker._integrateSystemLights()` wraps `LightSource.use` (oil gate + consume one oil when the light takes) and `LightSource._consumeLitItem` (lanterns/lamps survive burn-out), and an `updateToken` hook starts/stops the persistent gear FX when `flags.vagabond.prevLight` is set/removed. `tickSystemLightClocks(minutes)` is called from the crawl bar's new-turn path and ticks 6-segment light clocks one segment per 10 minutes. Not covered for system lights: canvas drop/pickup, party-token transfer, tracker window.
+
 ### Light Sources
 
 | Key | Matches | Duration | Consumable | Bright/Dim |

@@ -285,6 +285,7 @@ export const CrawlBar = {
           await CrawlState.addTime(mins);
           if (!game.settings.get(MODULE_ID, "realtimeTracking")) {
             await LightTracker.advanceTime(mins * 60);
+            await LightTracker.tickSystemLightClocks(mins);
           }
         }
         this.render();
