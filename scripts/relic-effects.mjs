@@ -143,12 +143,15 @@ export const RelicEffects = {
       }
     }
 
-    // Fabled Vicious: extra crit damage scaled to actor's hit die
+    // Fabled Vicious: on crit, extra damage equal to 2× the wielder's Hit Die.
+    // NPCs carry HD (system.hd); PCs have none, so Level stands in (the
+    // rules scale NPC HD against PC Level). The old read of system.hitDie
+    // matched no field and always rolled 2d6.
     if (crit) {
       for (const { flags } of relicFlags) {
         if (flags.relicPower === "vicious") {
-          const hd = actor?.system?.hitDie || "d6";
-          parts.push({ formula: `2${hd}`, label: "Vicious (Crit)" });
+          const hd = actor?.system?.hd ?? actor?.system?.attributes?.level?.value ?? 1;
+          parts.push({ formula: String(2 * hd), label: "Vicious (Crit)" });
         }
       }
     }
