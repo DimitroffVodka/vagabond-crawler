@@ -43,6 +43,39 @@ const PATCH_TARGETS = [
   ["sheets/handlers/spell-handler.mjs",  "SpellHandler",         "prototype._calculateSpellCost"],
   ["applications/spell-cast-dialog.mjs", "SpellCastDialog",      "calculateCosts"],
   ["applications/level-up-dialog.mjs",   "LevelUpDialog",        "prototype._prepareQuestionnaireContext"],
+  ["sheets/handlers/inventory-handler.mjs", "InventoryHandler",   "prototype.prepareInventoryGrid"],
+  ["helpers/damage-helper.mjs",          "VagabondDamageHelper", "calculateFinalDamageDetailed"],
+  ["helpers/damage-helper.mjs",          "VagabondDamageHelper", "_hasStatusResistanceForSave"],
+  ["helpers/damage-helper.mjs",          "VagabondDamageHelper", "handleApplyRestorative"],
+  ["helpers/status-helper.mjs",          "StatusHelper",         "applyStatus"],
+  ["helpers/status-helper.mjs",          "StatusHelper",         "_createStatusCountdown"],
+  ["documents/countdown-dice.mjs",       "CountdownDice",        "create"],
+  ["helpers/light-source.mjs",           "LightSource",          "use"],
+  ["helpers/light-source.mjs",           "LightSource",          "_consumeLitItem"],
+];
+
+/**
+ * System methods the Crawler CALLS without wrapping — many private
+ * (underscore) ones, so they can be renamed in any release. A rename would
+ * make the feature throw at the table instead of failing here.
+ */
+const CALLED_TARGETS = [
+  ["helpers/light-source.mjs",           "LightSource",          "isLightItem"],
+  ["helpers/light-source.mjs",           "LightSource",          "isItemLit"],
+  ["helpers/light-source.mjs",           "LightSource",          "douse"],
+  ["helpers/light-source.mjs",           "LightSource",          "tickRealtime"],
+  ["helpers/light-source.mjs",           "LightSource",          "_resolveTokenDoc"],
+  ["helpers/light-source.mjs",           "LightSource",          "_applyLight"],
+  ["helpers/light-source.mjs",           "LightSource",          "_restoreLight"],
+  ["helpers/light-source.mjs",           "LightSource",          "_occupyHands"],
+  ["helpers/light-source.mjs",           "LightSource",          "_createClockGM"],
+  ["helpers/light-source.mjs",           "LightSource",          "_deleteClock"],
+  ["documents/progress-clock.mjs",       "ProgressClock",        "getAll"],
+  ["helpers/imbue-helper.mjs",           "VagabondImbueHelper",  "resolveTargetWeapons"],
+  ["helpers/imbue-helper.mjs",           "VagabondImbueHelper",  "imbueWeapon"],
+  ["helpers/status-helper.mjs",          "StatusHelper",         "dealTickDamage"],
+  ["helpers/chat-card.mjs",              "VagabondChatCard",     "createActionCard"],
+  ["sheets/handlers/spell-handler.mjs",  "SpellHandler",         "prototype._trinketGateStatus"],
 ];
 
 /**
@@ -164,11 +197,11 @@ export function register() {
   suite("System Contract", () => {
 
     // ── The system still exposes every method we patch ────────────────────
-    case_("every monkey-patched system method still exists", async () => {
+    case_("every system method the Crawler patches or calls still exists", async () => {
       const missing = [];
       const cache = new Map();
 
-      for (const [file, exportName, path] of PATCH_TARGETS) {
+      for (const [file, exportName, path] of [...PATCH_TARGETS, ...CALLED_TARGETS]) {
         const spec = `${SYS}/${file}`;
         if (!cache.has(spec)) {
           try { cache.set(spec, await import(spec)); }
