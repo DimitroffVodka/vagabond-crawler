@@ -50,7 +50,7 @@ function _renderShareBody(share) {
     : "";
 
   const itemLines = (share.items ?? []).map(item => {
-    const bc = item.system?.cost;
+    const bc = item.system?.cost ?? item.system?.baseCost;  // cost is derived; saved item data only has baseCost
     const valParts = [];
     if (bc?.gold) valParts.push(`${bc.gold}g`);
     if (bc?.silver) valParts.push(`${bc.silver}s`);
@@ -499,7 +499,7 @@ export const LootDrops = {
     if (currency.copper > 0) parts.push(`${currency.copper}c`);
     for (const item of items ?? []) {
       const qty = item.system?.quantity > 1 ? ` ×${item.system.quantity}` : "";
-      const price = item.system?.costDisplay || _formatPrice(item.system?.cost) || "";
+      const price = item.system?.costDisplay || _formatPrice(item.system?.cost ?? item.system?.baseCost) || "";
       parts.push(`${item.name}${qty}${price ? ` (${price})` : ""}`);
     }
 

@@ -118,7 +118,7 @@ export const RelicEffects = {
     for (const { flags } of relicFlags) {
       if (!flags.baneTarget || !flags.baneDice) continue;
       for (const t of targets) {
-        const bt = t?.system?.beingType || "";
+        const bt = t?.system?.beingType || t?.system?.attributes?.beingType || "";  // NPC | character
         if (bt.toLowerCase().includes(flags.baneTarget.toLowerCase())) {
           parts.push({ formula: flags.baneDice, label: `Bane (${flags.baneTarget})` });
           break;

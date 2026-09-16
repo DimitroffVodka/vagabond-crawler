@@ -157,7 +157,7 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
     const html = `
       <div class="csd-header">
         <img src="${spell.img}" width="36" height="36" style="border-radius:4px">
-        <div><strong>${spell.name}</strong><div class="csd-muted">${spell.system?.effect ?? ""}</div></div>
+        <div><strong>${spell.name}</strong><div class="csd-muted">${spell.system?.duration ?? ""}</div></div>
       </div>
       <div class="csd-section">${damageSection}</div>
       <div class="csd-section">
