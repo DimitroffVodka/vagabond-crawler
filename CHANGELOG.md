@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.18.2
+
+### Vagabond 5.38 compatibility
+
+Verified against vagabond 5.38.1: 106/107 smoke cases pass; the remaining one checks the `verified` field this release bumps, and reads the manifest cached at world launch.
+
+- **Stacks were charged twice.** Vagabond 5.38 now charges `baseSlots × quantity` and pools zero-slot items at 10 per slot. Crawler still added its own stack multiplier on top, so three torches read as five slots, and stacked cards stretched across the grid. Crawler now defers to the system's count on 5.38+ and keeps the old multiplier on older systems.
+- **Alchemy Materials cost 10 slots per 1g.** VCE converts Materials into a zero-slot stack whose quantity is its silver value, which the new pool charged 1 slot per 10s. Materials now cost 1 slot per 1g or part of one (45s = 1, 2g 50s = 3). Weightless items stay out of the zero-slot pool, and the "Inventory is full" banner clears when Crawler's total is under capacity.
+- **Weapon and NPC-action animations stopped playing.** 5.38 stamps chat cards with the actor UUID instead of the id, so Animation FX could not find the attacker. Both forms are accepted now.
+
 ## v1.18.1
 
 ### Relics and inventory — five defects found by a second adversarial review
