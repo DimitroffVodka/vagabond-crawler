@@ -18,7 +18,8 @@
  * Also pins the counting rules Crawler shares with the system:
  *   - zero-slot items are free (the Backpack bug)
  *   - items stowed in a container are excluded
- *   - a stack costs `baseSlots × quantity` (Crawler's only deviation)
+ *   - a stack costs `baseSlots × quantity` (the system does this natively on
+ *     5.38+; Crawler adds it on legacy systems — never both)
  *   - the "Weightless" flag forgoes the stack multiplier
  */
 
@@ -52,6 +53,10 @@ async function addGear(actor, {
   const [item] = await actor.createEmbeddedDocuments("Item", [data], { skipStack: true });
   return item;
 }
+
+/** True when the system charges `baseSlots × quantity` itself (vagabond 5.38+). */
+const nativeStacking = () =>
+  typeof globalThis.vagabond?.utils?.EquipmentHelper?.itemStackCost === "function";
 
 /** The number the sheet header renders, per the production helper. */
 function headerTotal(actor) {
@@ -88,9 +93,10 @@ export function register() {
       const { actor } = await ctx.fx.createTestPC(ctx);
       await addGear(actor, { name: "VCTest Torch", baseSlots: 1, quantity: 3 });
 
-      // System counts the item once (1); Crawler adds 1 x (3 - 1) = 2 → total 3.
-      expect(actor.system.inventory.occupiedSlots).toBe(1);
-      expect(getExtraOccupiedSlots(actor)).toBe(2);
+      // Native: system charges 3, Crawler adds 0. Legacy: system 1, Crawler +2.
+      // The double-count regression was native 3 + Crawler 2 = 5.
+      expect(actor.system.inventory.occupiedSlots).toBe(nativeStacking() ? 3 : 1);
+      expect(getExtraOccupiedSlots(actor)).toBe(nativeStacking() ? 0 : 2);
       expect(headerTotal(actor)).toBe(3);
     });
 
@@ -110,11 +116,39 @@ export function register() {
       const { actor } = await ctx.fx.createTestPC(ctx);
       await addGear(actor, { name: "VCTest Feather", baseSlots: 1, quantity: 4, weightless: true });
 
-      // Flagged items still cost the system's baseSlots once — they only opt out
-      // of Crawler's quantity multiplier. Keeping this exact is what makes
-      // _itemCapacity() and getExtraOccupiedSlots() agree.
-      expect(getExtraOccupiedSlots(actor)).toBe(0);
+      // Flagged items cost baseSlots once — they only opt out of the quantity
+      // multiplier. On native systems Crawler subtracts the system's multiplier.
+      expect(getExtraOccupiedSlots(actor)).toBe(nativeStacking() ? -3 : 0);
       expect(headerTotal(actor)).toBe(1);
+    });
+
+    case_("Weightless zero-slot stack stays out of the 10-per-slot pool", async (ctx) => {
+      const { actor } = await ctx.fx.createTestPC(ctx);
+      await addGear(actor, { name: "VCTest Pebbles", baseSlots: 0, quantity: 100, weightless: true });
+      await addGear(actor, { name: "VCTest Rations", baseSlots: 0, quantity: 10 });
+
+      // Rations still pool RAW on native systems (10 → 1 slot); Pebbles add nothing.
+      expect(headerTotal(actor)).toBe(nativeStacking() ? 1 : 0);
+    });
+
+    case_("Materials cost 1 Slot per 1g or part of one (VCE conversion)", async (ctx) => {
+      const { actor } = await ctx.fx.createTestPC(ctx);
+      // VCE's alchemy converts Materials to exactly this: baseSlots 0, qty = silver, Weightless.
+      const mat = await addGear(actor, { name: "VCTest Materials (1g 50s) (Consumable)", baseSlots: 0, quantity: 150, weightless: true });
+      await mat.update({ "system.isConsumable": true });
+      expect(headerTotal(actor)).toBe(2);
+
+      await mat.update({ "system.quantity": 100 });
+      expect(headerTotal(actor)).toBe(1);
+      await mat.update({ "system.quantity": 5 });
+      expect(headerTotal(actor)).toBe(1);
+
+      await actor.sheet.render(true);
+      ctx.cleanup(async () => { try { await actor.sheet.close(); } catch {} });
+      await ctx.fx.settle(800);
+      const emptyNums = [...actor.sheet.element.querySelectorAll(".empty-slot .slot-number")]
+        .map(n => parseInt(n.textContent.trim(), 10)).filter(Number.isFinite);
+      expect(emptyNums[0]).toBe(headerTotal(actor) + 1);
     });
 
     case_("realistic loadout of quantity-1 items matches system occupiedSlots with 100% parity", async (ctx) => {
@@ -133,17 +167,17 @@ export function register() {
       expect(headerTotal(actor)).toBe(4); // Longsword(1) + Chainmail(2) + Shield(1) = 4
     });
 
-    case_("quantity 0 still costs baseSlots, matching the system", async (ctx) => {
+    case_("quantity 0 matches the system's charge", async (ctx) => {
       const { actor } = await ctx.fx.createTestPC(ctx);
       // Emptying a stack without deleting the item is ordinary play (ammo,
-      // consumables). The system charges baseSlots regardless of quantity, so a
-      // naive `baseSlots × qty` in _itemCapacity returned 0 and the grid started
-      // numbering at 1 while the header said 1 occupied.
+      // consumables). Legacy systems charge baseSlots regardless of quantity;
+      // native systems charge 0. Crawler must add nothing either way.
       await addGear(actor, { name: "VCTest Emptied Quiver", baseSlots: 1, quantity: 0 });
 
-      expect(actor.system.inventory.occupiedSlots).toBe(1);
+      const expected = nativeStacking() ? 0 : 1;
+      expect(actor.system.inventory.occupiedSlots).toBe(expected);
       expect(getExtraOccupiedSlots(actor)).toBe(0);
-      expect(headerTotal(actor)).toBe(1);
+      expect(headerTotal(actor)).toBe(expected);
     });
 
     case_("negative baseSlots contributes nothing rather than subtracting", async (ctx) => {
@@ -154,8 +188,8 @@ export function register() {
       await addGear(actor, { name: "VCTest Impossible", baseSlots: -3, quantity: 2 });
       await addGear(actor, { name: "VCTest Real Torch", baseSlots: 1, quantity: 2 });
 
-      expect(getExtraOccupiedSlots(actor)).toBe(1);   // only the torch's second unit
-      expect(headerTotal(actor)).toBe(2);             // system counts torch once + 1 extra
+      expect(getExtraOccupiedSlots(actor)).toBe(nativeStacking() ? 0 : 1);  // legacy: torch's second unit
+      expect(headerTotal(actor)).toBe(2);
     });
 
     case_("overload flips once a stack exceeds capacity", async (ctx) => {
@@ -173,8 +207,8 @@ export function register() {
 
     case_("sheet header and grid free-cell numbering agree", async (ctx) => {
       const { actor } = await ctx.fx.createTestPC(ctx);
-      // A stack is required: the header patch early-returns when extras are 0,
-      // so without one neither the header nor the grid renumber is exercised.
+      // A stack is required: on legacy systems the header patch early-returns
+      // when extras are 0, so without one the renumber isn't exercised.
       await addGear(actor, { name: "VCTest Soap",     baseSlots: 1, quantity: 2 });
       await addGear(actor, { name: "VCTest Bedroll",  baseSlots: 1, quantity: 1 });
       await addGear(actor, { name: "VCTest Trinket",  baseSlots: 0, quantity: 1, gearCategory: "Outdoors" });
@@ -226,7 +260,7 @@ export function register() {
       expect(emptyNums[0]).toBe(total + 1);
     });
 
-    case_("a stack spans its true footprint in the grid", async (ctx) => {
+    case_("a stack's card width follows the system generation", async (ctx) => {
       const { actor } = await ctx.fx.createTestPC(ctx);
       await addGear(actor, { name: "VCTest WideStack", baseSlots: 1, quantity: 3 });
 
@@ -239,9 +273,9 @@ export function register() {
         .find(c => actor.items.get(c.dataset.itemId)?.name === "VCTest WideStack");
       expect(card).toBeTruthy();
 
-      // totalSlots drives `grid-column: span N` in inventory-card.hbs. A 1-slot
-      // item at qty 3 occupies 3 cells, so it must not claim just one.
-      expect(card.style.gridColumn).toContain("3");
+      // totalSlots drives `grid-column: span N` in inventory-card.hbs. Legacy:
+      // Crawler widens the stack to 3. Native: the system keeps per-unit width.
+      expect(card.style.gridColumn).toContain(nativeStacking() ? "1" : "3");
     });
 
     case_("Weightless stack spans single slot in rendered grid", async (ctx) => {

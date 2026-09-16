@@ -41,21 +41,18 @@ import { resolveHitDieConfig, calculateHP, dieAvg } from "./monster-mutator.mjs"
 export const MODULE_ID = "vagabond-crawler";
 
 // ── Inventory helpers (shared with movement-tracker) ─────────────────────────
-// The system's `actor.system.inventory.occupiedSlots` (`_calculateInventorySlots`,
-// `module/data/actor-character.mjs:1174-1198`, verified against vagabond 5.36.0):
+// Two system generations:
 //
-//   if (item.system.containerId) continue;             // stowed items are free
-//   const itemSlots = item.system.slots || item.system.baseSlots || 0;
-//   if (itemSlots > 0) occupiedSlots += itemSlots;     // quantity is never read
+// - LEGACY (≤ 5.36): `_calculateInventorySlots` charged `baseSlots` once per
+//   top-level item and never read `quantity` — two Torches occupied one slot.
+//   Crawler added the stack multiplier: extra = `baseSlots × (N - 1)`.
+// - NATIVE (5.38+, `EquipmentHelper.itemStackCost` exists): the system charges
+//   `baseSlots × quantity` itself, pools zero-slot items RAW (10 = 1 slot), and
+//   numbers the grid from the stack cost. Adding Crawler's extra on top charged
+//   every stack twice. Crawler now only corrects for the Weightless flag.
 //
-// So the system charges nothing for zero-slot items and ignores quantity entirely
-// — two Torches occupy one slot. Crawler deviates on exactly ONE axis: quantity.
-// A stack of N costs `baseSlots × N`, so the extra to add is `baseSlots × (N - 1)`.
-//
-// Zero-slot items are free here, same as the system. Crawler used to pool them by
-// `gearCategory` at 10-per-slot, but `Math.ceil` ran per pool, so every distinct
-// category cost a full slot even at one item — a Backpack (`baseSlots: 0`, free in
-// the system) cost a slot, and characters read over capacity. Removed deliberately.
+// Either way the extra is Σ (Crawler's cost − system's cost) per item, so the
+// header and the grid can't disagree.
 const _INV_TYPES = new Set(["equipment", "weapon", "armor", "gear", "container"]);
 
 /**
@@ -72,19 +69,44 @@ export function isInventoryItem(item) {
 
 export function getExtraOccupiedSlots(actor) {
   if (!actor?.items) return 0;
+  // Stowed items are excluded by the system's own slot math — the container's
+  // slots represent them. Counting them here double-charged every packed item.
+  const items = actor.items.filter(isInventoryItem);
   let extra = 0;
-  for (const item of actor.items) {
-    if (!item.system || !_INV_TYPES.has(item.type)) continue;
-    // Stowed items are excluded by the system's own slot math — the container's
-    // slots represent them. Counting them here double-charged every packed item.
-    if (item.system.containerId) continue;
-    // "Weightless" opt-out: never contribute extra slots, whatever the quantity.
-    if (item.getFlag(MODULE_ID, "trueZeroSlot")) continue;
-    const baseSlots = _slotsOf(item);
-    const qty = _qtyOf(item);
-    if (qty > 1) extra += baseSlots * (qty - 1);
-  }
+  for (const item of items) extra += _itemCapacity(item) - _systemItemCost(item);
+  // Native zero-slot pool: Weightless items and Materials stay out of it.
+  const native = _nativeStacking();
+  if (native) extra += _pooledCost(items) - native.pooledZeroSlotCost(items);
   return extra;
+}
+
+const _isWeightless = (item) => !!item?.getFlag?.(MODULE_ID, "trueZeroSlot");
+
+// VCE's alchemy converts "Materials (1g)" into a consumable whose quantity is its
+// silver value, with `baseSlots: 0` + Weightless. Same match VCE uses to find them
+// (alchemy-helpers.mjs deductMaterials). Rule: every 1g, or part of one, is 1 Slot.
+const _isMaterials = (item) =>
+  item?.type === "equipment" && !!item.system?.isConsumable
+  && !!item.name?.toLowerCase().includes("materials");
+const MATERIALS_SILVER_PER_SLOT = 100;
+
+// Zero-slot pool cost under Crawler's model: the system's pool minus Weightless
+// items and Materials (which are charged by value instead).
+function _pooledCost(items) {
+  return _nativeStacking()?.pooledZeroSlotCost(
+    items.filter(i => !_isWeightless(i) && !_isMaterials(i))
+  ) ?? 0;
+}
+
+// The system's stack-aware helper, or null on legacy systems that ignore quantity.
+function _nativeStacking() {
+  const helper = globalThis.vagabond?.utils?.EquipmentHelper;
+  return typeof helper?.itemStackCost === "function" ? helper : null;
+}
+
+// What the system itself charges for one item (excluding the zero-slot pool).
+function _systemItemCost(item) {
+  return _nativeStacking()?.itemStackCost(item) ?? _slotsOf(item);
 }
 
 // Normalised readers, shared by both halves of the invariant below.
@@ -99,56 +121,55 @@ function _qtyOf(item) {
   return Math.max(0, Math.floor(item?.system?.quantity ?? 1));
 }
 
-// Capacity a single item consumes under Crawler's model. MUST stay in lockstep
-// with getExtraOccupiedSlots() above, or the sheet header and the inventory grid
-// will disagree. The identity that has to hold, summed over every item:
+// Capacity a single item consumes under Crawler's model. The identity that has
+// to hold, summed over every item (plus the native zero-slot pool):
 //
 //   Σ itemCapacity  ===  system.occupiedSlots + getExtraOccupiedSlots()
 //
-// The system contributes `baseSlots` once per item; Crawler's extra contributes
-// `baseSlots × (qty − 1)` unless the item is flagged weightless. So a weightless
-// item still costs the system's `baseSlots` — it only forgoes the stack multiplier.
+// A weightless item costs `baseSlots` once — it only forgoes the stack multiplier.
 //
-// `quantity: 0` is the case worth spelling out. The system charges `baseSlots`
-// regardless of quantity, and `getExtraOccupiedSlots` adds nothing (its guard is
-// `qty > 1`), so the header shows `baseSlots`. A naive `baseSlots × qty` here
-// would return 0 and the grid would start numbering at 1 while the header said 1
-// occupied — the sheet contradicting itself. Emptying a stack to zero without
-// deleting the item is ordinary play (ammo, consumables), so this is not
-// theoretical. Charging `baseSlots` keeps parity with the system.
+// `quantity: 0`: the legacy system charges `baseSlots` regardless of quantity, so
+// Crawler does too there (emptied ammo/consumables are ordinary play, and a naive
+// `baseSlots × 0` made the grid contradict the header). The native system charges
+// 0, and we follow it.
 function _itemCapacity(item) {
+  if (_isMaterials(item)) return Math.ceil(_qtyOf(item) / MATERIALS_SILVER_PER_SLOT);
   const baseSlots = _slotsOf(item);
-  if (item?.getFlag?.(MODULE_ID, "trueZeroSlot")) return baseSlots;
+  if (_isWeightless(item)) return baseSlots;
+  const native = _nativeStacking();
+  if (native) return native.itemStackCost(item);
   const qty = _qtyOf(item);
   return qty > 1 ? baseSlots * qty : baseSlots;
 }
 
 // ── Inventory grid numbering ─────────────────────────────────────────────────
-// The system numbers the grid from its own model, which never reads `quantity`
-// (`InventoryHandler.prepareInventoryGrid`, advancing by `itemData.totalSlots`).
-// Crawler charges `baseSlots × N` for a stack, so the patched header read "12 / 17"
-// while the grid still drew free cells starting at 11 — the sheet contradicted
-// itself. Recompute the numbering with quantity-aware sizes so both agree.
+// Recompute the free-cell numbering with Crawler's per-item capacity so the grid
+// agrees with the header. On legacy systems the grid ignored `quantity` entirely.
+// On native systems it's already right unless a Weightless stack is present.
 //
-// `totalSlots` also drives `grid-column: span` in inventory-card.hbs, so a stack
-// now visually occupies its true footprint instead of a single cell.
+// `totalSlots` drives `grid-column: span` in inventory-card.hbs. Legacy: widen a
+// stack to its true footprint. Native: leave the system's width (per-unit, capped
+// at 4) alone — overriding it made a ×10 Torch stack span 10 columns.
 export function renumberInventoryGrid(context, actor) {
   const inv = actor?.system?.inventory;
   if (!inv || !Array.isArray(context?.inventoryItems)) return;
   const baseMaxSlots = inv.baseMaxSlots ?? 0;
   const maxSlots = inv.maxSlots ?? 0;
+  const native = _nativeStacking();
 
   let capacityNumber = 1;
   for (const itemData of context.inventoryItems) {
     const consumed = _itemCapacity(itemData.item);
-    itemData.totalSlots = consumed;
-    if (consumed > 0) {
+    if (!native) itemData.totalSlots = consumed;
+    if (consumed > 0 || _slotsOf(itemData.item) > 0) {
       itemData.displayNumber = capacityNumber;
       capacityNumber += consumed;
     } else {
       itemData.displayNumber = null;  // zero-slot items are unnumbered, as before
     }
   }
+  // Native RAW pool: every 10 zero-slot items take a numbered cell (Weightless excluded).
+  capacityNumber += _pooledCost(context.inventoryItems.map(d => d.item));
 
   const itemCount = context.inventoryItems.length;
   const emptyCount = Math.max(0, baseMaxSlots - (capacityNumber - 1));
@@ -870,6 +891,8 @@ Hooks.once("ready", async () => {
       // Same story for the "Inventory is full / Rush action" banner — gated
       // by `{{#if isOverloaded}}` in features.hbs so it's missing from the DOM
       // when the system thinks we're under capacity. Inject (or update) it.
+      // Weightless pool exclusions can also take us back UNDER capacity.
+      if (newOccupied <= max) el.querySelector(".inventory-overload-warning")?.remove();
       if (newOccupied > max) {
         const overloadAmount = newOccupied - max;
         const msg = `Your Inventory is full, you can't take the Rush action. (+${overloadAmount} slots beyond capacity)`;
