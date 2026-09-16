@@ -21,6 +21,8 @@ Entry format: `- [agent, YYYY-MM-DD HH:MM CT] description`
 
 ## Recently Completed (last 7 days)
 
+- [claude, 2026-09-16] Inventory slots on vagabond 5.38.1: system now counts stacks natively, Crawler was double-counting; Weightless items excluded from the zero-slot pool; converted VCE Materials cost 1 slot per 1g (ceil). Live-tested: inventory-slots suite 15/15.
+
 - [hermes-wiki-writer, 2026-08-11] Published the accepted README-led GitHub Wiki as seven separate content pages plus shared sidebar/footer navigation. Strict validation returned 9 pages, 0 errors, and 0 warnings; every content page rendered; all seven live Wiki pages returned HTTP 200; sidebar entries and key section anchors were observed in the rendered GitHub HTML. The Wiki `main` and live `master` refs point to the same fast-forwarded publication commit. The separate Wiki checkout is clean, and unrelated module worktree changes were not included.
 - [claude, 2026-05-19 17:00 CT] Bootstrapped dev tooling scaffold (verify.sh, dev/, .planning/, CLAUDE.md and AGENTS.md verification rules) — ported from shadowdark-extras patterns. Local-only (no git repo).
 
