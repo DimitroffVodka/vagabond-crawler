@@ -33,6 +33,8 @@ For the full dashboard of which abilities are automated across every monster in 
 
 <!-- gif: docs/assets/flanking.png -->
 
+> **Vagabond 5.38 and later handle flanking natively** (a **Flanked** status with the same Vulnerable effects plus +2 damage, applied automatically as tokens move). On those versions Crawler's checker stays idle so tokens don't get Vulnerable twice; the rest of this section describes the checker on older system versions.
+
 Automatic flanking detection during combat. When two or more allied tokens are Close (within 5 ft) to a foe — and the foe is no more than one size larger than the flankers — the foe gains the **Vulnerable** condition. Bidirectional: heroes flank NPCs *and* NPCs flank heroes. Only the GM client evaluates (to avoid races); the checker tracks an actor flag `flankedBy` so it only removes Vulnerable it actually applied — a Vulnerable pushed on by a spell or ability stays put. Size hierarchy (small < medium < large < huge < giant < colossal) is resolved from `actor.system.size` for NPCs and `actor.system.attributes.size` for PCs. For unlinked tokens, the checker also mirrors `outgoingSavesModifier` changes back to the world actor so saves still work correctly.
 
 ### Countdown Dice Auto-Roller

@@ -136,6 +136,8 @@ ward-surcharge flow for NPC casts.
 
 ## Flanking Checker
 
+On Vagabond 5.38+ `FlankingChecker.init()` returns early when `CONFIG.statusEffects` has a `flanked` entry — the system's `FlankingHelper` applies that status (identical Vulnerable changes + the +2 flat damage in `_computeFinalDamage`) on token move/create/delete and combat changes. Everything below applies to older systems only.
+
 ### Settings
 
 | Setting | Default | Description |
