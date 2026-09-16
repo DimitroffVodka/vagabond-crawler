@@ -21,6 +21,8 @@ Entry format: `- [agent, YYYY-MM-DD HH:MM CT] description`
 
 ## Recently Completed (last 7 days)
 
+- [claude, 2026-09-16] System light sources: canvas drop/pickup (light + remaining clock carried, holder not consumed) and party gather/release (light + clocks move to the party token and back; burn-out while gathered stays out). ItemDrops asks LightTracker.claimsDrop — also ends the old double drop for Crawler lights outside ItemDrops' name list. Live: suite 117/117, no orphans.
+
 - [claude, 2026-09-16] Activated relic powers (scripts/relic-activations.mjs): Blast (6d6 Close, save buttons), Precision (next attack hits), After-Image I/II (unlinked token copy, 1/10 rounds), Wish-Granting (once ever), Benediction (1 HP once per week), Store Spell (Max Mana reserve → free cast). Uses reset on Crawler Rest / world time. Live: suite 115/115; sheet right-click menu shows the entries; Store Spell cast Burn for 0 Mana on Drako and restored Max Mana.
 
 - [claude, 2026-09-16] Mechanical relic powers built: Resistance (typed, half before Armor), Protection (Favor on saves vs Being type), Cursed Doom (restorative cap per die), Nightvision/Truesight/Tremors/Echolocation/Sense Life (token vision/detection modes), Darkness/Moonlit/Radiant (token light, Far = 60 ft). Left to the GM: movement, Telepathy/Detection/Valuables/Ambassador/Aqua-Lung/Warning, once-per-day powers, Jumping (system has no jump field). Live: suite 113/113; Drako's real Darksight shield + Darkening trinket now apply.
