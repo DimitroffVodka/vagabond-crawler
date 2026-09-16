@@ -13,18 +13,18 @@ Entry format: `- [agent, YYYY-MM-DD HH:MM CT] description`
 
 ## Awaiting Review
 
-- [claude, 2026-09-16 12:35 CT] Design calls surfaced by the 5.38 drift audit (not changed):
-  1. Relic powers on KNOWN_DEAD_AE_PATHS (26 keys: autoFailSaveVs, movement.*, senses.*, …) apply AEs nothing reads — implement consumers or strip them.
-  2. Fabled Vicious crit dice read actor.system.hitDie (no such field) → always 2d6.
-  3. VCE Monk Martial Arts Cleave still uses the pre-5.38 half-damage split (and its damage-total regex no longer matches, so it's inert).
-  4. VCE Imbue replaces the system's new native Imbue (imbue-helper, weapon.system.imbuedSpell) — decide which owns it.
-  5. Two light-source systems: the system's native LightSource (torch/lantern/candle Use macros, burn clocks) and the Crawler light tracker (right-click Light, fuel, party transfer). They don't share state — Crawler Extinguish sets the token dark even while a system-lit torch burns. Decide which owns lights.
+- [claude, 2026-09-16 13:55 CT] Relic powers still without mechanics (user to pick which to build):
+  - Mechanical, buildable: Resistance (typed, half damage — needs a damage-calc wrap), Protection niche/specific/general (Favor on saves vs a Being type — needs a save wrap keyed on the attacker's beingType), Cursed Doom (healing cap per die — the system's restorative apply only sees the total), Nightvision/Truesight/Tremors/Echolocation/Sense Life (Foundry token vision/detection modes), Darkness/Moonlit/Radiant I-III (token light while equipped), Jumping I-III.
+  - Once-per-day / GM-run: Blasting, Precision, After-Image, Wish-granting, Benediction, Store Spell.
+  - Flavor for the GM to adjudicate: Climbing, Clinging, Flying, Levitation, Blinking, Water/Web walk, Telepathy, Detection, Sense Valuables, Ambassador, Aqua-Lung, Warning, Soul Eater, Vorpal, Loyalty, Infinite.
 
 ## Blocked
 
 (nothing)
 
 ## Recently Completed (last 7 days)
+
+- [claude, 2026-09-16] User's design calls implemented. Vicious crit = 2×HD (NPC) / 2×Level (PC). Relic Bravery/Clarity/Repulsing → system.statusResistances, Burning I-III → item causedStatuses, cursed auto-fail saves → StatusHelper.applyStatus wrap; Loot Generator relics now carry relicForge/applicationMode/properties (shared buildRelicPowerData). Strip Imbue casts through the system's native Imbue (VCE ImbueManager removed). System light items (5.23+ macro) light through game.vagabond.lightSource; Crawler adds oil, keeps burned-out lanterns, ticks hour clocks on crawl turns, drives light FX. VCE Monk Martial Arts Cleave borrows the Cleave property (5.38 rule). Live: suite 109/109, VCE smoke 230/0/2.
 
 - [claude, 2026-09-16] Metal item prices: merchant buy/sell/restock, party inventory and loot/gamble cards now use the system's derived cost (baseCost × metal multiplier); relic loot no longer multiplies power value by the metal. Live: silver Longsword sold at 50% for 2g (400s cost), loot itemValue matched derived cost on 12/12 items, suite 107/107.
 
