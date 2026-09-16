@@ -13,7 +13,11 @@ Entry format: `- [agent, YYYY-MM-DD HH:MM CT] description`
 
 ## Awaiting Review
 
-(nothing)
+- [claude, 2026-09-16 12:35 CT] Design calls surfaced by the 5.38 drift audit (not changed):
+  1. Relic powers on KNOWN_DEAD_AE_PATHS (26 keys: autoFailSaveVs, movement.*, senses.*, …) apply AEs nothing reads — implement consumers or strip them.
+  2. Fabled Vicious crit dice read actor.system.hitDie (no such field) → always 2d6.
+  3. VCE Monk Martial Arts Cleave still uses the pre-5.38 half-damage split (and its damage-total regex no longer matches, so it's inert).
+  4. VCE Imbue replaces the system's new native Imbue (imbue-helper, weapon.system.imbuedSpell) — decide which owns it.
 
 ## Blocked
 
@@ -21,6 +25,7 @@ Entry format: `- [agent, YYYY-MM-DD HH:MM CT] description`
 
 ## Recently Completed (last 7 days)
 
+- [claude, 2026-09-16] Vagabond 5.38.1 drift audit + fixes, Crawler and VCE, each verified live. Crawler: rollAttack/rollDamage wraps forward all args; strip weapon attacks (favor/hinder, roll-damage setting, targets/skill, Cleave), strip spell cost via SpellCastDialog.calculateCosts, Place Template via Regions; relic Roll Damage UUID, Manasteal mana.current, Cold Iron metal key, rest maxLuck, delivery label i18n, weapon damage types, Bane vs PCs, loot prices; flanking defers to native `flanked`; Pack Instincts on token actor; FX hit/miss + NPC ⚡ placement; v14 deprecations (AE type strings, displace). Crawler suite 107/107. VCE fixes on its v14 branch (see its log).
 - [claude, 2026-09-16] Inventory slots on vagabond 5.38.1: system now counts stacks natively, Crawler was double-counting; Weightless items excluded from the zero-slot pool; converted VCE Materials cost 1 slot per 1g (ceil). Live-tested: inventory-slots suite 15/15.
 
 - [hermes-wiki-writer, 2026-08-11] Published the accepted README-led GitHub Wiki as seven separate content pages plus shared sidebar/footer navigation. Strict validation returned 9 pages, 0 errors, and 0 warnings; every content page rendered; all seven live Wiki pages returned HTTP 200; sidebar entries and key section anchors were observed in the rendered GitHub HTML. The Wiki `main` and live `master` refs point to the same fast-forwarded publication commit. The separate Wiki checkout is clean, and unrelated module worktree changes were not included.
