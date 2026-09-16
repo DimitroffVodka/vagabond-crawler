@@ -850,6 +850,19 @@ async function _fireAction(actor, type, indexStr, itemId) {
       // the numbers: the actor's own favor/hinder, the system's roll-damage
       // settings, and the targets + swung skill rollDamage needs on 5.38 for
       // weakness pre-rolls and per-die bonus doubling.
+      // Cleave (5.38, as RollHandler.rollWeapon): each extra Target steps the damage die
+      // down one size, capped by the steps the base die has left; without Cleave an
+      // attack has one Target.
+      let cleaveDieOverride = null;
+      const dieSteps = CONFIG.VAGABOND?.weaponDieSteps;
+      if (dieSteps && item.system.properties?.includes("Cleave")) {
+        const baseIdx = dieSteps.indexOf(parseInt(item.system.currentDamage?.match(/d(\d+)/i)?.[1], 10));
+        const maxTargets = 1 + Math.max(0, baseIdx);
+        if (targets.length > maxTargets) targets.splice(maxTargets);
+        if (targets.length > 1 && baseIdx >= 0) cleaveDieOverride = dieSteps[Math.max(0, baseIdx - (targets.length - 1))];
+      } else if (dieSteps && targets.length > 1) {
+        targets.splice(1);
+      }
       const attackResult = await item.rollAttack(actor, actor.system?.favorHinder || "none");
       if (!attackResult) return;
       // Animation FX is played by AnimationFx._onChatMessage on the
@@ -859,7 +872,7 @@ async function _fireAction(actor, type, indexStr, itemId) {
       const { VagabondDamageHelper } = await import("/systems/vagabond/module/helpers/damage-helper.mjs");
       if (VagabondDamageHelper.shouldRollDamage?.(isHit || attackResult.isCritical) ?? (isHit || attackResult.isCritical)) {
         damageRoll = await item.rollDamage(actor, attackResult.isCritical, attackResult.weaponSkill?.stat ?? null,
-          targets, null, attackResult.weaponSkillKey);
+          targets, cleaveDieOverride, attackResult.weaponSkillKey);
       }
       await VagabondChatCard.weaponAttack(actor, item, attackResult, damageRoll, targets);
 
