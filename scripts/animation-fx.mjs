@@ -322,7 +322,8 @@ export const AnimationFx = {
       const preHook = Hooks.on("preCreateChatMessage", (msg, data, opts, userId) => {
         if (stamped) return;
         const flags = foundry.utils.getProperty(data, "flags.vagabond") ?? {};
-        if (flags.actorId !== actor?.id) return;  // skip non-matching messages
+        // vagabond 5.38+ stamps the actor UUID; older systems stamped the id.
+        if (flags.actorId !== actor?.id && flags.actorId !== actor?.uuid) return;
         const update = {};
         if (typeof flags.actionIndex !== "number") {
           update["flags.vagabond.actionIndex"] = actionIndex;
@@ -505,7 +506,9 @@ export const AnimationFx = {
 
     const flags = message.flags?.vagabond;
     if (!flags?.actorId) return;
-    const actor = game.actors.get(flags.actorId);
+    // vagabond 5.38+ stamps the actor UUID (a synthetic token actor's for unlinked
+    // tokens); older systems stamped the world actor id.
+    const actor = flags.actorId.includes(".") ? fromUuidSync(flags.actorId) : game.actors.get(flags.actorId);
     if (!actor) return;
 
     let preset = null;

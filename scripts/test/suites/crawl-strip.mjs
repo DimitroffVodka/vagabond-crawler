@@ -112,7 +112,7 @@ export function register() {
       const { messages } = await ctx.fx.captureChatMessages(async () => {
         await VagabondChatCard.npcAction(npc, action, 0, []);
       });
-      const card = messages.find(m => m.flags?.vagabond?.actorId === npc.id);
+      const card = messages.find(m => [npc.id, npc.uuid].includes(m.flags?.vagabond?.actorId));
       expect(card).not.toBeUndefined();
       expect(card.flags?.vagabond?.actionIndex).toBe(0);
       expect(card.flags?.vagabond?.tokenId).toBe(npcTok.id);
