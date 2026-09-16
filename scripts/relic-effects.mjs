@@ -187,8 +187,10 @@ export const RelicEffects = {
 
     const original = VagabondItem.prototype.rollDamage;
     const self = this;
-    async function wrapped(actor, isCritical = false, statKey = null) {
-      const baseRoll = await original.call(this, actor, isCritical, statKey);
+    // ...rest = (targetsAtRollTime, dieOverride, skillKey) on 5.38: weakness pre-roll,
+    // per-die bonus doubling, Cleave's die step-down and the swung skill all need them.
+    async function wrapped(actor, isCritical = false, statKey = null, ...rest) {
+      const baseRoll = await original.call(this, actor, isCritical, statKey, ...rest);
       // Base may be null (no damage formula — Grapple, Net, etc.) — pass through
       if (!baseRoll) return baseRoll;
 

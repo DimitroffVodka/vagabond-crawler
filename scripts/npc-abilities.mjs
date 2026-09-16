@@ -481,10 +481,12 @@ async function _wrapSystemClasses() {
   }
   if (VagabondItem?.prototype?.rollAttack) {
     const origRollAttack = VagabondItem.prototype.rollAttack;
-    VagabondItem.prototype.rollAttack = async function (actor, favorHinder = "none") {
+    VagabondItem.prototype.rollAttack = async function (actor, favorHinder = "none", ...rest) {
       _isAttackRoll = true;
       try {
-        return await origRollAttack.call(this, actor, favorHinder);
+        // ...rest = (difficultyOverride, { allowUnequipped, skillKey, thrown }) on 5.38 —
+        // dropping them breaks unequipped throws and alternate weapon skills.
+        return await origRollAttack.call(this, actor, favorHinder, ...rest);
       } finally {
         _isAttackRoll = false;
       }
