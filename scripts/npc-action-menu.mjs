@@ -842,15 +842,20 @@ async function _fireAction(actor, type, indexStr, itemId) {
       const item = actor.items.get(itemId); if (!item) return;
       await applyPackInstincts(actor);
       const { VagabondChatCard } = globalThis.vagabond.utils;
-      const attackResult = await item.rollAttack(actor);
+      // Mirror the sheet path (RollHandler.rollWeapon) for the parts that change
+      // the numbers: the actor's own favor/hinder, the system's roll-damage
+      // settings, and the targets + swung skill rollDamage needs on 5.38 for
+      // weakness pre-rolls and per-die bonus doubling.
+      const attackResult = await item.rollAttack(actor, actor.system?.favorHinder || "none");
       if (!attackResult) return;
       // Animation FX is played by AnimationFx._onChatMessage on the
       // createChatMessage hook below — covers every UI path uniformly.
-      // Damage roll if hit
       let damageRoll = null;
       const isHit = attackResult.isHit ?? false;
-      if (isHit || attackResult.isCritical) {
-        damageRoll = await item.rollDamage(actor, attackResult.isCritical, attackResult.weaponSkill?.stat ?? null);
+      const { VagabondDamageHelper } = await import("/systems/vagabond/module/helpers/damage-helper.mjs");
+      if (VagabondDamageHelper.shouldRollDamage?.(isHit || attackResult.isCritical) ?? (isHit || attackResult.isCritical)) {
+        damageRoll = await item.rollDamage(actor, attackResult.isCritical, attackResult.weaponSkill?.stat ?? null,
+          targets, null, attackResult.weaponSkillKey);
       }
       await VagabondChatCard.weaponAttack(actor, item, attackResult, damageRoll, targets);
 
