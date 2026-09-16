@@ -272,7 +272,8 @@ export const RelicEffects = {
       // Before the original runs, check for relic bonuses and inject into the button's formula
       const actorId = button.dataset.actorId;
       const itemId = button.dataset.itemId;
-      const actor = game.actors.get(actorId);
+      // 5.38 writes the actor UUID here (bare id on older systems).
+      const actor = actorId?.includes(".") ? fromUuidSync(actorId) : game.actors.get(actorId);
       const item = actor?.items.get(itemId);
 
       if (actor && item) {
@@ -378,11 +379,11 @@ export const RelicEffects = {
           const roll = new Roll(manaDice);
           await roll.evaluate();
           const manaAmount = roll.total;
-          const currentMana = killer.system.mana?.value ?? 0;
+          const currentMana = killer.system.mana?.current ?? 0;
           const maxMana = killer.system.mana?.max ?? 0;
           if (maxMana > 0) {
             const newManaVal = Math.min(currentMana + manaAmount, maxMana);
-            await killer.update({ "system.mana.value": newManaVal });
+            await killer.update({ "system.mana.current": newManaVal });
 
             await ChatMessage.create({
               speaker: ChatMessage.getSpeaker({ actor: killer }),

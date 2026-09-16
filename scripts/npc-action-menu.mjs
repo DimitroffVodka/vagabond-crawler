@@ -449,9 +449,12 @@ function _npcDmgLabel(action) {
 }
 
 function _weaponDmgLabel(item) {
-  const dmg = item.system?.damageTwoHands || item.system?.damageOneHand;
+  const dmg = item.system?.currentDamage || item.system?.damageTwoHands || item.system?.damageOneHand;
   if (!dmg) return "";
-  const type = item.system?.damageType && item.system.damageType !== "-" ? ` ${item.system.damageType}` : "";
+  // Weapons keep their type per grip (damageTypeOneHand/TwoHands → derived currentDamageType);
+  // the general damageType stays "-" for them.
+  const dmgType = item.system?.currentDamageType ?? item.system?.damageType;
+  const type = dmgType && dmgType !== "-" ? ` ${dmgType}` : "";
   return `<span class="vcs-menu-dmg">${dmg}${type}</span>`;
 }
 

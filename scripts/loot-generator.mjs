@@ -190,6 +190,11 @@ const ART_ICONS = {
   7: ICONS.pottery, 8: ICONS.artifact,
 };
 
+/** Loot-table material name → system `metal` key ("Cold Iron" → "coldIron").
+ *  The field is a StringField with choices, so a plain lowercase "cold iron"
+ *  fails validation and the whole Item.create throws. */
+const _metalKey = (name) => name.toLowerCase().replace(/\s+(\w)/g, (_, c) => c.toUpperCase());
+
 /** Build an equipment itemData object for loot.
  *
  * `cost` may be either a flat number (treated as gold for backward
@@ -391,7 +396,7 @@ async function _createSpellScroll(manaCost) {
   const goldValue = 5 + 5 * manaCost;
 
   const deliveryType = spell.system?.deliveryType ?? "touch";
-  const deliveryName = CONFIG.VAGABOND?.deliveryTypes?.[deliveryType] ?? deliveryType;
+  const deliveryName = game.i18n.localize(CONFIG.VAGABOND?.deliveryTypes?.[deliveryType] ?? deliveryType);
 
   const scrollData = {
     spellName: spell.name,
@@ -1433,7 +1438,7 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Apply material
     if (material && material !== "Mundane") {
-      itemData.system.metal = material.toLowerCase();
+      itemData.system.metal = _metalKey(material);
     }
 
     // Update name with full generated name
@@ -1488,7 +1493,7 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     itemData.name = result.item;
     if (material && material !== "Mundane") {
-      itemData.system.metal = material.toLowerCase();
+      itemData.system.metal = _metalKey(material);
     }
 
     // Add relic power value to baseCost
@@ -2005,7 +2010,7 @@ export async function generateLevelLoot(level) {
           const matN = await _R("1d12", "Armor Material");
           const mat = ARMOR_MATERIAL[matN];
           if (mat && mat !== "Mundane") {
-            itemData.system.metal = mat.toLowerCase();
+            itemData.system.metal = _metalKey(mat);
             itemData.name = `${mat} ${itemData.name}`;
           }
         }
@@ -2044,7 +2049,7 @@ export async function generateLevelLoot(level) {
         const matN = await _R("1d8", "Weapon Material");
         const mat = WEAPON_MATERIAL[matN];
         if (mat && mat !== "Mundane") {
-          itemData.system.metal = mat.toLowerCase();
+          itemData.system.metal = _metalKey(mat);
           itemData.name = `${mat} ${itemData.name}`;
         }
       }
