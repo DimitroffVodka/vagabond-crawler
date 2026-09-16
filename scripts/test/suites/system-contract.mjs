@@ -76,6 +76,7 @@ const BACKED_AE_PATHS = [
   "system.saves.reflex.bonus",
   "system.saves.will.bonus",
   "system.speed.bonus",
+  "system.statusResistances",
   "system.universalSpellDamageBonus",
   "system.universalWeaponDamageBonus",
 ];
@@ -96,20 +97,18 @@ const BACKED_AE_PATHS = [
  * They are not system drift: none of these fields existed at v5.8.0 either, so
  * the 5.36.0 jump did not remove them — they were never there.
  *
+ * 2026-09-16: Bravery/Clarity/Repulsing moved to system.statusResistances,
+ * Burning I-III to item causedStatuses, and the cursed auto-fail saves to a
+ * StatusHelper.applyStatus wrap (relic-effects) — removed from this list.
+ *
  * This list PINS the damage rather than blessing it. The growth check below
  * fails if a new dead path appears, so the set cannot quietly expand while the
  * open question — implement the consumers, or strip the ineffective changes —
  * is still being triaged.
  */
 const KNOWN_DEAD_AE_PATHS = [
-  "system.autoFailSaveVs.berserk",
-  "system.autoFailSaveVs.charmed",
-  "system.autoFailSaveVs.frightened",
   "system.breatheUnderwater",
   "system.cannotBeSurprised",
-  "system.favorOnSaveVs.charmed",
-  "system.favorOnSaveVs.confused",
-  "system.favorOnSaveVs.frightened",
   "system.healingCappedPerDie",
   "system.movement.blink",
   "system.movement.climb",
@@ -118,7 +117,6 @@ const KNOWN_DEAD_AE_PATHS = [
   "system.movement.levitate",
   "system.movement.waterwalk",
   "system.movement.webwalk",
-  "system.onHitBurningDice",
   "system.senses.allsight",
   "system.senses.darksight",
   "system.senses.detection",

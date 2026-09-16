@@ -10,7 +10,7 @@ import {
 } from "./loot-data.mjs";
 import { LootTracker } from "./loot-tracker.mjs";
 import { SessionRecap } from "./session-recap.mjs";
-import { RELIC_POWERS } from "./relic-powers.mjs";
+import { RELIC_POWERS, buildRelicPowerData } from "./relic-powers.mjs";
 
 /* ── Relic Power → Active Effect mapping ─────────────────── */
 
@@ -71,30 +71,6 @@ function _findRelicPower(powerText) {
   _initRelicPowerMap();
   const lower = powerText.toLowerCase().replace(/\s*\(niche\)/i, "").trim();
   return _relicPowerMap[lower] ?? null;
-}
-
-/** Create Active Effect documents from a relic power, with optional input substitution. */
-function _buildRelicEffects(power, input = "") {
-  if (!power) return [];
-  const changes = (power.changes || []).map(e => ({
-    key: e.key.replace("{input}", input),
-    mode: e.mode,
-    value: String(e.value).replace("{input}", input),
-  }));
-  const moduleFlags = { relicPower: power.id || power.name, managed: true };
-  if (power.flags) {
-    for (const [k, v] of Object.entries(power.flags)) {
-      moduleFlags[k] = typeof v === "string" ? v.replace("{input}", input) : v;
-    }
-  }
-  return [{
-    name: `Relic: ${power.name}${input ? ` (${input})` : ""}`,
-    icon: "icons/svg/item-bag.svg",
-    changes,
-    disabled: false,
-    transfer: true,
-    flags: { [MODULE_ID]: moduleFlags },
-  }];
 }
 
 /* ── Loot Item Builders ────────────────────────────────── */
@@ -648,16 +624,22 @@ async function _resolveRawPower(rawPower, powerTable = "weapon", depth = 0) {
   return { display: rawPower, powerText: rawPower };
 }
 
-/** After resolving a power, build the AE effects for it. */
-function _buildEffectsForPower(powerText, input = "") {
+/** After resolving a power, write it onto the item data the same way the
+ *  Relic Forge does (AEs + applicationMode, relicForge flag, properties,
+ *  on-hit statuses). Without the relicForge flag the damage patches skip the
+ *  item, so Strike/Bane/Vicious never fired on generated relics. */
+function _applyRelicPower(itemData, powerText, input = "") {
   const power = _findRelicPower(powerText);
-  if (!power) return [];
+  if (!power) return;
   // For typed resistance, extract the element from the power text
   if (power.id === "resistance-typed" && !input) {
     const match = powerText.match(/(acid|cold|fire|poison|shock)/i);
     input = match ? match[1] : "";
   }
-  return _buildRelicEffects(power, input);
+  const { effectDocs, system, relicForge } = buildRelicPowerData(itemData, [power], { [power.id]: input });
+  itemData.effects = [...(itemData.effects || []), ...effectDocs];
+  itemData.system = { ...(itemData.system || {}), ...system };
+  foundry.utils.setProperty(itemData, "flags.vagabond-crawler.relicForge", relicForge);
 }
 
 /* ── Compendium item cache ─────────────────────────────── */
@@ -1463,12 +1445,12 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     _addPowerValue(itemData, powerText, material);
 
     // Apply relic Active Effects
-    const effects = _buildEffectsForPower(powerText);
-    if (effects.length) itemData.effects = [...(itemData.effects || []), ...effects];
+    _applyRelicPower(itemData, powerText);
 
     // Store loot gen metadata
     itemData.flags = itemData.flags || {};
     itemData.flags["vagabond-crawler"] = {
+      ...itemData.flags["vagabond-crawler"],
       lootGenerated: true,
       powerText,
       material,
@@ -1515,11 +1497,11 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     _addPowerValue(itemData, powerText, material);
 
     // Apply relic Active Effects
-    const effects = _buildEffectsForPower(powerText);
-    if (effects.length) itemData.effects = [...(itemData.effects || []), ...effects];
+    _applyRelicPower(itemData, powerText);
 
     itemData.flags = itemData.flags || {};
     itemData.flags["vagabond-crawler"] = {
+      ...itemData.flags["vagabond-crawler"],
       lootGenerated: true,
       powerText,
       material,
@@ -2009,8 +1991,7 @@ export async function generateLevelLoot(level) {
       const { display, powerText } = await _resolveRawPower(rawPower, "armor");
       itemData.name = display ? `${accName} ${display}` : accName;
       _addPowerValue(itemData, powerText, null);
-      const accEffects = _buildEffectsForPower(powerText);
-      if (accEffects.length) itemData.effects = accEffects;
+      _applyRelicPower(itemData, powerText);
       items.push(itemData);
     } else {
       // Actual armor
@@ -2034,8 +2015,7 @@ export async function generateLevelLoot(level) {
         if (display) itemData.name += ` ${display}`;
         _addPowerValue(itemData, powerText, itemData.system?.metal ?? null);
         // Apply relic Active Effects
-        const effects = _buildEffectsForPower(powerText);
-        if (effects.length) itemData.effects = effects;
+        _applyRelicPower(itemData, powerText);
         items.push(itemData);
       }
     }
@@ -2073,8 +2053,7 @@ export async function generateLevelLoot(level) {
       if (display) itemData.name += ` ${display}`;
       _addPowerValue(itemData, powerText, itemData.system?.metal ?? null);
       // Apply relic Active Effects
-      const effects = _buildEffectsForPower(powerText);
-      if (effects.length) itemData.effects = effects;
+      _applyRelicPower(itemData, powerText);
       items.push(itemData);
     }
   } else {

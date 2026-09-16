@@ -60,7 +60,7 @@ Per-NPC table and chance values live on actor flags or in the compendium loot co
 
 - Generator is the manual tool. Manager and Drops prepare automatic rewards for combat end.
 - **Give** adds the claim to Session Recap when tracking accepts that log entry.
-- Generated relics can receive matching Crawler effects when their text matches a catalogued power.
+- Generated relics get the same effects, properties and on-hit statuses as a forged relic when their text matches a catalogued power.
 - If **Loot Drops** is off, assigned tables do nothing at combat end.
 
 ---
@@ -70,6 +70,8 @@ Per-NPC table and chance values live on actor flags or in the compendium loot co
 Relic Forge adds powers to a weapon, armor, trinket, or other equipment. The left column browses the 11 power categories. The middle holds the base item and any input required by a power, such as a creature type for Bane. The right column lists the selected powers and their displayed costs.
 
 Forging can rename the item, add properties, stamp Crawler metadata, and create transfer Active Effects. Effects marked **when equipped** stay inactive while the relic is in a backpack.
+
+Status powers ride the system's rules: Bravery, Clarity and Repulsing give Favor on the save, Burning puts Burning on the weapon's hit, and the cursed Anger, Cowardice and Gullibility make the save fail.
 
 ### Forge a relic
 

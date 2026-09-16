@@ -75,6 +75,7 @@ export const RelicEffects = {
     // flags and inject the dice at roll time, scoped to the firing item.
     this._patchItemRollDamage();
     this._patchDamageHelper();
+    this._patchAutoFailSaves();
 
     // Hook into actor updates to detect kills for lifesteal / manasteal.
     Hooks.on("updateActor", (actor, changes, options, userId) => {
@@ -248,6 +249,32 @@ export const RelicEffects = {
   /* -------------------------------------------- */
   /*  Monkey-patch: VagabondDamageHelper           */
   /* -------------------------------------------- */
+
+  /**
+   * Cursed Anger / Cowardice / Gullibility: "auto-fail saves vs <status>".
+   * Every on-hit status goes through StatusHelper.applyStatus, whose
+   * skipSaveRoll option bypasses the resist save — set it when an applied
+   * relic AE on the target carries `autoFailSaveVs` for that status. The
+   * system's applicationMode gating (when-equipped) decides which AEs apply.
+   */
+  async _patchAutoFailSaves() {
+    let StatusHelper;
+    try {
+      ({ StatusHelper } = await import("/systems/vagabond/module/helpers/status-helper.mjs"));
+    } catch (e) {
+      console.warn(`${MODULE_ID} | Could not import StatusHelper:`, e);
+      return;
+    }
+    if (!StatusHelper?.applyStatus || isWrapped(StatusHelper, "applyStatus")) return;
+    const orig = StatusHelper.applyStatus;
+    StatusHelper.applyStatus = function (actor, entry, damageWasBlocked, sourceName, options = {}) {
+      const cursed = entry?.statusId && actor?.appliedEffects?.some(
+        e => e.flags?.[MODULE_ID]?.autoFailSaveVs === entry.statusId);
+      if (cursed) options = { ...options, skipSaveRoll: true, preRolledSave: null };
+      return orig.call(this, actor, entry, damageWasBlocked, sourceName, options);
+    };
+    markWrapped(StatusHelper, "applyStatus");
+  },
 
   async _patchDamageHelper() {
     // Import from the system's module path

@@ -100,7 +100,7 @@ export function register() {
       expect(parts).toEqual([]);
     });
 
-    case_("Vicious: fires only on critical hits, scaled to actor.system.hitDie || d6", async (ctx) => {
+    case_("Vicious: fires only on critical hits, 2× HD (NPC) or 2× Level (PC)", async (ctx) => {
       const RelicEffects = await loadRelicEffects();
       const { actor: pc } = await ctx.fx.createTestPC(ctx);
       const weapon = await ctx.fx.addWeapon(pc, { name: "VCTest Vicious" }, {
@@ -110,9 +110,8 @@ export function register() {
       const onCrit = RelicEffects.collectBonusParts(pc, weapon, { isCritical: true,  targets: [] });
       expect(onHit).toEqual([]);
       expect(onCrit.length).toBe(1);
-      // Synthetic PC has no hitDie set (it's normally derived from class data).
-      // collectBonusParts falls back to d6 when missing — verify the fallback.
-      expect(onCrit[0].formula).toBe("2d6");
+      // PCs have no HD; Level stands in.
+      expect(onCrit[0].formula).toBe(String(2 * (pc.system.attributes.level.value ?? 1)));
       expect(onCrit[0].label).toContain("Vicious");
     });
 

@@ -344,7 +344,7 @@ export const RELIC_POWERS = [
     cost: 0,
     nameFormat: { position: 'prefix', text: 'Angering' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.autoFailSaveVs.berserk', mode: 5, value: 'true' }],
+    changes: [],
     flags: { relicPower: 'cursed-anger', autoFailSaveVs: 'berserk' }
   },
   {
@@ -356,7 +356,7 @@ export const RELIC_POWERS = [
     cost: 0,
     nameFormat: { position: 'prefix', text: 'Cowering' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.autoFailSaveVs.frightened', mode: 5, value: 'true' }],
+    changes: [],
     flags: { relicPower: 'cursed-cowardice', autoFailSaveVs: 'frightened' }
   },
   {
@@ -380,7 +380,7 @@ export const RELIC_POWERS = [
     cost: 0,
     nameFormat: { position: 'prefix', text: 'Gullible' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.autoFailSaveVs.charmed', mode: 5, value: 'true' }],
+    changes: [],
     flags: { relicPower: 'cursed-gullibility', autoFailSaveVs: 'charmed' }
   },
   {
@@ -787,7 +787,7 @@ export const RELIC_POWERS = [
     cost: 150,
     nameFormat: { position: 'prefix', text: 'Brave' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.favorOnSaveVs.frightened', mode: 5, value: 'true' }],
+    changes: [{ key: 'system.statusResistances', mode: 2, value: 'frightened' }],
     flags: { relicPower: 'resistance-bravery' }
   },
   {
@@ -799,7 +799,7 @@ export const RELIC_POWERS = [
     cost: 150,
     nameFormat: { position: 'prefix', text: 'Clear-minded' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.favorOnSaveVs.confused', mode: 5, value: 'true' }],
+    changes: [{ key: 'system.statusResistances', mode: 2, value: 'confused' }],
     flags: { relicPower: 'resistance-clarity' }
   },
   {
@@ -811,7 +811,7 @@ export const RELIC_POWERS = [
     cost: 150,
     nameFormat: { position: 'prefix', text: 'Repelling' },
     applicationMode: 'when-equipped',
-    changes: [{ key: 'system.favorOnSaveVs.charmed', mode: 5, value: 'true' }],
+    changes: [{ key: 'system.statusResistances', mode: 2, value: 'charmed' }],
     flags: { relicPower: 'resistance-repulsing' }
   },
   {
@@ -1042,7 +1042,10 @@ export const RELIC_POWERS = [
     cost: 4000,
     nameFormat: { position: 'prefix', text: 'Minor Burning' },
     applicationMode: 'on-use',
-    changes: [{ key: 'system.onHitBurningDice', mode: 5, value: 'd4' }],
+    changes: [],
+    // Written to the item's system.causedStatuses by buildRelicPowerData, so
+    // the system's on-hit status pipeline applies Burning and its countdown.
+    causedStatuses: [{ statusId: 'burning', requiresDamage: true, saveType: 'none', duration: 'd4', tickDamageEnabled: true, damageOnTick: '', damageType: 'fire' }],
     flags: { relicPower: 'burning-1' }
   },
   {
@@ -1054,7 +1057,10 @@ export const RELIC_POWERS = [
     cost: 15000,
     nameFormat: { position: 'prefix', text: 'Burning' },
     applicationMode: 'on-use',
-    changes: [{ key: 'system.onHitBurningDice', mode: 5, value: 'd6' }],
+    changes: [],
+    // Written to the item's system.causedStatuses by buildRelicPowerData, so
+    // the system's on-hit status pipeline applies Burning and its countdown.
+    causedStatuses: [{ statusId: 'burning', requiresDamage: true, saveType: 'none', duration: 'd6', tickDamageEnabled: true, damageOnTick: '', damageType: 'fire' }],
     flags: { relicPower: 'burning-2' }
   },
   {
@@ -1066,7 +1072,10 @@ export const RELIC_POWERS = [
     cost: 64000,
     nameFormat: { position: 'prefix', text: 'Major Burning' },
     applicationMode: 'on-use',
-    changes: [{ key: 'system.onHitBurningDice', mode: 5, value: 'd8' }],
+    changes: [],
+    // Written to the item's system.causedStatuses by buildRelicPowerData, so
+    // the system's on-hit status pipeline applies Burning and its countdown.
+    causedStatuses: [{ statusId: 'burning', requiresDamage: true, saveType: 'none', duration: 'd8', tickDamageEnabled: true, damageOnTick: '', damageType: 'fire' }],
     flags: { relicPower: 'burning-3' }
   },
   {
@@ -1357,6 +1366,64 @@ export const METAL_DISPLAY_NAMES = {
  * of power objects in the same shape as RELIC_POWERS entries. Safe to call
  * before settings are registered (returns []).
  */
+/**
+ * Everything a set of relic powers writes onto an item: the relic AEs plus the
+ * item-level system fields (properties, on-hit statuses). Shared by the Relic
+ * Forge and the Loot Generator so generated relics carry the same data as
+ * forged ones.
+ * @param {object} itemData   plain item data (for img, existing properties/statuses)
+ * @param {object[]} powers   RELIC_POWERS entries
+ * @param {object} [userInputs] power id → input string
+ * @returns {{ effectDocs: object[], system: object, relicForge: object }}
+ */
+export function buildRelicPowerData(itemData, powers, userInputs = {}) {
+  const effectDocs = [];
+  const inputsRecord = {};
+  const properties = new Set(itemData?.system?.properties ?? []);
+  const causedStatuses = [...(itemData?.system?.causedStatuses ?? [])];
+  let powerCost = 0;
+  for (const power of powers) {
+    powerCost += power.cost || 0;
+    const input = userInputs[power.id] ?? power._userInput ?? "";
+    if (power.id) inputsRecord[power.id] = input;
+    const changes = (power.changes || []).map(e => ({
+      key:   e.key.replace("{input}", input),
+      mode:  e.mode,
+      value: String(e.value).replace("{input}", input),
+    }));
+    const moduleFlags = { relicPower: power.id || power.name, managed: true };
+    for (const [k, v] of Object.entries(power.flags ?? {})) {
+      moduleFlags[k] = typeof v === "string" ? v.replace("{input}", input) : v;
+    }
+    // The system filters AEs by `flags.vagabond.applicationMode`:
+    //   permanent → always; when-equipped → while equipped;
+    //   on-use → only as a roll-data overlay for rolls FROM this item.
+    effectDocs.push({
+      name:     `Relic: ${power.name}${input ? ` (${input})` : ""}`,
+      icon:     itemData?.img || "icons/svg/item-bag.svg",
+      changes,
+      disabled: false,
+      transfer: true,
+      flags: {
+        "vagabond-crawler": moduleFlags,
+        vagabond: { applicationMode: power.applicationMode || "when-equipped" },
+      },
+    });
+    for (const prop of power.addProperties ?? []) properties.add(prop);
+    for (const st of power.causedStatuses ?? []) {
+      if (!causedStatuses.some(c => c.statusId === st.statusId)) causedStatuses.push({ ...st });
+    }
+  }
+  const system = {};
+  if (properties.size) system.properties = Array.from(properties);
+  if (causedStatuses.length) system.causedStatuses = causedStatuses;
+  return {
+    effectDocs,
+    system,
+    relicForge: { forged: true, powers: powers.map(p => p.id || p.name), userInputs: inputsRecord, powerCost, forgedAt: Date.now() },
+  };
+}
+
 export function getCustomRelicPowers() {
   try {
     const arr = game.settings.get('vagabond-crawler', 'customRelicPowers');
