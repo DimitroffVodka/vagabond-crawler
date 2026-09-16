@@ -37,7 +37,17 @@ function _saveSpellState(actor, spell, state) {
 
 // ─── Mana Cost Calculator ─────────────────────────────────────────────────────
 
+// Vagabond 5.38's cost authority. The Crawler wraps it with the Magic Ward
+// surcharge (npc-abilities), so the strip charges exactly what the sheet's cast
+// dialog charges: dice-scaling spells, deferred Imbue mana, reduction order.
+let _SpellCastDialog = null;
+import("/systems/vagabond/module/applications/spell-cast-dialog.mjs")
+  .then(m => { _SpellCastDialog = m.SpellCastDialog ?? null; })
+  .catch(() => {});
+
 function _calcSpellCost(actor, spell, state) {
+  if (_SpellCastDialog?.calculateCosts) return _SpellCastDialog.calculateCosts(spell, actor, state);
+  // Older systems: local copy of the pre-dialog formula.
   const hasDamage = spell.system?.damageType !== "-" && state.damageDice >= 1;
   const damageCost = hasDamage && state.damageDice > 1 ? state.damageDice - 1 : 0;
   const fxCost = state.useFx && hasDamage ? 1 : 0;
