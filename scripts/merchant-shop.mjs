@@ -23,6 +23,12 @@ const GAMBLE_COSTS = {
 
 /** Convert a { gold, silver, copper } object to a single copper value.
  *  Vagabond currency: 100 copper = 1 silver, 100 silver = 1 gold. */
+/** An item's unit price: the system's derived cost (baseCost × metal multiplier —
+ *  silver is ×10) when present, else the stored baseCost. */
+function _unitPrice(item) {
+  return foundry.utils.deepClone(item?.system?.cost ?? item?.system?.baseCost ?? { gold: 0, silver: 0, copper: 0 });
+}
+
 function _toCopper(c) {
   return (c?.gold ?? 0) * 10000 + (c?.silver ?? 0) * 100 + (c?.copper ?? 0);
 }
@@ -243,7 +249,7 @@ export const MerchantShop = {
         img: i.img,
         uuid: i.uuid,
         type: i.type,
-        baseCost: foundry.utils.deepClone(i.system.baseCost ?? { gold: 0, silver: 0, copper: 0 }),
+        baseCost: _unitPrice(i),
         stock: i.getFlag(MODULE_ID, "unlimitedStock") ? -1 : (i.system.quantity ?? 1),
         itemData: i.toObject(),
         category: i.system.gearCategory || i.system.equipmentType || "Other",
@@ -608,7 +614,7 @@ export const MerchantShop = {
     if (!item) return this._broadcastError("Item not found in inventory.", userId);
 
     const sellRatio = this._app?._sellRatio ?? game.settings.get(MODULE_ID, "shopSellRatio") ?? 50;
-    const baseCost = item.system.baseCost ?? { gold: 0, silver: 0, copper: 0 };
+    const baseCost = _unitPrice(item);
     const unitSellPrice = _applySellRatio(baseCost, sellRatio);
     const totalCopper = _toCopper(unitSellPrice) * quantity;
     const totalSellPrice = _fromCopper(totalCopper);
@@ -636,7 +642,7 @@ export const MerchantShop = {
     });
 
     // Restock the merchant with the sold item
-    await this._restockMerchantInventory(itemData, quantity, originalUuid);
+    await this._restockMerchantInventory(itemData, quantity, originalUuid, baseCost);
 
     // Refresh open shop inventory if applicable
     if (this._app?.rendered) {
@@ -720,7 +726,7 @@ export const MerchantShop = {
     const doc = await fromUuid(itemUuid);
     if (!doc) return this._broadcastError("Item not found in compendium.", userId);
 
-    const baseCost = doc.system.baseCost ?? { gold: 0, silver: 0, copper: 0 };
+    const baseCost = _unitPrice(doc);
     const catMult = (buyMultiplier ?? this._app?._buyMultiplier ?? 100) / 100;
     const totalCopper = Math.round(_toCopper(baseCost) * catMult * quantity);
     const totalCost = _fromCopper(totalCopper);
@@ -905,8 +911,9 @@ export const MerchantShop = {
 
     // Chat message
     const itemIcon = result.items[0]?.img || "icons/svg/dice-target.svg";
+    const { itemValue } = await import("./loot-generator.mjs");
     const itemLines = result.items.map(it => {
-      const bc = it.system?.baseCost;
+      const bc = itemValue(it);
       const vp = [];
       if (bc?.gold) vp.push(`${bc.gold}g`);
       if (bc?.silver) vp.push(`${bc.silver}s`);
@@ -979,7 +986,7 @@ export const MerchantShop = {
     }
   },
 
-  async _restockMerchantInventory(itemData, quantity, originalUuid = null) {
+  async _restockMerchantInventory(itemData, quantity, originalUuid = null, unitPrice = null) {
     const mode = this._app?._mode ?? "compendium";
     if (mode === "actor" && this._app?._actorId) {
       const merchant = game.actors.get(this._app._actorId);
@@ -1005,7 +1012,7 @@ export const MerchantShop = {
         img: itemData.img,
         uuid: originalUuid,
         type: itemData.type,
-        baseCost: foundry.utils.deepClone(itemData.system.baseCost ?? { gold: 0, silver: 0, copper: 0 }),
+        baseCost: foundry.utils.deepClone(unitPrice ?? itemData.system.baseCost ?? { gold: 0, silver: 0, copper: 0 }),
         stock: quantity,
         itemData,
         category: itemData.system?.gearCategory || itemData.system?.equipmentType || "Other",
@@ -1047,7 +1054,7 @@ export const MerchantShop = {
       img: doc.img,
       uuid,
       type: doc.type,
-      baseCost: foundry.utils.deepClone(doc.system.baseCost ?? { gold: 0, silver: 0, copper: 0 }),
+      baseCost: _unitPrice(doc),
       stock,
       itemData: doc.toObject(),
       category: doc.system?.gearCategory || doc.system?.equipmentType || "Other",
@@ -1371,7 +1378,7 @@ class MerchantShopApp extends HandlebarsApplicationMixin(ApplicationV2) {
       sellItems = playerActor.items
         .filter(i => i.type === "equipment")
         .map(i => {
-          const baseCost = i.system.baseCost ?? { gold: 0, silver: 0, copper: 0 };
+          const baseCost = _unitPrice(i);
           const sellPrice = _applySellRatio(baseCost, this._sellRatio);
           return {
             id: i.id,

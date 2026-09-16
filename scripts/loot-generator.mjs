@@ -195,6 +195,16 @@ const ART_ICONS = {
  *  fails validation and the whole Item.create throws. */
 const _metalKey = (name) => name.toLowerCase().replace(/\s+(\w)/g, (_, c) => c.toUpperCase());
 
+/** Displayed value of item data: baseCost × the system's metal multiplier
+ *  (silver ×10, cold iron ×20…). Item data objects carry no derived `cost`;
+ *  relics don't use metal. */
+export function itemValue(d) {
+  const bc = d?.system?.baseCost ?? {};
+  const m = d?.system?.equipmentType === "relic" ? 1
+    : (CONFIG.VAGABOND?.metalData?.[d?.system?.metal]?.multiplier ?? 1);
+  return { gold: (bc.gold ?? 0) * m, silver: (bc.silver ?? 0) * m, copper: (bc.copper ?? 0) * m };
+}
+
 /** Build an equipment itemData object for loot.
  *
  * `cost` may be either a flat number (treated as gold for backward
@@ -308,14 +318,19 @@ function _powerGoldValue(powerText) {
   return 0;
 }
 
-/** Add relic power value to an item's baseCost. */
+/** Add relic power value to an item's baseCost. The system prices metal by
+ *  multiplying the whole baseCost (silver ×10…), so once `system.metal` is set
+ *  the multiplier already covers the material and the power's value is stored
+ *  divided by it — otherwise a 5000g power on silver would sell for 50000g. */
 function _addPowerValue(itemData, powerText, material) {
+  const mult = itemData.system?.equipmentType === "relic" ? 1
+    : (CONFIG.VAGABOND?.metalData?.[itemData.system?.metal]?.multiplier ?? 1);
   const powerGold = _powerGoldValue(powerText);
-  const matGold = (material && material !== "Mundane") ? (_powerGoldValue(material)) : 0;
+  const matGold = (mult === 1 && material && material !== "Mundane") ? (_powerGoldValue(material)) : 0;
   const extraGold = powerGold + matGold;
   if (extraGold > 0) {
     const bc = itemData.system.baseCost ?? { gold: 0, silver: 0, copper: 0 };
-    const totalCopper = (bc.gold ?? 0) * 10000 + (bc.silver ?? 0) * 100 + (bc.copper ?? 0) + extraGold * 10000;
+    const totalCopper = (bc.gold ?? 0) * 10000 + (bc.silver ?? 0) * 100 + (bc.copper ?? 0) + Math.round(extraGold * 10000 / mult);
     itemData.system.baseCost = {
       gold: Math.floor(totalCopper / 10000),
       silver: Math.floor((totalCopper % 10000) / 100),
@@ -978,7 +993,7 @@ export const LootGenerator = {
 
     // Build the chat card content
     const itemLines = items.map(d => {
-      const bc = d.system?.baseCost;
+      const bc = itemValue(d);
       const valParts = [];
       if (bc?.gold)   valParts.push(`${bc.gold}g`);
       if (bc?.silver) valParts.push(`${bc.silver}s`);
@@ -1129,7 +1144,7 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Sum value across all items (alchemy gives 2)
         let totalCopper = 0;
         for (const d of (h.itemData ?? [])) {
-          const bc = d.system?.baseCost;
+          const bc = itemValue(d);
           if (bc) totalCopper += (bc.gold ?? 0) * 10000 + (bc.silver ?? 0) * 100 + (bc.copper ?? 0);
         }
         const totalCost = totalCopper ? {
@@ -1723,7 +1738,7 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Item rows — vcl-gen-claim-item style, matches Roll for Selected Token + Loot Drops
     const itemLines = (entry.itemData ?? []).map(d => {
-      const bc = d.system?.baseCost;
+      const bc = itemValue(d);
       const vp = [];
       if (bc?.gold)   vp.push(`${bc.gold}g`);
       if (bc?.silver) vp.push(`${bc.silver}s`);
