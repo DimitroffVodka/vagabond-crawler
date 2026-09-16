@@ -323,19 +323,6 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
     if (costs.totalCost > (actor.system?.mana?.current   ?? 0))  { ui.notifications.error(`Not enough mana! Need ${costs.totalCost}.`); return; }
     if (costs.totalCost > (actor.system?.mana?.castingMax ?? 0)) { ui.notifications.error(`Exceeds casting max of ${actor.system?.mana?.castingMax}!`); return; }
 
-    // Imbue delivery: bypass d20/damage, delegate to VCE ImbueManager
-    const imbueHandler = game.vagabondCharacterEnhancer?.imbue?.handleImbueCast;
-    if (s.deliveryType === "imbue" && imbueHandler) {
-      const handled = await game.vagabondCharacterEnhancer.imbue.handleImbueCast(actor, spell, s, costs);
-      if (handled) {
-        s.damageDice = 1; s.deliveryIncrease = 0; s.useFx = spell.system?.damageType === "-";
-        s.previewActive = false; s.focusAfterCast = false;
-        _saveSpellState(actor, spell, s);
-        this.close();
-        return;
-      }
-    }
-
     const manaSkillKey = actor.system?.classData?.manaSkill;
     if (!manaSkillKey)                          { ui.notifications.error("No mana skill configured!"); return; }
     if (!actor.system?.classData?.isSpellcaster){ ui.notifications.warn("Your class cannot cast spells!"); return; }
@@ -345,9 +332,13 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
       return;
     }
 
-    const targets = Array.from(game.user.targets).map(t => ({
+    let targets = Array.from(game.user.targets).map(t => ({
       tokenId: t.id, sceneId: t.scene.id, actorId: t.actor?.id, actorName: t.name, actorImg: t.document.texture.src,
     }));
+    // Imbue is the system's native delivery (as SpellHandler._executeCast):
+    // no Cast Check, the spell goes onto targeted beings' equipped weapons,
+    // and damage/Effect are chosen and paid when the imbued attack hits.
+    const isImbue = s.deliveryType === "imbue";
 
     try {
       // ── Roll ──────────────────────────────────────────────────────────────
@@ -355,7 +346,7 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
       const difficulty = skill.difficulty;
       let roll = null, isSuccess = false, isCritical = false;
 
-      if (spell.system?.noRollRequired) {
+      if (spell.system?.noRollRequired || isImbue) {
         isSuccess = true;
       } else {
         const { VagabondRollBuilder } = await import("/systems/vagabond/module/helpers/roll-builder.mjs");
@@ -379,6 +370,29 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
         const critNum = VagabondRollBuilder.calculateCritThreshold(rollData, "spell");
         const d20 = roll.terms.find(t => t.constructor.name === "Die" && t.faces === 20);
         isCritical = (d20?.results?.[0]?.result ?? 0) >= critNum;
+      }
+
+      if (isImbue) {
+        const { VagabondImbueHelper } = await import("/systems/vagabond/module/helpers/imbue-helper.mjs");
+        const count = CONFIG.VAGABOND.deliveryBaseRanges.imbue.value
+          + CONFIG.VAGABOND.deliveryIncrement.imbue * s.deliveryIncrease;
+        const assignments = await VagabondImbueHelper.resolveTargetWeapons(Array.from(game.user.targets), count);
+        if (!assignments.length) return;  // no weapons / picker cancelled — nothing spent
+        const upfront = game.settings.get("vagabond", "imbueUpfrontMana");
+        for (const { weapon } of assignments) {
+          await VagabondImbueHelper.imbueWeapon(weapon, {
+            sourceActor: actor, spell,
+            damageDice: upfront ? s.damageDice : 0,
+            deferredMana: upfront ? costs.deferredMana : 0,
+            deferredPayment: !upfront,
+            manaSkillKey,
+          });
+        }
+        targets = assignments.map(({ targetActor, weapon }) => {
+          const tokenDoc = targetActor.token ?? targetActor.getActiveTokens(true)[0]?.document;
+          return { tokenId: tokenDoc?.id ?? null, sceneId: tokenDoc?.parent?.id ?? null, actorId: targetActor.id,
+            actorName: weapon.name, subName: tokenDoc?.name ?? targetActor.name, actorImg: weapon.img };
+        });
       }
 
       // A failed Cast Check pays per the 5.38 spellManaOnCastFail world setting
@@ -429,7 +443,7 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
       const { VagabondDamageHelper } = await import("/systems/vagabond/module/helpers/damage-helper.mjs");
       const manaSkill = actor.system.skills[manaSkillKey];
       let damageRoll = null;
-      if (spell.system?.damageType !== "-" && s.damageDice > 0 && VagabondDamageHelper.shouldRollDamage(isSuccess)) {
+      if (!isImbue && spell.system?.damageType !== "-" && s.damageDice > 0 && VagabondDamageHelper.shouldRollDamage(isSuccess)) {
         damageRoll = await VagabondDamageHelper.rollSpellDamage(actor, spell, s, isCritical, manaSkill?.stat ?? "reason");
       }
 
