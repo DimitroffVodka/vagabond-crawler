@@ -6,6 +6,8 @@
 
 Tested live against vagabond 5.38.1 on Foundry 14.367 — `await game.vagabondCrawler.test.run()` returned `total: 121, passed: 121, failed: 0`.
 
+- Weapon attacks from the strip honour VCE's Spin-to-Win cap lift and Monk Martial Arts Cleave lend (read from `game.vagabondCharacterEnhancer.cleaveTargetCap` / `monkLendsCleave` when VCE is active).
+
 - **Wraps forward every argument.** `rollAttack` / `rollDamage` wraps dropped 5.38's new targets, die-override and skill arguments.
 - **Crawl Strip matches the sheet.**
   - Weapon attacks: favor/hinder, the roll-damage setting, targets and skill, 5.38 Cleave (die steps down per extra target).
