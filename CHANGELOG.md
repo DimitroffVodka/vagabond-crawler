@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.19.0
 
 ### Vagabond 5.38.1 compatibility
 
