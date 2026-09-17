@@ -887,29 +887,38 @@ async function _fireAction(actor, type, indexStr, itemId) {
       // weakness pre-rolls and per-die bonus doubling.
       // Cleave (5.38, as RollHandler.rollWeapon): each extra Target steps the damage die
       // down one size, capped by the steps the base die has left; without Cleave an
-      // attack has one Target.
-      let cleaveDieOverride = null;
-      const dieSteps = CONFIG.VAGABOND?.weaponDieSteps;
-      if (dieSteps && item.system.properties?.includes("Cleave")) {
-        const baseIdx = dieSteps.indexOf(parseInt(item.system.currentDamage?.match(/d(\d+)/i)?.[1], 10));
-        const maxTargets = 1 + Math.max(0, baseIdx);
-        if (targets.length > maxTargets) targets.splice(maxTargets);
-        if (targets.length > 1 && baseIdx >= 0) cleaveDieOverride = dieSteps[Math.max(0, baseIdx - (targets.length - 1))];
-      } else if (dieSteps && targets.length > 1) {
-        targets.splice(1);
+      // attack has one Target. VCE, when present, lends Cleave (Monk Martial
+      // Arts) and lifts the cap (Spin-to-Win) — the sheet path gets the same
+      // from VCE's RollHandler.rollWeapon patch, which this strip bypasses.
+      const vce = game.vagabondCharacterEnhancer;
+      const lentCleave = !!vce?.monkLendsCleave?.(actor, item);
+      if (lentCleave) item.system.properties = [...(item.system.properties ?? []), "Cleave"];
+      try {
+        let cleaveDieOverride = null;
+        const dieSteps = CONFIG.VAGABOND?.weaponDieSteps;
+        if (dieSteps && item.system.properties?.includes("Cleave")) {
+          const baseIdx = dieSteps.indexOf(parseInt(item.system.currentDamage?.match(/d(\d+)/i)?.[1], 10));
+          const maxTargets = vce?.cleaveTargetCap?.(actor, item) ?? (1 + Math.max(0, baseIdx));
+          if (targets.length > maxTargets) targets.splice(maxTargets);
+          if (targets.length > 1 && baseIdx >= 0) cleaveDieOverride = dieSteps[Math.max(0, baseIdx - (targets.length - 1))];
+        } else if (dieSteps && targets.length > 1) {
+          targets.splice(1);
+        }
+        const attackResult = await item.rollAttack(actor, actor.system?.favorHinder || "none");
+        if (!attackResult) return;
+        // Animation FX is played by AnimationFx._onChatMessage on the
+        // createChatMessage hook below — covers every UI path uniformly.
+        let damageRoll = null;
+        const isHit = attackResult.isHit ?? false;
+        const { VagabondDamageHelper } = await import("/systems/vagabond/module/helpers/damage-helper.mjs");
+        if (VagabondDamageHelper.shouldRollDamage?.(isHit || attackResult.isCritical) ?? (isHit || attackResult.isCritical)) {
+          damageRoll = await item.rollDamage(actor, attackResult.isCritical, attackResult.weaponSkill?.stat ?? null,
+            targets, cleaveDieOverride, attackResult.weaponSkillKey);
+        }
+        await VagabondChatCard.weaponAttack(actor, item, attackResult, damageRoll, targets);
+      } finally {
+        if (lentCleave) item.system.properties = item.system.properties.filter(p => p !== "Cleave");
       }
-      const attackResult = await item.rollAttack(actor, actor.system?.favorHinder || "none");
-      if (!attackResult) return;
-      // Animation FX is played by AnimationFx._onChatMessage on the
-      // createChatMessage hook below — covers every UI path uniformly.
-      let damageRoll = null;
-      const isHit = attackResult.isHit ?? false;
-      const { VagabondDamageHelper } = await import("/systems/vagabond/module/helpers/damage-helper.mjs");
-      if (VagabondDamageHelper.shouldRollDamage?.(isHit || attackResult.isCritical) ?? (isHit || attackResult.isCritical)) {
-        damageRoll = await item.rollDamage(actor, attackResult.isCritical, attackResult.weaponSkill?.stat ?? null,
-          targets, cleaveDieOverride, attackResult.weaponSkillKey);
-      }
-      await VagabondChatCard.weaponAttack(actor, item, attackResult, damageRoll, targets);
 
       // NOTE: Alchemical post-attack effects are handled by vagabond-character-enhancer.
 
