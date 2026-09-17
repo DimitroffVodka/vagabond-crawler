@@ -37,7 +37,23 @@ function _saveSpellState(actor, spell, state) {
 
 // ─── Mana Cost Calculator ─────────────────────────────────────────────────────
 
+// Vagabond 5.38's cost authority. The Crawler wraps it with the Magic Ward
+// surcharge (npc-abilities), so the strip charges exactly what the sheet's cast
+// dialog charges: dice-scaling spells, deferred Imbue mana, reduction order.
+let _SpellCastDialog = null;
+import("/systems/vagabond/module/applications/spell-cast-dialog.mjs")
+  .then(m => { _SpellCastDialog = m.SpellCastDialog ?? null; })
+  .catch(() => {});
+// 5.38 cast gates the sheet enforces: the Trinket requirement (world setting
+// trinketCastRequirement) lives on SpellHandler and only reads this.actor.
+let _SpellHandler = null;
+import("/systems/vagabond/module/sheets/handlers/spell-handler.mjs")
+  .then(m => { _SpellHandler = m.SpellHandler ?? null; })
+  .catch(() => {});
+
 function _calcSpellCost(actor, spell, state) {
+  if (_SpellCastDialog?.calculateCosts) return _SpellCastDialog.calculateCosts(spell, actor, state);
+  // Older systems: local copy of the pre-dialog formula.
   const hasDamage = spell.system?.damageType !== "-" && state.damageDice >= 1;
   const damageCost = hasDamage && state.damageDice > 1 ? state.damageDice - 1 : 0;
   const fxCost = state.useFx && hasDamage ? 1 : 0;
@@ -147,7 +163,7 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
     const html = `
       <div class="csd-header">
         <img src="${spell.img}" width="36" height="36" style="border-radius:4px">
-        <div><strong>${spell.name}</strong><div class="csd-muted">${spell.system?.effect ?? ""}</div></div>
+        <div><strong>${spell.name}</strong><div class="csd-muted">${spell.system?.duration ?? ""}</div></div>
       </div>
       <div class="csd-section">${damageSection}</div>
       <div class="csd-section">
@@ -247,49 +263,43 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
     if (!s.deliveryType) { ui.notifications.warn("Select a delivery type first!"); return; }
     const noTemplate = ['touch', 'remote', 'imbue', 'glyph'];
     if (noTemplate.includes(s.deliveryType)) { ui.notifications.info(`${s.deliveryType} delivery does not use an area template.`); return; }
-    // If preview exists, make it permanent
+    // Vagabond 5.38 draws spell areas as Regions via its template manager:
+    // sheet previews live in activePreviews, placed areas in chatRegions, and
+    // any untracked spell Region is deleted as an orphan on the next preview.
     const mgr = globalThis.vagabond?.managers?.templates;
+    if (!mgr?._constructRegionData) { ui.notifications.warn("Spell area templates are unavailable."); return; }
+    const track = (region) => mgr.chatRegions?.set(`crawler-${region.id}`, region.id);
+
+    // If preview exists, make it permanent
     const key = `${this.actor.id}-${this.spell.id}`;
-    const previewId = mgr?.activePreviews?.get(key);
-    if (previewId) {
-      const template = canvas.scene.templates.get(previewId);
-      if (template) {
-        await template.update({ "flags.vagabond.isPreview": false });
-        mgr.activePreviews.delete(key);
-        this.spellState.previewActive = false;
-        _saveSpellState(this.actor, this.spell, this.spellState);
-        this.render();
-        ui.notifications.info("Template placed.");
-        return;
-      }
+    const preview = canvas.scene.regions.get(mgr.activePreviews?.get(key));
+    if (preview) {
+      await preview.update({ "flags.vagabond.isPreview": false, "flags.vagabond.deliveryType": s.deliveryType });
+      mgr.activePreviews.delete(key);
+      track(preview);
+      this.spellState.previewActive = false;
+      _saveSpellState(this.actor, this.spell, this.spellState);
+      this.render();
+      ui.notifications.info("Template placed.");
+      return;
     }
-    // No preview — create from caster position
+    // No preview — build the area from the caster/targets the way the system does
     const base = CONFIG.VAGABOND.deliveryBaseRanges?.[s.deliveryType];
     const inc  = CONFIG.VAGABOND.deliveryIncrement?.[s.deliveryType];
     const dist = base?.value ? base.value + inc * s.deliveryIncrease : 0;
     if (!dist) return;
     const token = this.actor.token?.object || this.actor.getActiveTokens()[0];
-    const templateData = {
-      distance: dist, fillColor: game.user.color || '#FF0000',
-      direction: token?.document?.rotation || 0,
-      flags: { vagabond: { spellId: this.spell.id, actorId: this.actor.id } },
-    };
-    switch (s.deliveryType) {
-      case 'aura':   templateData.t = 'circle'; templateData.x = token?.center?.x ?? 0; templateData.y = token?.center?.y ?? 0; break;
-      case 'cone':   templateData.t = 'cone'; templateData.angle = 90; templateData.x = token?.center?.x ?? 0; templateData.y = token?.center?.y ?? 0; break;
-      case 'line':   templateData.t = 'ray'; templateData.width = canvas.scene?.grid?.distance ?? 5; templateData.x = token?.center?.x ?? 0; templateData.y = token?.center?.y ?? 0; break;
-      case 'sphere': { templateData.t = 'circle'; const tgt = game.user.targets.first(); templateData.x = tgt?.center?.x ?? token?.center?.x ?? 0; templateData.y = tgt?.center?.y ?? token?.center?.y ?? 0; break; }
-      case 'cube': {
-        templateData.t = 'rect'; templateData.distance = dist * Math.sqrt(2); templateData.direction = 45;
-        const tgt2 = game.user.targets.first();
-        const cx = tgt2?.center?.x ?? token?.center?.x ?? 0; const cy = tgt2?.center?.y ?? token?.center?.y ?? 0;
-        const gridPx = canvas.grid?.size ?? 100; const gridDist = canvas.scene?.grid?.distance ?? 5;
-        const sidePx = (dist / gridDist) * gridPx;
-        templateData.x = cx - sidePx / 2; templateData.y = cy - sidePx / 2; break;
-      }
-      default: ui.notifications.warn(`No template for delivery type: ${s.deliveryType}`); return;
+    const targets = Array.from(game.user.targets);
+    const regionData = mgr._constructRegionData({
+      type: s.deliveryType, distance: dist, token, targets: game.user.targets,
+      centroid: targets.length ? mgr._calculateTargetCentroid(targets) : null, notify: true,
+    });
+    if (!regionData) return;
+    regionData.flags = { vagabond: { deliveryType: s.deliveryType } };
+    try {
+      const [region] = await canvas.scene.createEmbeddedDocuments("Region", [regionData]);
+      if (region) { track(region); ui.notifications.info("Template placed."); }
     }
-    try { await canvas.scene.createEmbeddedDocuments('MeasuredTemplate', [templateData]); ui.notifications.info("Template placed."); }
     catch (err) { console.error("Vagabond Crawler | Template placement failed:", err); }
   }
   async _cast() {
@@ -304,21 +314,14 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
     const costs = _calcSpellCost(actor, spell, s);
 
     if (!s.deliveryType)                                          { ui.notifications.warn("Select a delivery type first!"); return; }
+    const trinketGate = _SpellHandler?.prototype?._trinketGateStatus?.call({ actor }) ?? { status: "ok" };
+    if (trinketGate.status !== "ok") {
+      const suffix = trinketGate.status === "block" ? "GateBlocked" : "GateWarned";
+      ui.notifications.warn(game.i18n.localize(`VAGABOND.SpellCast.${trinketGate.reason}${suffix}`));
+      if (trinketGate.status === "block") return;
+    }
     if (costs.totalCost > (actor.system?.mana?.current   ?? 0))  { ui.notifications.error(`Not enough mana! Need ${costs.totalCost}.`); return; }
     if (costs.totalCost > (actor.system?.mana?.castingMax ?? 0)) { ui.notifications.error(`Exceeds casting max of ${actor.system?.mana?.castingMax}!`); return; }
-
-    // Imbue delivery: bypass d20/damage, delegate to VCE ImbueManager
-    const imbueHandler = game.vagabondCharacterEnhancer?.imbue?.handleImbueCast;
-    if (s.deliveryType === "imbue" && imbueHandler) {
-      const handled = await game.vagabondCharacterEnhancer.imbue.handleImbueCast(actor, spell, s, costs);
-      if (handled) {
-        s.damageDice = 1; s.deliveryIncrease = 0; s.useFx = spell.system?.damageType === "-";
-        s.previewActive = false; s.focusAfterCast = false;
-        _saveSpellState(actor, spell, s);
-        this.close();
-        return;
-      }
-    }
 
     const manaSkillKey = actor.system?.classData?.manaSkill;
     if (!manaSkillKey)                          { ui.notifications.error("No mana skill configured!"); return; }
@@ -329,9 +332,13 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
       return;
     }
 
-    const targets = Array.from(game.user.targets).map(t => ({
+    let targets = Array.from(game.user.targets).map(t => ({
       tokenId: t.id, sceneId: t.scene.id, actorId: t.actor?.id, actorName: t.name, actorImg: t.document.texture.src,
     }));
+    // Imbue is the system's native delivery (as SpellHandler._executeCast):
+    // no Cast Check, the spell goes onto targeted beings' equipped weapons,
+    // and damage/Effect are chosen and paid when the imbued attack hits.
+    const isImbue = s.deliveryType === "imbue";
 
     try {
       // ── Roll ──────────────────────────────────────────────────────────────
@@ -339,7 +346,7 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
       const difficulty = skill.difficulty;
       let roll = null, isSuccess = false, isCritical = false;
 
-      if (spell.system?.noRollRequired) {
+      if (spell.system?.noRollRequired || isImbue) {
         isSuccess = true;
       } else {
         const { VagabondRollBuilder } = await import("/systems/vagabond/module/helpers/roll-builder.mjs");
@@ -365,6 +372,38 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
         isCritical = (d20?.results?.[0]?.result ?? 0) >= critNum;
       }
 
+      if (isImbue) {
+        const { VagabondImbueHelper } = await import("/systems/vagabond/module/helpers/imbue-helper.mjs");
+        const count = CONFIG.VAGABOND.deliveryBaseRanges.imbue.value
+          + CONFIG.VAGABOND.deliveryIncrement.imbue * s.deliveryIncrease;
+        const assignments = await VagabondImbueHelper.resolveTargetWeapons(Array.from(game.user.targets), count);
+        if (!assignments.length) return;  // no weapons / picker cancelled — nothing spent
+        const upfront = game.settings.get("vagabond", "imbueUpfrontMana");
+        for (const { weapon } of assignments) {
+          await VagabondImbueHelper.imbueWeapon(weapon, {
+            sourceActor: actor, spell,
+            damageDice: upfront ? s.damageDice : 0,
+            deferredMana: upfront ? costs.deferredMana : 0,
+            deferredPayment: !upfront,
+            manaSkillKey,
+          });
+        }
+        targets = assignments.map(({ targetActor, weapon }) => {
+          const tokenDoc = targetActor.token ?? targetActor.getActiveTokens(true)[0]?.document;
+          return { tokenId: tokenDoc?.id ?? null, sceneId: tokenDoc?.parent?.id ?? null, actorId: targetActor.id,
+            actorName: weapon.name, subName: tokenDoc?.name ?? targetActor.name, actorImg: weapon.img };
+        });
+      }
+
+      // A failed Cast Check pays per the 5.38 spellManaOnCastFail world setting
+      // (successOnly / fullOnFail / halfOnFail), as SpellHandler._executeCast does.
+      if (!isSuccess) {
+        let failMode = "successOnly";
+        try { failMode = game.settings.get("vagabond", "spellManaOnCastFail"); } catch (e) { /* pre-5.38 */ }
+        const failCost = failMode === "fullOnFail" ? costs.totalCost
+          : failMode === "halfOnFail" ? Math.ceil(costs.totalCost / 2) : 0;
+        if (failCost > 0) await actor.update({ "system.mana.current": Math.max(0, actor.system.mana.current - failCost) });
+      }
       if (isSuccess) {
         await actor.update({ "system.mana.current": Math.max(0, actor.system.mana.current - costs.totalCost) });
 
@@ -404,7 +443,7 @@ export class CrawlerSpellDialog extends foundry.applications.api.ApplicationV2 {
       const { VagabondDamageHelper } = await import("/systems/vagabond/module/helpers/damage-helper.mjs");
       const manaSkill = actor.system.skills[manaSkillKey];
       let damageRoll = null;
-      if (spell.system?.damageType !== "-" && s.damageDice > 0 && VagabondDamageHelper.shouldRollDamage(isSuccess)) {
+      if (!isImbue && spell.system?.damageType !== "-" && s.damageDice > 0 && VagabondDamageHelper.shouldRollDamage(isSuccess)) {
         damageRoll = await VagabondDamageHelper.rollSpellDamage(actor, spell, s, isCritical, manaSkill?.stat ?? "reason");
       }
 
@@ -449,9 +488,12 @@ function _npcDmgLabel(action) {
 }
 
 function _weaponDmgLabel(item) {
-  const dmg = item.system?.damageTwoHands || item.system?.damageOneHand;
+  const dmg = item.system?.currentDamage || item.system?.damageTwoHands || item.system?.damageOneHand;
   if (!dmg) return "";
-  const type = item.system?.damageType && item.system.damageType !== "-" ? ` ${item.system.damageType}` : "";
+  // Weapons keep their type per grip (damageTypeOneHand/TwoHands → derived currentDamageType);
+  // the general damageType stays "-" for them.
+  const dmgType = item.system?.currentDamageType ?? item.system?.damageType;
+  const type = dmgType && dmgType !== "-" ? ` ${dmgType}` : "";
   return `<span class="vcs-menu-dmg">${dmg}${type}</span>`;
 }
 
@@ -839,15 +881,33 @@ async function _fireAction(actor, type, indexStr, itemId) {
       const item = actor.items.get(itemId); if (!item) return;
       await applyPackInstincts(actor);
       const { VagabondChatCard } = globalThis.vagabond.utils;
-      const attackResult = await item.rollAttack(actor);
+      // Mirror the sheet path (RollHandler.rollWeapon) for the parts that change
+      // the numbers: the actor's own favor/hinder, the system's roll-damage
+      // settings, and the targets + swung skill rollDamage needs on 5.38 for
+      // weakness pre-rolls and per-die bonus doubling.
+      // Cleave (5.38, as RollHandler.rollWeapon): each extra Target steps the damage die
+      // down one size, capped by the steps the base die has left; without Cleave an
+      // attack has one Target.
+      let cleaveDieOverride = null;
+      const dieSteps = CONFIG.VAGABOND?.weaponDieSteps;
+      if (dieSteps && item.system.properties?.includes("Cleave")) {
+        const baseIdx = dieSteps.indexOf(parseInt(item.system.currentDamage?.match(/d(\d+)/i)?.[1], 10));
+        const maxTargets = 1 + Math.max(0, baseIdx);
+        if (targets.length > maxTargets) targets.splice(maxTargets);
+        if (targets.length > 1 && baseIdx >= 0) cleaveDieOverride = dieSteps[Math.max(0, baseIdx - (targets.length - 1))];
+      } else if (dieSteps && targets.length > 1) {
+        targets.splice(1);
+      }
+      const attackResult = await item.rollAttack(actor, actor.system?.favorHinder || "none");
       if (!attackResult) return;
       // Animation FX is played by AnimationFx._onChatMessage on the
       // createChatMessage hook below — covers every UI path uniformly.
-      // Damage roll if hit
       let damageRoll = null;
       const isHit = attackResult.isHit ?? false;
-      if (isHit || attackResult.isCritical) {
-        damageRoll = await item.rollDamage(actor, attackResult.isCritical, attackResult.weaponSkill?.stat ?? null);
+      const { VagabondDamageHelper } = await import("/systems/vagabond/module/helpers/damage-helper.mjs");
+      if (VagabondDamageHelper.shouldRollDamage?.(isHit || attackResult.isCritical) ?? (isHit || attackResult.isCritical)) {
+        damageRoll = await item.rollDamage(actor, attackResult.isCritical, attackResult.weaponSkill?.stat ?? null,
+          targets, cleaveDieOverride, attackResult.weaponSkillKey);
       }
       await VagabondChatCard.weaponAttack(actor, item, attackResult, damageRoll, targets);
 

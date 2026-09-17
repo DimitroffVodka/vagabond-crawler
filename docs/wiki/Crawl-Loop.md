@@ -46,7 +46,7 @@ In combat, the budget uses the fastest available movement mode: walk, fly, swim,
 
 Hover a card during combat to open its action tabs. PC cards show **Weapons** and **Spells**, plus situational tabs such as Craft, Beast, Step Up, Virtuoso, or Specialty. NPC cards show **Actions** and **Abilities**.
 
-Click a weapon or NPC action to use Vagabond's normal attack path, including VCE's Favor and Hinder handling when that module is active. Spells open the shared **Cast Spell Dialog**, where you can choose delivery, adjust damage dice, toggle FX, increase area or range, and mark a Focus cast. The mana total updates with those choices and includes Magic Ward surcharges from targeted enemies. Only the card's owners see its menu. The older **NPC Action Menu** setting no longer exists; the menu now depends on ownership and an active combat.
+Click a weapon or NPC action to use Vagabond's normal attack path, including VCE's Favor and Hinder handling when that module is active. Spells open the shared **Cast Spell Dialog**, where you can choose delivery, adjust damage dice, toggle FX, increase area or range, and mark a Focus cast. Strip rolls follow the sheet's 5.38 rules: Cleave steps the damage die down per extra target, spell costs use the system calculator with the Trinket gate and the failed-cast mana setting, Imbue is the system's own, and Place Template makes a Region. The mana total updates with those choices and includes Magic Ward surcharges from targeted enemies. Only the card's owners see its menu. The older **NPC Action Menu** setting no longer exists; the menu now depends on ownership and an active combat.
 
 #### HP + Stats Quick Reference
 

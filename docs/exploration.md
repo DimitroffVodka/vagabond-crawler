@@ -99,6 +99,17 @@ Small monsters always use `HP = max(1, HD)` regardless of die — small things a
 
 Tracks burn time and Foundry light settings for every torch, candle, and lantern the party carries. Twelve source types ship with the module, each with its own bright/dim radius, color, animation, and fuel behavior. Burn time deducts from the world time — either per crawl turn (`Time Passes` button) or in real time while Foundry is unpaused. Lanterns consume oil when burn time reaches zero (and auto-refuel if the carrier has more oil), while torches and candles simply go out.
 
+**Vagabond 5.23+ light items.** Torches, lanterns, candles, lamps and sunrods from the system compendium carry a Use macro, and the system lights them: **Use** the item, pick a burn mode (lit, real-time, hour clock, quarter clock), and it restores the token's old light when the clock runs out or you douse it. The Crawler's right-click Light entry skips those items and adds three things on top:
+
+- **Oil.** A lantern or lamp won't light without oil, and lighting it uses one oil.
+- **Burn-out keeps the lantern.** The system would delete a burned-out lantern; the Crawler posts "burned through its oil" instead.
+- **Crawl turns tick hour clocks.** Time Passes moves each light's 6-segment hour clock down one segment per 10 minutes, and the light FX follows the token's light.
+
+- **Drop a lit one on the canvas.** It lands as a light token with the same light and the rest of its burn clock; the holder goes dark and nothing is consumed. Pick it up from the Token HUD and the new holder lights up with the remaining clock. An unlit system light drops like any other item. A dropped torch that burns out disappears; a dropped lantern that runs dry stays on the floor.
+- **Party tokens.** Gathering a member with a lit system light moves the light and its clock onto the party token; releasing hands them back. If it burns out while gathered, the member comes back with it out.
+
+- **Light Tracker window.** System lights are listed under their token's character (or "Dropped" / the party token) with a time bar: real-time clocks count down in minutes, hour clocks show 10 minutes per segment, quarter clocks 6 hours. **+ / −** add or burn that much time on their clocks too, and the douse button puts the light out (deleting its clock, or dousing a no-timer light).
+
 ### How to use
 
 1. **Light a source.** Right-click any supported item in inventory → **Light**. The token's Foundry light properties switch to the configured bright/dim/color/animation, and burn time starts counting down.

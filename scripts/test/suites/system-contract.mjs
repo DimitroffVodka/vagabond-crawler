@@ -43,6 +43,39 @@ const PATCH_TARGETS = [
   ["sheets/handlers/spell-handler.mjs",  "SpellHandler",         "prototype._calculateSpellCost"],
   ["applications/spell-cast-dialog.mjs", "SpellCastDialog",      "calculateCosts"],
   ["applications/level-up-dialog.mjs",   "LevelUpDialog",        "prototype._prepareQuestionnaireContext"],
+  ["sheets/handlers/inventory-handler.mjs", "InventoryHandler",   "prototype.prepareInventoryGrid"],
+  ["helpers/damage-helper.mjs",          "VagabondDamageHelper", "calculateFinalDamageDetailed"],
+  ["helpers/damage-helper.mjs",          "VagabondDamageHelper", "_hasStatusResistanceForSave"],
+  ["helpers/damage-helper.mjs",          "VagabondDamageHelper", "handleApplyRestorative"],
+  ["helpers/status-helper.mjs",          "StatusHelper",         "applyStatus"],
+  ["helpers/status-helper.mjs",          "StatusHelper",         "_createStatusCountdown"],
+  ["documents/countdown-dice.mjs",       "CountdownDice",        "create"],
+  ["helpers/light-source.mjs",           "LightSource",          "use"],
+  ["helpers/light-source.mjs",           "LightSource",          "_consumeLitItem"],
+];
+
+/**
+ * System methods the Crawler CALLS without wrapping — many private
+ * (underscore) ones, so they can be renamed in any release. A rename would
+ * make the feature throw at the table instead of failing here.
+ */
+const CALLED_TARGETS = [
+  ["helpers/light-source.mjs",           "LightSource",          "isLightItem"],
+  ["helpers/light-source.mjs",           "LightSource",          "isItemLit"],
+  ["helpers/light-source.mjs",           "LightSource",          "douse"],
+  ["helpers/light-source.mjs",           "LightSource",          "tickRealtime"],
+  ["helpers/light-source.mjs",           "LightSource",          "_resolveTokenDoc"],
+  ["helpers/light-source.mjs",           "LightSource",          "_applyLight"],
+  ["helpers/light-source.mjs",           "LightSource",          "_restoreLight"],
+  ["helpers/light-source.mjs",           "LightSource",          "_occupyHands"],
+  ["helpers/light-source.mjs",           "LightSource",          "_createClockGM"],
+  ["helpers/light-source.mjs",           "LightSource",          "_deleteClock"],
+  ["documents/progress-clock.mjs",       "ProgressClock",        "getAll"],
+  ["helpers/imbue-helper.mjs",           "VagabondImbueHelper",  "resolveTargetWeapons"],
+  ["helpers/imbue-helper.mjs",           "VagabondImbueHelper",  "imbueWeapon"],
+  ["helpers/status-helper.mjs",          "StatusHelper",         "dealTickDamage"],
+  ["helpers/chat-card.mjs",              "VagabondChatCard",     "createActionCard"],
+  ["sheets/handlers/spell-handler.mjs",  "SpellHandler",         "prototype._trinketGateStatus"],
 ];
 
 /**
@@ -76,6 +109,7 @@ const BACKED_AE_PATHS = [
   "system.saves.reflex.bonus",
   "system.saves.will.bonus",
   "system.speed.bonus",
+  "system.statusResistances",
   "system.universalSpellDamageBonus",
   "system.universalWeaponDamageBonus",
 ];
@@ -96,21 +130,21 @@ const BACKED_AE_PATHS = [
  * They are not system drift: none of these fields existed at v5.8.0 either, so
  * the 5.36.0 jump did not remove them — they were never there.
  *
+ * 2026-09-16: Bravery/Clarity/Repulsing moved to system.statusResistances,
+ * Burning I-III to item causedStatuses, and the cursed auto-fail saves to a
+ * StatusHelper.applyStatus wrap (relic-effects) — removed from this list.
+ * Nightvision/Truesight/Tremors/Echolocation/Sense Life (token vision and
+ * detection modes) and Cursed Doom (restorative cap) likewise moved to flag
+ * consumers in relic-effects.
+ *
  * This list PINS the damage rather than blessing it. The growth check below
  * fails if a new dead path appears, so the set cannot quietly expand while the
  * open question — implement the consumers, or strip the ineffective changes —
  * is still being triaged.
  */
 const KNOWN_DEAD_AE_PATHS = [
-  "system.autoFailSaveVs.berserk",
-  "system.autoFailSaveVs.charmed",
-  "system.autoFailSaveVs.frightened",
   "system.breatheUnderwater",
   "system.cannotBeSurprised",
-  "system.favorOnSaveVs.charmed",
-  "system.favorOnSaveVs.confused",
-  "system.favorOnSaveVs.frightened",
-  "system.healingCappedPerDie",
   "system.movement.blink",
   "system.movement.climb",
   "system.movement.cling",
@@ -118,15 +152,9 @@ const KNOWN_DEAD_AE_PATHS = [
   "system.movement.levitate",
   "system.movement.waterwalk",
   "system.movement.webwalk",
-  "system.onHitBurningDice",
-  "system.senses.allsight",
-  "system.senses.darksight",
   "system.senses.detection",
-  "system.senses.echolocation",
-  "system.senses.senseLife",
   "system.senses.senseValuables",
   "system.senses.telepathy",
-  "system.senses.tremorsense",
   "system.speakAllLanguages",
 ];
 
@@ -169,11 +197,11 @@ export function register() {
   suite("System Contract", () => {
 
     // ── The system still exposes every method we patch ────────────────────
-    case_("every monkey-patched system method still exists", async () => {
+    case_("every system method the Crawler patches or calls still exists", async () => {
       const missing = [];
       const cache = new Map();
 
-      for (const [file, exportName, path] of PATCH_TARGETS) {
+      for (const [file, exportName, path] of [...PATCH_TARGETS, ...CALLED_TARGETS]) {
         const spec = `${SYS}/${file}`;
         if (!cache.has(spec)) {
           try { cache.set(spec, await import(spec)); }
@@ -232,6 +260,13 @@ export function register() {
         .filter(([k]) => !known.has(k) && !_resolvesAnywhere(k, pc, npc))
         .map(([k, owner]) => `${k} (power "${owner}")`);
       expect(`new dead paths: ${surprises.join(", ")}`).toBe("new dead paths: ");
+    });
+
+    // ── The status the Flanking Checker defers to ─────────────────────────
+    case_("vagabond 5.38+ still registers the `flanked` status the checker idles on", async () => {
+      if (foundry.utils.isNewerVersion("5.38", game.system.version)) return;
+      // Renamed → FlankingChecker wakes up and stacks a second Vulnerable on every flanked token.
+      expect(CONFIG.statusEffects.some(s => s.id === "flanked")).toBe(true);
     });
 
     // ── Declared compatibility hasn't fallen behind reality ───────────────

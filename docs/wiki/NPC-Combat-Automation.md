@@ -32,7 +32,7 @@ The generated [`docs/audit/abilities.md`](https://github.com/DimitroffVodka/vaga
 
 ### Flanking Checker
 
-During combat, two allied tokens within 5 feet can flank a foe no more than one size larger than the flankers. The foe gains **Vulnerable**. This works in both directions: heroes can flank NPCs, and NPCs can flank heroes. The GM client evaluates the positions and records the effect Crawler added, so removing a flank does not remove Vulnerable from some other spell or ability. Unlinked NPC tokens are supported.
+On Vagabond 5.38 and later the system flanks tokens itself (the **Flanked** status), so Crawler's checker stays idle. On older versions: during combat, two allied tokens within 5 feet can flank a foe no more than one size larger than the flankers. The foe gains **Vulnerable**. This works in both directions: heroes can flank NPCs, and NPCs can flank heroes. The GM client evaluates the positions and records the effect Crawler added, so removing a flank does not remove Vulnerable from some other spell or ability. Unlinked NPC tokens are supported.
 
 ### Countdown Dice Auto-Roller
 

@@ -51,7 +51,7 @@ Hide/show uses a 200ms timer — hovering the card or panel keeps it alive, leav
 | `spell` | Opens `CrawlerSpellDialog` |
 | `craft` | `craftItem(actor, craftName, true)` (5s quick craft) |
 
-Weapon attacks respect the actor's `favorHinder` state and trigger alchemical post-attack hooks automatically via `createChatMessage`.
+Weapon attacks mirror `RollHandler.rollWeapon`: the actor's `favorHinder`, the system's roll-damage setting, the targets and swung skill that `rollDamage` needs on 5.38, and Cleave — each extra Target steps the damage die down one size, capped by the steps the base die has left. Alchemical post-attack hooks fire via `createChatMessage`.
 
 ### Spell Dialog (`CrawlerSpellDialog`)
 
@@ -61,20 +61,19 @@ ApplicationV2 window for casting spells with full control over:
 - **Include Effect**: Toggle spell effect on/off (+1 mana if combined with damage)
 - **Delivery Type**: Select from system's `CONFIG.VAGABOND.deliveryTypes` — each has a base cost (reduced by `bonuses.deliveryManaCostReduction`)
 - **Delivery Increase**: Expand area/targets (+cost per increment from `CONFIG.VAGABOND.deliveryIncreaseCost`)
-- **Template Preview/Place**: Sphere, cube, aura, cone, line templates on the canvas
+- **Template Preview/Place**: Sphere, cube, aura, cone, line — placed as a Region (`createEmbeddedDocuments("Region", …)`), not a MeasuredTemplate; touch / remote / imbue / glyph have none
 - **Focus**: Toggle sustained spell tracking after cast
 - **Mana Display**: Shows total cost vs current mana vs casting max
 
-#### Cast Flow
+#### Cast Flow (mirrors `SpellHandler._executeCast` on 5.38)
 
-1. Validate delivery type, mana sufficiency, casting max
-2. Import `VagabondRollBuilder` for d20 roll with favor/hinder
-3. Set `_isCastCheck = true` so cast-check target modifiers + Nimble apply to the roll
-4. On success: deduct mana, apply focus if toggled
-5. Roll damage via `VagabondDamageHelper.rollSpellDamage()`
-6. Create chat card via `VagabondChatCard.spellCast()`
-7. Play spell FX via `VagabondSpellSequencer`
-8. Reset dialog state and close
+1. Cost from the static `SpellCastDialog.calculateCosts(spell, actor, state)` — dice scaling, deferred Imbue mana, reduction order; validate mana and casting max
+2. Trinket gate via `SpellHandler.prototype._trinketGateStatus` (world setting `trinketCastRequirement`): warn, or block the cast
+3. `VagabondRollBuilder` d20 with favor/hinder, `_isCastCheck = true` so cast-check target modifiers + Nimble apply. Skipped for `noRollRequired` spells and Imbue
+4. Imbue: `VagabondImbueHelper.resolveTargetWeapons` / `imbueWeapon`, mana per `imbueUpfrontMana`. Otherwise deduct mana on success — a failed Cast Check pays per the `spellManaOnCastFail` world setting — and apply focus if toggled
+5. Damage via `VagabondDamageHelper.rollSpellDamage()` when `shouldRollDamage(isSuccess)`
+6. Chat card via `VagabondChatCard.spellCast()`, FX via `VagabondSpellSequencer`
+7. Reset dialog state and close
 
 ---
 
@@ -135,6 +134,8 @@ ward-surcharge flow for NPC casts.
 ---
 
 ## Flanking Checker
+
+On Vagabond 5.38+ `FlankingChecker.init()` returns early when `CONFIG.statusEffects` has a `flanked` entry — the system's `FlankingHelper` applies that status (identical Vulnerable changes + the +2 flat damage in `_computeFinalDamage`) on token move/create/delete and combat changes. Everything below applies to older systems only.
 
 ### Settings
 

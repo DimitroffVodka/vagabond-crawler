@@ -35,8 +35,9 @@ export const StackSplit = {
     if (a.name !== b.name) return false;
     if (a.type !== b.type) return false;
     // Lit light sources must stay separate (matches existing auto-stack guard)
-    const aLit = !!(a.flags?.[MODULE_ID]?.lit ?? a.getFlag?.(MODULE_ID, "lit"));
-    const bLit = !!(b.flags?.[MODULE_ID]?.lit ?? b.getFlag?.(MODULE_ID, "lit"));
+    const sysLit = x => !!x.uuid && !!game.vagabond?.lightSource?.isItemLit?.(x);
+    const aLit = !!(a.flags?.[MODULE_ID]?.lit ?? a.getFlag?.(MODULE_ID, "lit")) || sysLit(a);
+    const bLit = !!(b.flags?.[MODULE_ID]?.lit ?? b.getFlag?.(MODULE_ID, "lit")) || sysLit(b);
     if (aLit || bLit) return false;
     // Junk marking must match
     const aJunk = !!a.getFlag?.(MODULE_ID, "junk");

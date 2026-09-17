@@ -481,10 +481,12 @@ async function _wrapSystemClasses() {
   }
   if (VagabondItem?.prototype?.rollAttack) {
     const origRollAttack = VagabondItem.prototype.rollAttack;
-    VagabondItem.prototype.rollAttack = async function (actor, favorHinder = "none") {
+    VagabondItem.prototype.rollAttack = async function (actor, favorHinder = "none", ...rest) {
       _isAttackRoll = true;
       try {
-        return await origRollAttack.call(this, actor, favorHinder);
+        // ...rest = (difficultyOverride, { allowUnequipped, skillKey, thrown }) on 5.38 —
+        // dropping them breaks unequipped throws and alternate weapon skills.
+        return await origRollAttack.call(this, actor, favorHinder, ...rest);
       } finally {
         _isAttackRoll = false;
       }
@@ -582,19 +584,19 @@ export async function applyPackInstincts(attacker) {
     console.log(`${MODULE_ID} | Pack Instincts: ${targetActor.name} — saves vs this attacker hindered`);
   }
 
-  // Attacker: saves against this NPC's attacks are Hindered.
-  // Use the world actor (game.actors) because the save system resolves the
-  // source via game.actors.get(actorId), not the synthetic token actor.
+  // Attacker: saves against this NPC's attacks are Hindered. Put it on the
+  // attacking token's own actor: 5.38 resolves the save source from the chat
+  // card's actor UUID, so a world-actor copy only leaked the Hinder onto every
+  // other token of the same NPC.
   if (applied) {
-    const worldActor = game.actors.get(attacker.id) ?? attacker;
-    if (!worldActor.effects.some(_isPackInstinctsEffect)) {
-      await worldActor.createEmbeddedDocuments("ActiveEffect", [{
+    if (!attacker.effects.some(_isPackInstinctsEffect)) {
+      await attacker.createEmbeddedDocuments("ActiveEffect", [{
         name:     "Pack Instincts (active)",
         img:      "icons/svg/downgrade.svg",
         origin:   PACK_INSTINCTS_ORIGIN,
         flags:    { [MODULE_ID]: { packInstincts: true } },
         changes: [
-          { key: "system.outgoingSavesModifier", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "hinder" },
+          { key: "system.outgoingSavesModifier", type: "override", value: "hinder" },
         ],
       }]);
     }
@@ -704,7 +706,7 @@ async function ensureSoftUnderbellyEffect(actor) {
       origin: SOFT_UNDERBELLY_ORIGIN,
       flags:  { [MODULE_ID]: { softUnderbelly: true } },
       changes: [
-        { key: "system.armor", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "0", priority: 999 },
+        { key: "system.armor", type: "override", value: "0", priority: 999 },
       ],
     }]);
     console.log(`${MODULE_ID} | Soft Underbelly: armor set to 0 on ${actor.name} (Prone)`);

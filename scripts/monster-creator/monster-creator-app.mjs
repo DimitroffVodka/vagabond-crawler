@@ -914,7 +914,7 @@ async function _getWeaponsList() {
       name:           w.name,
       damageOneHand:  w.system.damageOneHand ?? "",
       damageTwoHands: w.system.damageTwoHands ?? "",
-      damageType:     w.system.damageType ?? "-",
+      damageType:     w.system.currentDamageType ?? w.system.damageType ?? "-",  // weapons: per-grip type, derived
       weaponSkill:    w.system.weaponSkill ?? "melee",
       grip:           w.system.grip ?? "1H",
       range:          w.system.range ?? "close",

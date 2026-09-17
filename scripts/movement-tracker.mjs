@@ -447,8 +447,9 @@ export const MovementTracker = {
     const actor = doc.actor;
 
     // Teleport token back to turn-start position (bypass wall collision)
-    await doc.update({ x: start.x, y: start.y }, {
-      teleport: true, animate: false, [MODULE_ID]: { rollback: true },
+    // action "displace" is v14's teleport (the `teleport` update option is deprecated, removed in v15).
+    await doc.update({ x: start.x, y: start.y, action: "displace" }, {
+      animate: false, [MODULE_ID]: { rollback: true },
     });
 
     // Refund full turn movement (base speed — Rush is a choice, not a given)

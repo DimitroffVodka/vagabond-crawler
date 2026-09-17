@@ -11,6 +11,7 @@
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
+import { isWrapped, markWrapped } from "./wrap-guard.mjs";
 
 const LIGHT_SOURCES = {
   torch: {
@@ -171,7 +172,26 @@ function _getLightDef(itemName) {
   return null;
 }
 
-function _isLightSource(item) { return !!_getLightDef(item.name); }
+/** Crawler-managed light: a known light name the system doesn't own. Items
+ *  whose Use macro calls game.vagabond.lightSource.use (vagabond 5.23+) light,
+ *  douse and burn out through the system instead. */
+function _isLightSource(item) {
+  if (game.vagabond?.lightSource?.isLightItem?.(item)) return false;
+  return !!_getLightDef(item.name);
+}
+
+// ── System light sources (game.vagabond.lightSource) ─────────────────────────
+
+/** System lights that burn oil. The system has no fuel concept and consumes
+ *  the lantern itself on burn-out. */
+const _OIL_LIGHT = name => /^(lantern|lamp)\b/i.test(name?.trim() ?? "");
+const _OIL_DEF = { fuel: name => /^oil/i.test(name.trim()) };
+
+/** Every gear FX preset a light can start — stopped wholesale on douse,
+ *  since the lit item may already be gone by then. */
+function _allLightPresets(fx) {
+  return Object.values(fx.getConfig().gear ?? {});
+}
 
 /** Find the party token that contains this actor as a gathered member. */
 function _findPartyToken(actor) {
@@ -298,9 +318,79 @@ function _watchSheet(root, actor) {
 
 // ── Drop light on canvas ──────────────────────────────────────────────────────
 
+/** True when the light tracker (not ItemDrops) handles dropping this item:
+ *  a Crawler light, or a system light that is currently lit. */
+function _claimsDrop(item) {
+  const LS = game.vagabond?.lightSource;
+  if (LS?.isLightItem?.(item)) return LS.isItemLit(item);
+  return _isLightSource(item);
+}
+
+/** Snapshot of a system light clock, enough to respawn it on another token. */
+function _clockState(journal) {
+  const ls = journal.getFlag("vagabond", "lightSource");
+  const pc = journal.getFlag("vagabond", "progressClock");
+  return { mode: ls.mode, kind: pc.kind, segments: pc.segments, filled: pc.filled,
+    durationMin: ls.durationMin, startTime: ls.startTime };
+}
+
+function _systemClocks(pred) {
+  return (game.vagabond?.clocks?.getAll?.() ?? []).filter(j => {
+    const ls = j.getFlag("vagabond", "lightSource");
+    return ls && pred(ls);
+  });
+}
+
+/** A lit system light dropped on the canvas: the holder's light goes out (the
+ *  clock is deleted without burning the item), and a light-actor token carries
+ *  the light and a fresh clock holding the remaining burn. */
+async function _dropSystemLight(item, dropX, dropY) {
+  const LS = game.vagabond.lightSource;
+  const actor = item.parent;
+  const holder = LS._resolveTokenDoc(null, actor);
+  const light = foundry.utils.deepClone(holder?._source.light ?? {});
+  const clock = _systemClocks(ls => ls.itemUuid === item.uuid)[0];
+  const clockState = clock ? _clockState(clock) : null;
+
+  const itemData = item.toObject();
+  delete itemData._id;
+  itemData.system.quantity = 1;
+
+  if (clock) await clock.delete();          // no expiry marker: restores the holder, nothing consumed
+  else if (holder) await LS.douse(holder);  // manual ("lit") lights have no clock
+
+  const snapX = Math.round(dropX / canvas.grid.size) * canvas.grid.size;
+  const snapY = Math.round(dropY / canvas.grid.size) * canvas.grid.size;
+  const lightActor = await Actor.create({
+    name: `${item.name} (dropped)`, type: actor.type, img: item.img,
+    flags: { [MODULE_ID]: { [VLT_LIGHT_ACTOR_FLAG]: true, sourceActorId: actor.id, itemName: item.name,
+      itemImg: item.img, lit: false, systemLight: { itemData, light } } },
+    prototypeToken: { name: item.name, actorLink: true, width: 0.5, height: 0.5, texture: { src: item.img } },
+    ownership: { default: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER },
+  });
+  const [tdoc] = await canvas.scene.createEmbeddedDocuments("Token", [{
+    actorId: lightActor.id, actorLink: true, x: snapX, y: snapY, width: 0.5, height: 0.5,
+    name: item.name, texture: { src: item.img }, light, hidden: false,
+    displayName: CONST.TOKEN_DISPLAY_MODES.HOVER, disposition: CONST.TOKEN_DISPOSITIONS.NEUTRAL,
+    flags: { vagabond: { prevLight: DARK_LIGHT } },
+  }]);
+  if (clockState) {
+    await LS._createClockGM({ name: `${item.name} (dropped)`, tokenUuid: tdoc.uuid, itemUuid: null, ...clockState });
+  }
+
+  if ((item.system.quantity ?? 1) > 1) await item.update({ "system.quantity": item.system.quantity - 1 });
+  else await item.delete();
+
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor }),
+    content: `<div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">🔦</span><span><strong>${actor.name}</strong> dropped their lit <strong>${item.name}</strong>.</span></div>`,
+  });
+}
+
 async function _dropLightOnCanvas(item, dropX, dropY) {
   const actor = item.parent;
   if (!actor) return;
+  if (game.vagabond?.lightSource?.isLightItem?.(item)) return _dropSystemLight(item, dropX, dropY);
   const match = _getLightDef(item.name);
   if (!match) return;
   const { key, def } = match;
@@ -399,6 +489,7 @@ async function _doPickup(lightActor, token, targetActor) {
   _pickingUp.add(lightActor.id);
   try {
   const flags     = lightActor.flags?.[MODULE_ID] ?? {};
+  if (flags.systemLight) return await _pickupSystemLight(lightActor, token?.document ?? token, targetActor, flags.systemLight);
   const itemName  = flags.itemName      ?? "Torch";
   const itemImg   = flags.itemImg       ?? "icons/sundries/lights/torch-brown.webp";
   const sourceKey = flags.sourceKey     ?? "torch";
@@ -438,6 +529,40 @@ async function _doPickup(lightActor, token, targetActor) {
   } finally {
     _pickingUp.delete(lightActor.id);
   }
+}
+
+/** Picking up a dropped system light: the item goes back into an inventory and,
+ *  if it's still burning, lights the new holder with the remaining clock. */
+async function _pickupSystemLight(lightActor, droppedTdoc, targetActor, sys) {
+  const LS = game.vagabond.lightSource;
+  droppedTdoc ??= canvas.scene.tokens.find(t => t.actorId === lightActor.id);
+  const [item] = await targetActor.createEmbeddedDocuments("Item", [sys.itemData], { skipStack: true });
+  const clock = droppedTdoc ? _systemClocks(ls => ls.tokenUuid === droppedTdoc.uuid)[0] : null;
+  const stillLit = droppedTdoc?.flags?.vagabond?.prevLight !== undefined;
+  const target = LS._resolveTokenDoc(null, targetActor);
+
+  let relit = false;
+  if (stillLit && target) {
+    await LS._applyLight(target, sys.light);
+    const hr = item.system.handsRequired ?? 0;
+    if (hr > 0 && game.settings.get("vagabond", "lightSourceHandMode") !== "independent") {
+      await LS._occupyHands(targetActor, item, hr, target);
+    }
+    if (clock) {
+      await LS._createClockGM({ name: `${item.name} (${target.name})`, tokenUuid: target.uuid, itemUuid: item.uuid, ..._clockState(clock) });
+    }
+    relit = true;
+  }
+  // Token before clock: the system's clock-delete hook restores its token's
+  // light asynchronously, and would update a token we'd just deleted.
+  if (droppedTdoc) await droppedTdoc.delete();
+  if (clock) await clock.delete();
+  await lightActor.delete();
+
+  await ChatMessage.create({
+    speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+    content: `<div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">🤲</span><span><strong>${targetActor.name}</strong> picked up <strong>${item.name}</strong>${relit ? " — still burning" : ""}.</span></div>`,
+  });
 }
 
 // ── LightTracker ──────────────────────────────────────────────────────────────
@@ -511,7 +636,228 @@ export const LightTracker = {
     }
   },
 
+  /**
+   * Layer the Crawler's extras onto the system's native light sources:
+   * lanterns/lamps need and burn oil, burning out a lantern doesn't destroy
+   * it, and the persistent light FX follows the token's system light.
+   */
+  _integrateSystemLights() {
+    const LS = game.vagabond?.lightSource;
+    if (!LS?.use || isWrapped(LS, "use")) return;
+
+    const origUse = LS.use;
+    LS.use = async function (opts = {}) {
+      const item = opts.item;
+      const owner = item?.parent ?? opts.actor;
+      if (!item || !_OIL_LIGHT(item.name) || !owner) return origUse.call(this, opts);
+      const fuel = _findFuel(owner, _OIL_DEF);
+      if (!fuel) return ui.notifications.warn(`${item.name} needs fuel (oil) to light.`);
+      const tdoc = LS._resolveTokenDoc?.(opts.token, opts.actor);
+      const lightBefore = JSON.stringify(tdoc?.light ?? null);
+      const result = await origUse.call(this, opts);
+      // use() returns nothing; it lit if the item now reads lit or the token's light changed.
+      if (LS.isItemLit(item) || JSON.stringify(tdoc?.light ?? null) !== lightBefore) {
+        await _consumeFuel(fuel);
+      }
+      return result;
+    };
+    markWrapped(LS, "use");
+
+    if (LS._consumeLitItem && !isWrapped(LS, "_consumeLitItem")) {
+      const origConsume = LS._consumeLitItem;
+      LS._consumeLitItem = async function (itemUuid) {
+        const item = itemUuid ? fromUuidSync(itemUuid) : null;
+        if (item && _OIL_LIGHT(item.name)) {
+          ChatMessage.create({ content: `<p><i class="fas fa-oil-can"></i> <strong>${item.name}</strong> has burned through its oil.</p>`,
+            speaker: ChatMessage.getSpeaker({ actor: item.parent }) });
+          return;
+        }
+        return origConsume.call(this, itemUuid);
+      };
+      markWrapped(LS, "_consumeLitItem");
+    }
+
+    // Light FX: the system writes flags.vagabond.prevLight when it lights a
+    // token and removes it when the light goes out.
+    Hooks.on("updateToken", (tdoc, changes, _opts, userId) => {
+      if (userId !== game.userId) return;
+      // Only react when prevLight itself was set or removed ("-=prevLight" / _del).
+      const vg = foundry.utils.getProperty(changes, "flags.vagabond");
+      if (!vg || !Object.keys(vg).some(k => k.includes("prevLight"))) return;
+      const token = tdoc.object;
+      const fx = game.vagabondCrawler?.animationFx;
+      if (!token || !fx) return;
+      if (tdoc.flags?.vagabond?.prevLight) {
+        const itemUuid = tdoc.flags.vagabond.litItems?.[0]
+          ?? game.vagabond.clocks?.getAll?.().find(j => j.getFlag("vagabond", "lightSource")?.tokenUuid === tdoc.uuid)
+            ?.getFlag("vagabond", "lightSource")?.itemUuid;
+        const name = itemUuid ? fromUuidSync(itemUuid)?.name : null;
+        const preset = fx.resolveGearPresetByLightType(_getLightDef(name ?? "")?.key ?? "torch");
+        fx.startPersistent(preset, token);
+      } else {
+        for (const preset of _allLightPresets(fx)) fx.stopPersistent(preset, token);
+      }
+    });
+  },
+
+  /** ItemDrops asks this before handling a canvas drop. */
+  claimsDrop(item) { return _claimsDrop(item); },
+
+  /**
+   * System lights and party tokens. Gathering deletes member tokens, which
+   * would strand their light clocks; the party token takes over the light and
+   * the clocks, and hands them back on release.
+   * partyLights (on the party token) = { [memberActorUuid]: lightConfig | "expired" }.
+   */
+  _registerSystemLightParty() {
+    const LS = game.vagabond?.lightSource;
+    if (!LS) return;
+    const isGM = () => game.user === game.users.activeGM;
+    const readLights = pdoc => JSON.parse(pdoc.getFlag(MODULE_ID, "partyLights") || "{}");
+    const writeLights = (pdoc, lights) => Object.keys(lights).length
+      ? pdoc.setFlag(MODULE_ID, "partyLights", JSON.stringify(lights))
+      : pdoc.unsetFlag(MODULE_ID, "partyLights");
+    // Gather and release touch every member at once; serialise the
+    // read-modify-write of partyLights so members don't overwrite each other.
+    let queue = Promise.resolve();
+    const serial = fn => (queue = queue.catch(() => {}).then(fn));
+    // The owner comes from the item uuid itself ("Actor.X.Item.Y"): a burned-out
+    // item is already deleted by the time our hooks look.
+    const ownerUuidOf = ls => ls.itemUuid?.split(".Item.")[0] ?? null;
+    const rebind = async (fromUuid, toUuid, pred = () => true) => {
+      for (const j of _systemClocks(ls => ls.tokenUuid === fromUuid && pred(ls))) {
+        await j.setFlag("vagabond", "lightSource", { ...j.getFlag("vagabond", "lightSource"), tokenUuid: toUuid });
+      }
+    };
+
+    Hooks.on("deleteToken", tokenDoc => {
+      if (!isGM() || tokenDoc.flags?.vagabond?.prevLight === undefined) return;
+      const actor = tokenDoc.actor ?? game.actors.get(tokenDoc.actorId);
+      if (!actor || actor.getFlag(MODULE_ID, VLT_LIGHT_ACTOR_FLAG)) return;
+      const light = foundry.utils.deepClone(tokenDoc._source.light);
+      const oldUuid = tokenDoc.uuid;
+      setTimeout(() => serial(async () => {
+        const pdoc = _findPartyToken(actor)?.document;
+        if (!pdoc) return;
+        await rebind(oldUuid, pdoc.uuid);
+        await writeLights(pdoc, { ...readLights(pdoc), [actor.uuid]: light });
+        await LS._applyLight(pdoc, light);
+      }), 500);
+    });
+
+    Hooks.on("createToken", tdoc => {
+      if (!isGM() || tdoc.actor?.type === "party") return;
+      const actor = tdoc.actor;
+      serial(async () => {
+        const pdoc = canvas.scene?.tokens.find(t => t.actor?.type === "party" && readLights(t)[actor?.uuid] !== undefined);
+        if (!pdoc) return;
+        const lights = readLights(pdoc);
+        const entry = lights[actor.uuid];
+        delete lights[actor.uuid];
+        await rebind(pdoc.uuid, tdoc.uuid, ls => ownerUuidOf(ls) === actor.uuid);
+        if (entry === "expired") {  // burned out while gathered: the snapshot still says lit
+          await LS._restoreLight(tdoc);
+          if (tdoc.getFlag("vagabond", "litItems") !== undefined) await tdoc.unsetFlag("vagabond", "litItems");
+        }
+        const still = Object.values(lights).filter(l => l !== "expired");
+        if (still.length) await pdoc.update({ light: still[0] });
+        else await LS._restoreLight(pdoc);
+        await writeLights(pdoc, lights);
+      });
+    });
+
+    Hooks.on("deleteJournalEntry", (journal, options) => {
+      const ls = journal.flags?.vagabond?.lightSource;
+      if (!isGM() || !ls?.tokenUuid || !options?.vagabondLightExpired) return;
+      const tdoc = fromUuidSync(ls.tokenUuid);
+      if (!tdoc) return;
+      // Let the system's own delete hook restore the token first.
+      setTimeout(async () => {
+        const lightActor = tdoc.actor;
+        if (lightActor?.getFlag(MODULE_ID, VLT_LIGHT_ACTOR_FLAG)) {
+          const name = lightActor.getFlag(MODULE_ID, "itemName") ?? "light source";
+          if (_OIL_LIGHT(name)) return;  // an empty lantern stays where it was dropped
+          await ChatMessage.create({ content: `<div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">🕯️</span><span>A dropped <strong>${name}</strong> has burned out!</span></div>` });
+          await tdoc.delete();
+          await lightActor.delete();
+          return;
+        }
+        if (tdoc.actor?.type !== "party") return;
+        const ownerUuid = ownerUuidOf(ls);
+        await serial(async () => {
+          const lights = readLights(tdoc);
+          if (!ownerUuid || lights[ownerUuid] === undefined) return;
+          lights[ownerUuid] = "expired";
+          await writeLights(tdoc, lights);
+          const still = Object.values(lights).filter(l => l !== "expired");
+          if (still.length) await LS._applyLight(tdoc, still[0]);
+        });
+      }, 300);
+    });
+  },
+
+  /**
+   * A new crawl turn advances time on the system's manual light clocks too:
+   * an "hour" clock is 6 segments = 60 minutes, so one segment per 10 minutes.
+   * The system deletes the clock (restoring the light) when it reaches 0.
+   */
+  async tickSystemLightClocks(minutes, { realtime = false } = {}) {
+    if (!game.user.isGM || !minutes) return;
+    for (const j of _systemClocks(() => true)) {
+      const ls = j.getFlag("vagabond", "lightSource");
+      const pc = j.getFlag("vagabond", "progressClock");
+      if (ls.mode === "clock") {
+        // 6-segment hour clock: 10 min a segment; 1-segment quarter clock: a 6-hour shift.
+        const perSegment = pc.segments === 6 ? 10 : 360;
+        const steps = Math.round(minutes / perSegment);
+        if (!steps) continue;
+        const filled = Math.max(0, Math.min(pc.segments, (pc.filled ?? 0) - steps));
+        if (filled !== pc.filled) await j.update({ "flags.vagabond.progressClock.filled": filled });
+      } else if (realtime && ls.mode === "realtime") {
+        // Burning time moves the start earlier; adding time moves it later (never past now).
+        const startTime = Math.min(Date.now(), (ls.startTime ?? Date.now()) - minutes * 60000);
+        await j.setFlag("vagabond", "lightSource", { ...ls, startTime });
+      }
+    }
+    if (realtime) await game.vagabond?.lightSource?.tickRealtime?.();
+  },
+
+  /** Tracker rows for the system's light sources: every light clock, plus
+   *  manual (no-clock) lights recorded in a token's litItems. */
+  _systemLightRows() {
+    const rows = [];
+    const clocked = new Set();
+    for (const j of _systemClocks(() => true)) {
+      const ls = j.getFlag("vagabond", "lightSource");
+      const pc = j.getFlag("vagabond", "progressClock");
+      const tdoc = fromUuidSync(ls.tokenUuid ?? "");
+      const item = ls.itemUuid ? fromUuidSync(ls.itemUuid) : null;
+      if (ls.itemUuid) clocked.add(ls.itemUuid);
+      let mins, pct;
+      if (ls.mode === "realtime") {
+        mins = Math.max(0, (ls.durationMin ?? 0) - (Date.now() - (ls.startTime ?? Date.now())) / 60000);
+        pct = ls.durationMin ? mins / ls.durationMin : 0;
+      } else {
+        const perSegment = pc.segments === 6 ? 10 : 360;
+        mins = (pc.filled ?? 0) * perSegment;
+        pct = pc.segments ? (pc.filled ?? 0) / pc.segments : 0;
+      }
+      rows.push({ tdoc, clockId: j.id, name: item?.name ?? tdoc?.name ?? j.name,
+        formattedTime: this._formatTime(Math.round(mins * 60)) + (ls.mode === "realtime" ? " (real)" : ""),
+        pct: Math.round(pct * 100) });
+    }
+    for (const tdoc of canvas.scene?.tokens ?? []) {
+      for (const uuid of tdoc.flags?.vagabond?.litItems ?? []) {
+        if (clocked.has(uuid)) continue;
+        rows.push({ tdoc, clockId: null, name: fromUuidSync(uuid)?.name ?? "Light", formattedTime: "no timer", pct: 100 });
+      }
+    }
+    return rows;
+  },
+
   init() {
+    this._integrateSystemLights();
+    this._registerSystemLightParty();
     for (const hookName of ["renderVagabondCharacterSheet", "renderVagabondActorSheet", "renderActorSheet"]) {
       Hooks.on(hookName, (app, html) => {
         const actor = app.actor ?? app.document;
@@ -586,7 +932,7 @@ export const LightTracker = {
       if (data.type !== "Item") return;
       let item;
       try { item = await fromUuid(data.uuid); } catch(e) { return; }
-      if (!item || !_isLightSource(item) || !item.parent) return;
+      if (!item || !item.parent || !_claimsDrop(item)) return;
       if (game.user.isGM) {
         await _dropLightOnCanvas(item, data.x, data.y);
       } else {
@@ -622,6 +968,9 @@ export const LightTracker = {
     });
 
     Hooks.on("updateItem", () => { if (this._trackerApp?.rendered) this._trackerApp.render(); });
+    for (const hook of ["createJournalEntry", "updateJournalEntry", "deleteJournalEntry"]) {
+      Hooks.on(hook, j => { if (j.flags?.vagabond?.lightSource && this._trackerApp?.rendered) this._trackerApp.render(); });
+    }
   },
 
   openTracker() {
@@ -918,6 +1267,21 @@ class LightTrackerApp extends HbsMixin(AppV2) {
         }),
       });
     }
+    // System light sources, grouped under the token's actor (dropped lights and
+    // party tokens get their own entries).
+    for (const row of LightTracker._systemLightRows()) {
+      const actor = row.tdoc?.actor;
+      const dropped = actor?.getFlag(MODULE_ID, VLT_LIGHT_ACTOR_FLAG);
+      const key = actor?.id ?? row.name;
+      let entry = entries.find(e => e.actorId === key && !e.dropped === !dropped);
+      if (!entry) {
+        entry = { actorId: key, dropped, name: dropped ? "🔦 Dropped" : (actor?.name ?? row.tdoc?.name ?? "Light"),
+          img: dropped ? (actor.getFlag(MODULE_ID, "itemImg") ?? actor.img) : (actor?.img ?? row.tdoc?.texture.src), lights: [] };
+        entries.push(entry);
+      }
+      entry.lights.push({ id: null, actorId: key, name: row.name, formattedTime: row.formattedTime, pct: row.pct,
+        clockId: row.clockId, tokenUuid: row.tdoc?.uuid ?? null });
+    }
     const defaultMins = game.settings.get(MODULE_ID, "timePassesMinutes");
     return { entries, defaultMins };
   }
@@ -944,6 +1308,7 @@ class LightTrackerApp extends HbsMixin(AppV2) {
       // Positive adjusted = add time to torches (rewind burn), negative = burn torches down
       // advanceTime(secs) subtracts secs from remaining, so negate: adding mins means negative secs
       await LightTracker.advanceTime(-adjusted * 60);
+      await LightTracker.tickSystemLightClocks(-adjusted, { realtime: true });
       const label = multiplier > 0 ? "Time Added" : "Time Passes";
       const icon  = multiplier > 0 ? "fa-hourglass-start" : "fa-hourglass-half";
       await ChatMessage.create({
@@ -959,9 +1324,15 @@ class LightTrackerApp extends HbsMixin(AppV2) {
     // Douse buttons
     this.element.querySelectorAll(".vlt-douse").forEach(btn => {
       btn.addEventListener("click", async ev => {
-        const { actorId, itemId } = ev.currentTarget.dataset;
-        const item = game.actors.get(actorId)?.items.get(itemId);
-        if (item) await LightTracker._douseLight(item);
+        const { actorId, itemId, clockId, tokenUuid } = ev.currentTarget.dataset;
+        const LS = game.vagabond?.lightSource;
+        if (clockId) await LS?._deleteClock(clockId);            // system clock: its delete hook restores the light
+        else if (tokenUuid) await LS?.douse(fromUuidSync(tokenUuid));  // system light with no timer
+        else {
+          const item = game.actors.get(actorId)?.items.get(itemId);
+          if (item) await LightTracker._douseLight(item);
+        }
+        this.render();
       }, { signal });
     });
   }

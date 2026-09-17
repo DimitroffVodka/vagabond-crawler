@@ -12,21 +12,6 @@ import { MODULE_ID } from "./vagabond-crawler.mjs";
 import { LootTracker } from "./loot-tracker.mjs";
 
 /* -------------------------------------------- */
-/*  Light Source Detection (exclude from drops)  */
-/* -------------------------------------------- */
-
-const LIGHT_NAMES = [
-  /^torch$/i,
-  /^candle$/i,
-  /^lantern,?\s*(hooded|bullseye)?$/i,
-  /^oil\s*lamp$/i,
-];
-
-function _isLightSource(itemName) {
-  return LIGHT_NAMES.some(re => re.test(itemName?.trim()));
-}
-
-/* -------------------------------------------- */
 /*  Item Drops Singleton                        */
 /* -------------------------------------------- */
 
@@ -87,8 +72,9 @@ export const ItemDrops = {
     // Only equipment items
     if (item.type !== "equipment") return;
 
-    // Exclude light sources — handled by LightTracker
-    if (_isLightSource(item.name)) return;
+    // Lights the LightTracker drops as light actors (Crawler lights, lit system
+    // lights) are its job; an unlit system light drops like any other item.
+    if (game.vagabondCrawler?.lightTracker?.claimsDrop?.(item)) return;
 
     // Prevent dropping if not owned
     const sourceActor = item.actor;

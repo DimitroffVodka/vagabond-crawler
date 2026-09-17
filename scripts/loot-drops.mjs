@@ -10,7 +10,7 @@ import { MODULE_ID } from "./vagabond-crawler.mjs";
 import { generateLoot } from "./loot-tables.mjs";
 import { LootManager } from "./loot-manager.mjs";
 import { LootTracker } from "./loot-tracker.mjs";
-import { renderTraceHtml } from "./loot-generator.mjs";
+import { renderTraceHtml, itemValue } from "./loot-generator.mjs";
 
 const LOOT_ICON = "icons/containers/chest/chest-worn-oak-tan.webp";
 
@@ -50,7 +50,7 @@ function _renderShareBody(share) {
     : "";
 
   const itemLines = (share.items ?? []).map(item => {
-    const bc = item.system?.cost;
+    const bc = itemValue(item);  // saved item data has no derived cost: base × metal multiplier
     const valParts = [];
     if (bc?.gold) valParts.push(`${bc.gold}g`);
     if (bc?.silver) valParts.push(`${bc.silver}s`);
@@ -499,7 +499,7 @@ export const LootDrops = {
     if (currency.copper > 0) parts.push(`${currency.copper}c`);
     for (const item of items ?? []) {
       const qty = item.system?.quantity > 1 ? ` ×${item.system.quantity}` : "";
-      const price = item.system?.costDisplay || _formatPrice(item.system?.cost) || "";
+      const price = _formatPrice(itemValue(item));  // base × metal multiplier; saved item data has no derived cost
       parts.push(`${item.name}${qty}${price ? ` (${price})` : ""}`);
     }
 

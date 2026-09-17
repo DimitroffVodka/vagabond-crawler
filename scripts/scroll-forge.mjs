@@ -78,7 +78,7 @@ class ScrollForgeApp extends foundry.applications.api.HandlebarsApplicationMixin
     const hasDamage = spell?.system?.damageType !== "-";
 
     const deliveryOptions = Object.entries(CONFIG.VAGABOND?.deliveryTypes ?? {})
-      .map(([k, v]) => ({ value: k, label: v, selected: k === s.deliveryType }));
+      .map(([k, v]) => ({ value: k, label: game.i18n.localize(v), selected: k === s.deliveryType }));
 
     return {
       spells: this._spellCache,
@@ -158,7 +158,7 @@ class ScrollForgeApp extends foundry.applications.api.HandlebarsApplicationMixin
     const manaCost = _calcManaCost(spell, s);
     const goldValue = 5 + 5 * manaCost;
 
-    const deliveryName = CONFIG.VAGABOND?.deliveryTypes?.[s.deliveryType] ?? s.deliveryType;
+    const deliveryName = game.i18n.localize(CONFIG.VAGABOND?.deliveryTypes?.[s.deliveryType] ?? s.deliveryType);
     const base = CONFIG.VAGABOND?.deliveryBaseRanges?.[s.deliveryType];
     const inc  = CONFIG.VAGABOND?.deliveryIncrement?.[s.deliveryType];
     const totalVal = base?.value ? base.value + inc * s.deliveryIncrease : null;
@@ -272,7 +272,7 @@ async function _useScroll(item) {
     }
 
     // Delivery text
-    const deliveryName = CONFIG.VAGABOND?.deliveryTypes?.[s.deliveryType] ?? s.deliveryType;
+    const deliveryName = game.i18n.localize(CONFIG.VAGABOND?.deliveryTypes?.[s.deliveryType] ?? s.deliveryType);
     const base = CONFIG.VAGABOND?.deliveryBaseRanges?.[s.deliveryType];
     const inc  = CONFIG.VAGABOND?.deliveryIncrement?.[s.deliveryType];
     const totalVal = base?.value ? base.value + inc * s.deliveryIncrease : null;

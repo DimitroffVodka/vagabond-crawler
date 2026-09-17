@@ -10,7 +10,7 @@ import {
 } from "./loot-data.mjs";
 import { LootTracker } from "./loot-tracker.mjs";
 import { SessionRecap } from "./session-recap.mjs";
-import { RELIC_POWERS } from "./relic-powers.mjs";
+import { RELIC_POWERS, buildRelicPowerData } from "./relic-powers.mjs";
 
 /* ── Relic Power → Active Effect mapping ─────────────────── */
 
@@ -71,30 +71,6 @@ function _findRelicPower(powerText) {
   _initRelicPowerMap();
   const lower = powerText.toLowerCase().replace(/\s*\(niche\)/i, "").trim();
   return _relicPowerMap[lower] ?? null;
-}
-
-/** Create Active Effect documents from a relic power, with optional input substitution. */
-function _buildRelicEffects(power, input = "") {
-  if (!power) return [];
-  const changes = (power.changes || []).map(e => ({
-    key: e.key.replace("{input}", input),
-    mode: e.mode,
-    value: String(e.value).replace("{input}", input),
-  }));
-  const moduleFlags = { relicPower: power.id || power.name, managed: true };
-  if (power.flags) {
-    for (const [k, v] of Object.entries(power.flags)) {
-      moduleFlags[k] = typeof v === "string" ? v.replace("{input}", input) : v;
-    }
-  }
-  return [{
-    name: `Relic: ${power.name}${input ? ` (${input})` : ""}`,
-    icon: "icons/svg/item-bag.svg",
-    changes,
-    disabled: false,
-    transfer: true,
-    flags: { [MODULE_ID]: moduleFlags },
-  }];
 }
 
 /* ── Loot Item Builders ────────────────────────────────── */
@@ -189,6 +165,21 @@ const ART_ICONS = {
   4: ICONS.figurine, 5: ICONS.bust, 6: ICONS.pottery,
   7: ICONS.pottery, 8: ICONS.artifact,
 };
+
+/** Loot-table material name → system `metal` key ("Cold Iron" → "coldIron").
+ *  The field is a StringField with choices, so a plain lowercase "cold iron"
+ *  fails validation and the whole Item.create throws. */
+const _metalKey = (name) => name.toLowerCase().replace(/\s+(\w)/g, (_, c) => c.toUpperCase());
+
+/** Displayed value of item data: baseCost × the system's metal multiplier
+ *  (silver ×10, cold iron ×20…). Item data objects carry no derived `cost`;
+ *  relics don't use metal. */
+export function itemValue(d) {
+  const bc = d?.system?.baseCost ?? {};
+  const m = d?.system?.equipmentType === "relic" ? 1
+    : (CONFIG.VAGABOND?.metalData?.[d?.system?.metal]?.multiplier ?? 1);
+  return { gold: (bc.gold ?? 0) * m, silver: (bc.silver ?? 0) * m, copper: (bc.copper ?? 0) * m };
+}
 
 /** Build an equipment itemData object for loot.
  *
@@ -303,14 +294,19 @@ function _powerGoldValue(powerText) {
   return 0;
 }
 
-/** Add relic power value to an item's baseCost. */
+/** Add relic power value to an item's baseCost. The system prices metal by
+ *  multiplying the whole baseCost (silver ×10…), so once `system.metal` is set
+ *  the multiplier already covers the material and the power's value is stored
+ *  divided by it — otherwise a 5000g power on silver would sell for 50000g. */
 function _addPowerValue(itemData, powerText, material) {
+  const mult = itemData.system?.equipmentType === "relic" ? 1
+    : (CONFIG.VAGABOND?.metalData?.[itemData.system?.metal]?.multiplier ?? 1);
   const powerGold = _powerGoldValue(powerText);
-  const matGold = (material && material !== "Mundane") ? (_powerGoldValue(material)) : 0;
+  const matGold = (mult === 1 && material && material !== "Mundane") ? (_powerGoldValue(material)) : 0;
   const extraGold = powerGold + matGold;
   if (extraGold > 0) {
     const bc = itemData.system.baseCost ?? { gold: 0, silver: 0, copper: 0 };
-    const totalCopper = (bc.gold ?? 0) * 10000 + (bc.silver ?? 0) * 100 + (bc.copper ?? 0) + extraGold * 10000;
+    const totalCopper = (bc.gold ?? 0) * 10000 + (bc.silver ?? 0) * 100 + (bc.copper ?? 0) + Math.round(extraGold * 10000 / mult);
     itemData.system.baseCost = {
       gold: Math.floor(totalCopper / 10000),
       silver: Math.floor((totalCopper % 10000) / 100),
@@ -391,7 +387,7 @@ async function _createSpellScroll(manaCost) {
   const goldValue = 5 + 5 * manaCost;
 
   const deliveryType = spell.system?.deliveryType ?? "touch";
-  const deliveryName = CONFIG.VAGABOND?.deliveryTypes?.[deliveryType] ?? deliveryType;
+  const deliveryName = game.i18n.localize(CONFIG.VAGABOND?.deliveryTypes?.[deliveryType] ?? deliveryType);
 
   const scrollData = {
     spellName: spell.name,
@@ -628,16 +624,31 @@ async function _resolveRawPower(rawPower, powerTable = "weapon", depth = 0) {
   return { display: rawPower, powerText: rawPower };
 }
 
-/** After resolving a power, build the AE effects for it. */
-function _buildEffectsForPower(powerText, input = "") {
-  const power = _findRelicPower(powerText);
-  if (!power) return [];
+/** After resolving a power, write it onto the item data the same way the
+ *  Relic Forge does (AEs + applicationMode, relicForge flag, properties,
+ *  on-hit statuses). Without the relicForge flag the damage patches skip the
+ *  item, so Strike/Bane/Vicious never fired on generated relics. */
+export function _applyRelicPower(itemData, powerText, input = "") {
+  // Table spellings the alias map doesn't know: "Fabled, Vicious" is Vicious;
+  // "Bane of Goblin (Niche)" / "Protection vs Undead" name the creature, and the
+  // tier follows _powerGoldValue's rule (niche suffix, comma = subtype, else type).
+  const named = powerText.match(/^(Bane of|Protection vs)\s+(.+?)(\s*\(niche\))?$/i);
+  if (named) {
+    const tier = named[3] ? "niche" : named[2].includes(",") ? "specific" : "general";
+    powerText = `${named[1].startsWith("Bane") ? "bane" : "protection"}-${tier}`;
+    input ||= named[2];
+  }
+  const power = _findRelicPower(powerText.replace(/^fabled,\s*/i, ""));
+  if (!power) return;
   // For typed resistance, extract the element from the power text
   if (power.id === "resistance-typed" && !input) {
     const match = powerText.match(/(acid|cold|fire|poison|shock)/i);
     input = match ? match[1] : "";
   }
-  return _buildRelicEffects(power, input);
+  const { effectDocs, system, relicForge } = buildRelicPowerData(itemData, [power], { [power.id]: input });
+  itemData.effects = [...(itemData.effects || []), ...effectDocs];
+  itemData.system = { ...(itemData.system || {}), ...system };
+  foundry.utils.setProperty(itemData, "flags.vagabond-crawler.relicForge", relicForge);
 }
 
 /* ── Compendium item cache ─────────────────────────────── */
@@ -973,7 +984,7 @@ export const LootGenerator = {
 
     // Build the chat card content
     const itemLines = items.map(d => {
-      const bc = d.system?.baseCost;
+      const bc = itemValue(d);
       const valParts = [];
       if (bc?.gold)   valParts.push(`${bc.gold}g`);
       if (bc?.silver) valParts.push(`${bc.silver}s`);
@@ -1124,7 +1135,7 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
         // Sum value across all items (alchemy gives 2)
         let totalCopper = 0;
         for (const d of (h.itemData ?? [])) {
-          const bc = d.system?.baseCost;
+          const bc = itemValue(d);
           if (bc) totalCopper += (bc.gold ?? 0) * 10000 + (bc.silver ?? 0) * 100 + (bc.copper ?? 0);
         }
         const totalCost = totalCopper ? {
@@ -1433,7 +1444,7 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Apply material
     if (material && material !== "Mundane") {
-      itemData.system.metal = material.toLowerCase();
+      itemData.system.metal = _metalKey(material);
     }
 
     // Update name with full generated name
@@ -1443,12 +1454,12 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
     _addPowerValue(itemData, powerText, material);
 
     // Apply relic Active Effects
-    const effects = _buildEffectsForPower(powerText);
-    if (effects.length) itemData.effects = [...(itemData.effects || []), ...effects];
+    _applyRelicPower(itemData, powerText);
 
     // Store loot gen metadata
     itemData.flags = itemData.flags || {};
     itemData.flags["vagabond-crawler"] = {
+      ...itemData.flags["vagabond-crawler"],
       lootGenerated: true,
       powerText,
       material,
@@ -1488,18 +1499,18 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     itemData.name = result.item;
     if (material && material !== "Mundane") {
-      itemData.system.metal = material.toLowerCase();
+      itemData.system.metal = _metalKey(material);
     }
 
     // Add relic power value to baseCost
     _addPowerValue(itemData, powerText, material);
 
     // Apply relic Active Effects
-    const effects = _buildEffectsForPower(powerText);
-    if (effects.length) itemData.effects = [...(itemData.effects || []), ...effects];
+    _applyRelicPower(itemData, powerText);
 
     itemData.flags = itemData.flags || {};
     itemData.flags["vagabond-crawler"] = {
+      ...itemData.flags["vagabond-crawler"],
       lootGenerated: true,
       powerText,
       material,
@@ -1718,7 +1729,7 @@ class LootGeneratorApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // Item rows — vcl-gen-claim-item style, matches Roll for Selected Token + Loot Drops
     const itemLines = (entry.itemData ?? []).map(d => {
-      const bc = d.system?.baseCost;
+      const bc = itemValue(d);
       const vp = [];
       if (bc?.gold)   vp.push(`${bc.gold}g`);
       if (bc?.silver) vp.push(`${bc.silver}s`);
@@ -1989,8 +2000,7 @@ export async function generateLevelLoot(level) {
       const { display, powerText } = await _resolveRawPower(rawPower, "armor");
       itemData.name = display ? `${accName} ${display}` : accName;
       _addPowerValue(itemData, powerText, null);
-      const accEffects = _buildEffectsForPower(powerText);
-      if (accEffects.length) itemData.effects = accEffects;
+      _applyRelicPower(itemData, powerText);
       items.push(itemData);
     } else {
       // Actual armor
@@ -2005,7 +2015,7 @@ export async function generateLevelLoot(level) {
           const matN = await _R("1d12", "Armor Material");
           const mat = ARMOR_MATERIAL[matN];
           if (mat && mat !== "Mundane") {
-            itemData.system.metal = mat.toLowerCase();
+            itemData.system.metal = _metalKey(mat);
             itemData.name = `${mat} ${itemData.name}`;
           }
         }
@@ -2014,8 +2024,7 @@ export async function generateLevelLoot(level) {
         if (display) itemData.name += ` ${display}`;
         _addPowerValue(itemData, powerText, itemData.system?.metal ?? null);
         // Apply relic Active Effects
-        const effects = _buildEffectsForPower(powerText);
-        if (effects.length) itemData.effects = effects;
+        _applyRelicPower(itemData, powerText);
         items.push(itemData);
       }
     }
@@ -2044,7 +2053,7 @@ export async function generateLevelLoot(level) {
         const matN = await _R("1d8", "Weapon Material");
         const mat = WEAPON_MATERIAL[matN];
         if (mat && mat !== "Mundane") {
-          itemData.system.metal = mat.toLowerCase();
+          itemData.system.metal = _metalKey(mat);
           itemData.name = `${mat} ${itemData.name}`;
         }
       }
@@ -2053,8 +2062,7 @@ export async function generateLevelLoot(level) {
       if (display) itemData.name += ` ${display}`;
       _addPowerValue(itemData, powerText, itemData.system?.metal ?? null);
       // Apply relic Active Effects
-      const effects = _buildEffectsForPower(powerText);
-      if (effects.length) itemData.effects = effects;
+      _applyRelicPower(itemData, powerText);
       items.push(itemData);
     }
   } else {

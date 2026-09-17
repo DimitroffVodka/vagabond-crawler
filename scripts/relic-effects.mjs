@@ -55,6 +55,121 @@ function _getWeaponRelicFlags(item) {
   return results;
 }
 
+/** Flag values off the relic AEs currently applying to an actor (the system's
+ *  applicationMode gating decides which apply — when-equipped, etc). */
+function _appliedRelicFlags(actor) {
+  return (actor?.appliedEffects ?? []).map(e => e.flags?.[MODULE_ID]).filter(f => f?.relicPower);
+}
+
+/* ── Senses & light: relic powers that change the wearer's token ───────── */
+
+const _RANGE_FT = {
+  close: () => CONFIG.VAGABOND?.closeRangeFeet ?? 5,
+  near:  () => CONFIG.VAGABOND?.nearRangeFeet ?? 30,
+  far:   () => 60,  // ponytail: the system defines no Far distance; 60 ft (2× Near) until it does
+};
+
+/** grantedSense → Foundry vision mode / detection mode. range null = sight-limited. */
+const _RELIC_SENSES = {
+  darksight:    { vision: "darkvision" },
+  allsight:     { detection: "seeAll", range: null },
+  tremorsense:  { detection: "feelTremor", range: "near" },
+  echolocation: { detection: "senseAll", range: "near" },
+  senseLife:    { detection: "senseAll", range: "near" },
+};
+
+const _RELIC_LIGHTS = {
+  sunlight:  { color: "#fff1c9", luminosity: 0.5, negative: false },
+  moonlight: { color: "#a9c3ff", luminosity: 0.3, negative: false },
+  darkness:  { color: null,      luminosity: 0.5, negative: true },
+};
+
+const _lightKey = l => JSON.stringify([l?.dim ?? 0, l?.bright ?? 0, !!l?.negative, l?.color ?? null]);
+
+/** Update entry that deletes a key (Foundry 14 _del, legacy "-=" before). */
+function _deleteKey(path) {
+  if (globalThis._del !== undefined) return { [path]: globalThis._del };
+  const i = path.lastIndexOf(".");
+  return { [`${path.slice(0, i)}.-=${path.slice(i + 1)}`]: null };
+}
+
+/** Bring one token in line with the relic senses/light its actor should have.
+ *  What we changed (and what was there before) lives in flags.vagabond-crawler.relicToken,
+ *  so removing the relic restores the token and never touches a light someone else set. */
+async function _syncRelicToken(tdoc) {
+  const actor = tdoc?.actor;
+  if (!actor) return;
+  const src = tdoc._source;
+  // Stored as a JSON string: flag updates merge objects, and removed keys must go.
+  const raw = tdoc.getFlag(MODULE_ID, "relicToken");
+  const state = typeof raw === "string" ? JSON.parse(raw) : (raw ?? {});
+  const next = { detection: { ...(state.detection ?? {}) } };
+  const update = {};
+  const flags = _appliedRelicFlags(actor);
+
+  // Detection modes
+  const wantDet = {};
+  for (const f of flags) {
+    const d = _RELIC_SENSES[f.grantedSense];
+    if (d?.detection) wantDet[d.detection] = d.range ? _RANGE_FT[d.range]() : null;
+  }
+  for (const [id, range] of Object.entries(wantDet)) {
+    const cur = src.detectionModes?.[id];
+    if (!(id in next.detection)) next.detection[id] = cur ? foundry.utils.deepClone(cur) : null;
+    if (!cur?.enabled || cur.range !== range) update[`detectionModes.${id}`] = { enabled: true, range };
+  }
+  for (const [id, prev] of Object.entries(next.detection)) {
+    if (id in wantDet) continue;
+    Object.assign(update, prev ? { [`detectionModes.${id}`]: prev } : _deleteKey(`detectionModes.${id}`));
+    delete next.detection[id];
+  }
+
+  // Darksight
+  if (flags.some(f => _RELIC_SENSES[f.grantedSense]?.vision)) {
+    next.vision = state.vision ?? { visionMode: src.sight.visionMode, range: src.sight.range };
+    if (src.sight.visionMode !== "darkvision") update["sight.visionMode"] = "darkvision";
+    if (!state.vision) update["sight.range"] = null;
+  } else if (state.vision) {
+    update["sight.visionMode"] = state.vision.visionMode;
+    update["sight.range"] = state.vision.range;
+  }
+
+  // Emitted light: the widest applying relic light
+  let want = null;
+  for (const f of flags) {
+    if (!_RELIC_LIGHTS[f.lightType]) continue;
+    const r = (_RANGE_FT[f.lightRange] ?? _RANGE_FT.close)();
+    if (!want || r > want.range) want = { type: f.lightType, range: r };
+  }
+  const nowKey = _lightKey(src.light);
+  const ours = !!state.light && nowKey === state.light;
+  if (want) {
+    const light = { ..._RELIC_LIGHTS[want.type], dim: want.range, bright: want.range, animation: { type: null } };
+    const unlit = !src.light.dim && !src.light.bright && !tdoc.flags?.vagabond?.prevLight;
+    if (ours || unlit) {
+      if (nowKey !== _lightKey(light)) update.light = light;
+      next.light = _lightKey(light);
+    }
+  } else if (ours) {
+    update.light = { dim: 0, bright: 0, negative: false, color: null, luminosity: 0.5 };
+  }
+
+  // Nothing managed → no flag at all (don't stamp every token in the world).
+  const empty = !Object.keys(next.detection).length && !next.vision && !next.light;
+  const nextRaw = empty ? null : JSON.stringify(next);
+  const flagChanged = (raw ?? null) !== nextRaw;
+  if (!Object.keys(update).length && !flagChanged) return;
+  const path = `flags.${MODULE_ID}.relicToken`;
+  if (flagChanged) Object.assign(update, nextRaw ? { [path]: nextRaw } : _deleteKey(path));
+  await tdoc.update(update, { vcRelicSync: true });
+}
+
+function _syncRelicActor(actor) {
+  if (!actor || game.user !== game.users.activeGM) return;
+  const tokens = actor.isToken ? [actor.token] : actor.getActiveTokens(false, true);
+  for (const tdoc of tokens) _syncRelicToken(tdoc).catch(e => console.warn(`${MODULE_ID} | relic token sync failed:`, e));
+}
+
 /* -------------------------------------------- */
 /*  Relic Effects Singleton                     */
 /* -------------------------------------------- */
@@ -75,6 +190,9 @@ export const RelicEffects = {
     // flags and inject the dice at roll time, scoped to the firing item.
     this._patchItemRollDamage();
     this._patchDamageHelper();
+    this._patchAutoFailSaves();
+    this._patchDefenses();
+    this._registerTokenSync();
 
     // Hook into actor updates to detect kills for lifesteal / manasteal.
     Hooks.on("updateActor", (actor, changes, options, userId) => {
@@ -118,7 +236,7 @@ export const RelicEffects = {
     for (const { flags } of relicFlags) {
       if (!flags.baneTarget || !flags.baneDice) continue;
       for (const t of targets) {
-        const bt = t?.system?.beingType || "";
+        const bt = t?.system?.beingType || t?.system?.attributes?.beingType || "";  // NPC | character
         if (bt.toLowerCase().includes(flags.baneTarget.toLowerCase())) {
           parts.push({ formula: flags.baneDice, label: `Bane (${flags.baneTarget})` });
           break;
@@ -143,12 +261,15 @@ export const RelicEffects = {
       }
     }
 
-    // Fabled Vicious: extra crit damage scaled to actor's hit die
+    // Fabled Vicious: on crit, extra damage equal to 2× the wielder's Hit Die.
+    // NPCs carry HD (system.hd); PCs have none, so Level stands in (the
+    // rules scale NPC HD against PC Level). The old read of system.hitDie
+    // matched no field and always rolled 2d6.
     if (crit) {
       for (const { flags } of relicFlags) {
         if (flags.relicPower === "vicious") {
-          const hd = actor?.system?.hitDie || "d6";
-          parts.push({ formula: `2${hd}`, label: "Vicious (Crit)" });
+          const hd = actor?.system?.hd ?? actor?.system?.attributes?.level?.value ?? 1;
+          parts.push({ formula: String(2 * hd), label: "Vicious (Crit)" });
         }
       }
     }
@@ -187,8 +308,10 @@ export const RelicEffects = {
 
     const original = VagabondItem.prototype.rollDamage;
     const self = this;
-    async function wrapped(actor, isCritical = false, statKey = null) {
-      const baseRoll = await original.call(this, actor, isCritical, statKey);
+    // ...rest = (targetsAtRollTime, dieOverride, skillKey) on 5.38: weakness pre-roll,
+    // per-die bonus doubling, Cleave's die step-down and the swung skill all need them.
+    async function wrapped(actor, isCritical = false, statKey = null, ...rest) {
+      const baseRoll = await original.call(this, actor, isCritical, statKey, ...rest);
       // Base may be null (no damage formula — Grapple, Net, etc.) — pass through
       if (!baseRoll) return baseRoll;
 
@@ -244,6 +367,120 @@ export const RelicEffects = {
   /*  Monkey-patch: VagabondDamageHelper           */
   /* -------------------------------------------- */
 
+  /**
+   * Cursed Anger / Cowardice / Gullibility: "auto-fail saves vs <status>".
+   * Every on-hit status goes through StatusHelper.applyStatus, whose
+   * skipSaveRoll option bypasses the resist save — set it when an applied
+   * relic AE on the target carries `autoFailSaveVs` for that status. The
+   * system's applicationMode gating (when-equipped) decides which AEs apply.
+   */
+  async _patchAutoFailSaves() {
+    let StatusHelper;
+    try {
+      ({ StatusHelper } = await import("/systems/vagabond/module/helpers/status-helper.mjs"));
+    } catch (e) {
+      console.warn(`${MODULE_ID} | Could not import StatusHelper:`, e);
+      return;
+    }
+    if (!StatusHelper?.applyStatus || isWrapped(StatusHelper, "applyStatus")) return;
+    const orig = StatusHelper.applyStatus;
+    StatusHelper.applyStatus = function (actor, entry, damageWasBlocked, sourceName, options = {}) {
+      const cursed = entry?.statusId && actor?.appliedEffects?.some(
+        e => e.flags?.[MODULE_ID]?.autoFailSaveVs === entry.statusId);
+      if (cursed) options = { ...options, skipSaveRoll: true, preRolledSave: null };
+      return orig.call(this, actor, entry, damageWasBlocked, sourceName, options);
+    };
+    markWrapped(StatusHelper, "applyStatus");
+  },
+
+  /**
+   * Resistance (typed): half damage of that type before Armor.
+   * Protection (niche/specific/general): Favor on saves vs attacks from that
+   *   kind of Being — rides the system's status-resistance Favor vote.
+   * Cursed Doom: healing from a chat-card restorative capped at 1 per die.
+   */
+  async _patchDefenses() {
+    let DH;
+    try {
+      ({ VagabondDamageHelper: DH } = await import("/systems/vagabond/module/helpers/damage-helper.mjs"));
+    } catch (e) {
+      console.warn(`${MODULE_ID} | Could not import VagabondDamageHelper:`, e);
+      return;
+    }
+
+    if (DH.calculateFinalDamageDetailed && !isWrapped(DH, "calculateFinalDamageDetailed")) {
+      const orig = DH.calculateFinalDamageDetailed;
+      DH.calculateFinalDamageDetailed = function (actor, damage, damageType, ...rest) {
+        const type = String(damageType ?? "").toLowerCase();
+        const physical = ["blunt", "piercing", "slashing", "physical"].includes(type);
+        const resisted = damage > 0 && _appliedRelicFlags(actor).some(f => {
+          const r = String(f.damageResistance ?? "").toLowerCase();
+          return r && (r === type || (r === "physical" && physical));
+        });
+        return orig.call(this, actor, resisted ? Math.floor(damage / 2) : damage, damageType, ...rest);
+      };
+      markWrapped(DH, "calculateFinalDamageDetailed");
+    }
+
+    if (DH._hasStatusResistanceForSave && !isWrapped(DH, "_hasStatusResistanceForSave")) {
+      const orig = DH._hasStatusResistanceForSave;
+      DH._hasStatusResistanceForSave = async function (targetActor, saveType, ctx = {}) {
+        if (await orig.call(this, targetActor, saveType, ctx)) return true;
+        const src = ctx?.sourceActor;
+        if (!src) return false;
+        const being = String(src.system?.beingType ?? "").toLowerCase();
+        const name = String(src.name ?? "").toLowerCase();
+        return _appliedRelicFlags(targetActor).some(f => {
+          const ward = String(f.wardTarget ?? "").toLowerCase().trim();
+          if (!ward) return false;
+          // General wards name the type in the singular ("Beast" vs "Beasts").
+          if (f.wardType === "general") return being.startsWith(ward);
+          return name.includes(ward) || being.includes(ward);
+        });
+      };
+      markWrapped(DH, "_hasStatusResistanceForSave");
+    }
+
+    if (DH.handleApplyRestorative && !isWrapped(DH, "handleApplyRestorative")) {
+      let dice = null;
+      const orig = DH.handleApplyRestorative;
+      DH.handleApplyRestorative = async function (button, ...rest) {
+        const msg = game.messages.get(button?.closest?.("[data-message-id]")?.dataset.messageId);
+        dice = (msg?.rolls ?? []).flatMap(r => r.dice ?? []).filter(d => d.faces !== 20)
+          .reduce((n, d) => n + d.results.filter(x => x.active !== false).length, 0);
+        try { return await orig.call(this, button, ...rest); } finally { dice = null; }
+      };
+      Hooks.on("vagabond.preDamageApply", ctx => {
+        if (!dice) return;
+        const cap = _appliedRelicFlags(ctx.actor).find(f => f.healingCappedPerDie)?.healingCappedPerDie;
+        if (cap) ctx.amount = Math.min(ctx.amount, cap * dice);
+      });
+      markWrapped(DH, "handleApplyRestorative");
+    }
+  },
+
+  /** Keep relic senses/light on tokens in step with what's equipped. */
+  _registerTokenSync() {
+    const actorOf = doc => doc?.parent?.documentName === "Actor" ? doc.parent
+      : doc?.parent?.parent?.documentName === "Actor" ? doc.parent.parent : null;
+    for (const hook of ["createActiveEffect", "updateActiveEffect", "deleteActiveEffect", "createItem", "updateItem", "deleteItem"]) {
+      Hooks.on(hook, doc => _syncRelicActor(actorOf(doc)));
+    }
+    Hooks.on("createToken", tdoc => { if (game.user === game.users.activeGM) _syncRelicToken(tdoc); });
+    // Another light/vision change (a torch going out restores the old light) —
+    // put the relic's back if it should be there.
+    Hooks.on("updateToken", (tdoc, changes, options) => {
+      if (options?.vcRelicSync || game.user !== game.users.activeGM) return;
+      if ("light" in changes || "sight" in changes || "detectionModes" in changes) _syncRelicToken(tdoc);
+    });
+    const syncScene = () => {
+      if (game.user !== game.users.activeGM) return;
+      for (const tdoc of canvas.scene?.tokens ?? []) _syncRelicToken(tdoc);
+    };
+    Hooks.on("canvasReady", syncScene);
+    if (canvas.ready) syncScene();
+  },
+
   async _patchDamageHelper() {
     // Import from the system's module path
     let DamageHelper;
@@ -270,7 +507,8 @@ export const RelicEffects = {
       // Before the original runs, check for relic bonuses and inject into the button's formula
       const actorId = button.dataset.actorId;
       const itemId = button.dataset.itemId;
-      const actor = game.actors.get(actorId);
+      // 5.38 writes the actor UUID here (bare id on older systems).
+      const actor = actorId?.includes(".") ? fromUuidSync(actorId) : game.actors.get(actorId);
       const item = actor?.items.get(itemId);
 
       if (actor && item) {
@@ -376,11 +614,11 @@ export const RelicEffects = {
           const roll = new Roll(manaDice);
           await roll.evaluate();
           const manaAmount = roll.total;
-          const currentMana = killer.system.mana?.value ?? 0;
+          const currentMana = killer.system.mana?.current ?? 0;
           const maxMana = killer.system.mana?.max ?? 0;
           if (maxMana > 0) {
             const newManaVal = Math.min(currentMana + manaAmount, maxMana);
-            await killer.update({ "system.mana.value": newManaVal });
+            await killer.update({ "system.mana.current": newManaVal });
 
             await ChatMessage.create({
               speaker: ChatMessage.getSpeaker({ actor: killer }),

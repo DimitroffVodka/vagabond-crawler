@@ -74,7 +74,7 @@ class PartyInventoryApp extends HandlebarsApplicationMixin(ApplicationV2) {
           img: i.img,
           quantity: i.system.quantity ?? 1,
           equipped: i.system.equipped,
-          baseCost: _fmtCost(i.system.baseCost),
+          baseCost: _fmtCost(i.system.cost ?? i.system.baseCost),
           isJunk: !!i.getFlag(MODULE_ID, "junk"),
           slots: i.system.slots || i.system.baseSlots || 0,
         }))

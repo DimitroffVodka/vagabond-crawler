@@ -148,6 +148,9 @@ export function register() {
       // Sequencer effect with the same name. If the guard is broken we'd
       // get two stacked instances per token.
       if (typeof Sequencer === "undefined") return;  // nothing to verify
+      // A looping file that ships in the free JB2A pack (the old Light/LightOrb01
+      // path doesn't exist in it, so Sequencer posted a "could not find file" error).
+      if (!game.modules.get("JB2A_DnD5e")?.active) return;
       const afx = game.vagabondCrawler.animationFx;
       const { token } = await ctx.fx.createTestPC(ctx);
       const preset = {
@@ -155,7 +158,7 @@ export function register() {
         type: "onToken",
         target: "self",
         persist: true,
-        hit: { file: "modules/JB2A_DnD5e/Library/Generic/Light/LightOrb01_01_Regular_Yellow_400x400.webm", scale: 1, duration: 1000 },
+        hit: { file: "modules/JB2A_DnD5e/Library/Generic/Marker/MarkerLightOrbLoop_01_Regular_Blue_400x400.webm", scale: 1, duration: 1000 },
       };
       const tag = `vagabond-crawler-fx-${preset.label}-${token.id}`;
       ctx.cleanup(async () => {

@@ -118,7 +118,7 @@ class MyApp extends HandlebarsApplicationMixin(ApplicationV2) {
 | `light-tracker.mjs` | Light source burn time, fuel system (lanterns consume oil), 12 light source types, real-time mode, canvas drop/pickup, party token light transfer |
 | `morale-checker.mjs` | Auto morale checks on death/half-defeated/solo-half-HP |
 | `rest-breather.mjs` | Recovery dialog — breather (ration + heal) and full rest |
-| `flanking-checker.mjs` | Auto-apply Vulnerable when 2+ allies adjacent to foe, mirrors outgoingSavesModifier to world actor for unlinked tokens |
+| `flanking-checker.mjs` | Auto-apply Vulnerable when 2+ allies adjacent to foe (idle on vagabond 5.38+, which has a native `flanked` status) |
 | `npc-abilities.mjs` | Passive hooks: Pack Instincts/Tactics (save hinder), Magic Ward I/II/III (cast penalty), npcAction wrapper |
 | `animation-fx.mjs` | Animation FX subsystem — **authoritative** resolver + playback for weapons, alchemical, gear, NPC actions. `createChatMessage` hook trigger (covers all UI paths). Per-item/per-action override flags. Posts GM warning if `vagabond.useItemAnimations` is on (would cause double-fire on sheet clicks). |
 | `animation-fx-config.mjs` | ApplicationV2 config window for Animation FX — 6 tabs (Weapons, Skill Fallbacks, Alchemical, Gear, NPC Actions, Settings) with hit/miss animation editor |
@@ -129,8 +129,9 @@ class MyApp extends HandlebarsApplicationMixin(ApplicationV2) {
 | `countdown-roller.mjs` | Auto-rolls countdown dice at round start, applies tick damage, cleans up on combat end |
 | `scroll-forge.mjs` | Spell Scroll Forge ApplicationV2 — create consumable scrolls from compendium, use via context menu |
 | `relic-forge.mjs` | Relic crafting ApplicationV2 window |
-| `relic-effects.mjs` | Relic power application and active effects |
+| `relic-effects.mjs` | Relic power consumers: bonus dice (Strike/Bane/Vicious), lifesteal/manasteal, cursed auto-fail saves, Resistance/Protection/Doom damage-helper wraps, relic senses + light synced onto tokens (`flags.vagabond-crawler.relicToken`) |
 | `relic-powers.mjs` | Relic power definitions |
+| `relic-activations.mjs` | Activated relic powers on the item context menu (Blast, Precision, After-Image, Wish, Store Spell), Benediction preUpdateActor save, per-day/week use tracking (`flags.vagabond-crawler.relicUses`), reset on Rest |
 | `loot-drops.mjs` | Automatic loot assignment on NPC defeat (Owner permission for all players) |
 | `loot-manager.mjs` | Loot distribution ApplicationV2 window |
 | `loot-tracker.mjs` | Session loot tracking ApplicationV2 window |
@@ -211,7 +212,7 @@ Conventional Commits: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`. Short imp
 - **GM check**: `if (!game.user.isGM) return;` before state mutations or broadcasts
 - **Render debounce**: CrawlStrip uses `requestAnimationFrame` queuing
 - **Linked + unlinked tokens**: always handle both — use `token.actor` (synthetic) not just actor ID
-- **World actor vs token actor**: the save system uses `game.actors.get(actorId)` (world actor). When applying effects to unlinked tokens, mirror relevant changes (e.g. `outgoingSavesModifier`) to the world actor too. See flanking-checker and npc-abilities for examples.
+- **World actor vs token actor**: vagabond 5.38 writes actor **UUIDs** into chat flags (`flags.vagabond.actorId`) and button `data-actor-id`, and resolves them with `TargetHelper.resolveActorRef` — so the save source is the attacking token's own (synthetic) actor. Apply effects to `token.actor`; do NOT mirror them to the world actor (that leaks them to every other token of the NPC). Read those refs with `fromUuidSync` (or `game.actors.get` only for bare ids) — see animation-fx and relic-effects.
 - **Passing actors to npc-abilities helpers**: `applyPackInstincts` and similar expect the synthetic token actor (`tok.actor`), not the world actor. World-actor `getActiveTokens(true)` often returns empty for unlinked tokens, causing the helper to silently no-op.
 - **Disposition over actor type**: use `token.document.disposition === CONST.TOKEN_DISPOSITIONS.FRIENDLY` for hero/NPC classification, NOT `actor.type === "character"`. Friendly NPC summons must appear on the Heroes side.
 - **Party actor speed**: `system.speed` is an object `{ base, crawl }` on characters but a flat number on party actors. Always check `typeof system.speed === "object"` before accessing `.base` / `.crawl`.

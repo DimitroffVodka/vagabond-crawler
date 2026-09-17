@@ -496,7 +496,12 @@ export const AnimationFx = {
     const flag = message.flags?.vagabond?.rollOutcome;
     if (flag === "hit" || flag === "miss") return flag;
     const content = message.content ?? "";
-    if (/\bMISS\b/i.test(content) && !/\bHIT\b/i.test(content)) return "miss";
+    // 5.38 writes no rollOutcome flag; the roll banner carries result-hit / result-miss.
+    // Prefer that over word matching, which read any "hit" in the card text (e.g.
+    // "on hit") as a hit.
+    if (content.includes("result-miss")) return "miss";
+    if (content.includes("result-hit")) return "hit";
+    if (/\bMISS\b/.test(content) && !/\bHIT\b/.test(content)) return "miss";
     return "hit";
   },
 
@@ -837,7 +842,9 @@ export const AnimationFx = {
       if (!actor || actor.type !== "npc") return;
       const el = sheet.element;
       if (!el) return;
-      const rows = el.querySelectorAll("[data-action-index]");
+      // Only the action rows themselves: on an unlocked sheet the remove button,
+      // caused-status lists and status chips carry data-action-index too.
+      const rows = el.querySelectorAll(".npc-action-view[data-action-index], .npc-action-edit[data-action-index]");
       rows.forEach(row => {
         if (row.querySelector(".vcfx-action-override")) return;
         const idx = Number(row.dataset.actionIndex);

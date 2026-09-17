@@ -53,7 +53,18 @@ export const FlankingChecker = {
 
   _debounceTimer: null,
 
+  /** Vagabond 5.38+ tracks flanking itself: a `flanked` status (the same Vulnerable
+   *  changes plus +2 damage) applied by FlankingHelper on move/combat. Running ours
+   *  too stacks a second Vulnerable effect on every flanked token. */
+  get systemHandlesFlanking() {
+    return CONFIG.statusEffects?.some(s => s.id === "flanked") ?? false;
+  },
+
   init() {
+    if (this.systemHandlesFlanking) {
+      console.log(`${MODULE_ID} | Flanking: system handles it natively (flanked status) — checker idle.`);
+      return;
+    }
     // Re-evaluate flanking whenever any token moves
     Hooks.on("updateToken", (doc, changes) => {
       if (!game.user.isGM || !game.combat) return;
@@ -163,9 +174,9 @@ export const FlankingChecker = {
       origin:   `module.${MODULE_ID}.flanking`,
       flags:    { [MODULE_ID]: { flanking: true } },
       changes: [
-        { key: "system.favorHinder",              mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "hinder" },
-        { key: "system.incomingAttacksModifier",   mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "favor"  },
-        { key: "system.outgoingSavesModifier",     mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "favor"  },
+        { key: "system.favorHinder",              type: "override", value: "hinder" },
+        { key: "system.incomingAttacksModifier",   type: "override", value: "favor"  },
+        { key: "system.outgoingSavesModifier",     type: "override", value: "favor"  },
       ],
     };
   },
@@ -189,7 +200,7 @@ export const FlankingChecker = {
           origin:   `module.${MODULE_ID}.flanking.saves`,
           flags:    { [MODULE_ID]: { flanking_saves: true } },
           changes: [
-            { key: "system.outgoingSavesModifier", mode: CONST.ACTIVE_EFFECT_MODES.OVERRIDE, value: "favor" },
+            { key: "system.outgoingSavesModifier", type: "override", value: "favor" },
           ],
         }]);
       }

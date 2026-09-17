@@ -7,7 +7,7 @@
  */
 
 import { MODULE_ID } from "./vagabond-crawler.mjs";
-import { RELIC_POWERS, RELIC_POWER_CATEGORIES, METAL_DISPLAY_NAMES, getRelicPower, getPowersByCategory, getCustomRelicPowers } from "./relic-powers.mjs";
+import { RELIC_POWERS, RELIC_POWER_CATEGORIES, METAL_DISPLAY_NAMES, getRelicPower, getPowersByCategory, getCustomRelicPowers, buildRelicPowerData } from "./relic-powers.mjs";
 import { confirmDialog } from "./dialog-helpers.mjs";
 
 /* -------------------------------------------- */
@@ -104,67 +104,11 @@ export const RelicForge = {
       return { relicName: item.name, powerCost: 0, effectsCreated: 0 };
     }
 
-    const updates = {};
-    const effectDocs = [];
-    let powerCost = 0;
-    const inputsRecord = {};
-
-    for (const power of powers) {
-      powerCost += power.cost || 0;
-      const input = userInputs[power.id] ?? power._userInput ?? "";
-      if (power.id) inputsRecord[power.id] = input;
-
-      const changes = (power.changes || []).map(e => ({
-        key:   e.key.replace("{input}", input),
-        mode:  e.mode,
-        value: String(e.value).replace("{input}", input),
-      }));
-
-      const moduleFlags = { relicPower: power.id || power.name, managed: true };
-      if (power.flags) {
-        for (const [k, v] of Object.entries(power.flags)) {
-          moduleFlags[k] = typeof v === "string" ? v.replace("{input}", input) : v;
-        }
-      }
-
-      // The system filters AEs by `flags.vagabond.applicationMode`:
-      //   permanent     → always applies
-      //   when-equipped → applies while parent.system.equipped is true
-      //   on-use        → skipped from the actor pass; applied as a temporary
-      //                   roll-data overlay only for rolls FROM this item
-      // Defaulting to 'when-equipped' preserves the original Crawler behavior
-      // for any custom power that omits the field.
-      const applicationMode = power.applicationMode || 'when-equipped';
-      effectDocs.push({
-        name:     `Relic: ${power.name}${input ? ` (${input})` : ""}`,
-        icon:     item.img || "icons/svg/item-bag.svg",
-        changes,
-        disabled: false,
-        transfer: true,
-        flags: {
-          [MODULE_ID]: { ...moduleFlags },
-          vagabond:   { applicationMode },
-        },
-      });
-    }
-
+    const { effectDocs, system, relicForge } = buildRelicPowerData(item.toObject(), powers, userInputs);
     const relicName = this.computeRelicName(item.toObject(), powers, userInputs);
-    updates.name = relicName;
-    updates[`flags.${MODULE_ID}.relicForge`] = {
-      forged:      true,
-      powers:      powers.map(p => p.id || p.name),
-      userInputs:  inputsRecord,
-      powerCost,
-      forgedAt:    Date.now(),
-    };
-
-    const existingProps = new Set(item.system.properties || []);
-    for (const power of powers) {
-      if (power.addProperties) {
-        for (const prop of power.addProperties) existingProps.add(prop);
-      }
-    }
-    updates["system.properties"] = Array.from(existingProps);
+    const powerCost = relicForge.powerCost;
+    const updates = { name: relicName, [`flags.${MODULE_ID}.relicForge`]: relicForge };
+    for (const [k, v] of Object.entries(system)) updates[`system.${k}`] = v;
 
     await item.update(updates);
     if (effectDocs.length > 0) {

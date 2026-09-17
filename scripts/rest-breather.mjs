@@ -7,6 +7,7 @@
 
 import { MODULE_ID }    from "./vagabond-crawler.mjs";
 import { waitDialog }   from "./dialog-helpers.mjs";
+import { RelicActivations } from "./relic-activations.mjs";
 
 export const RestBreather = {
 
@@ -71,6 +72,7 @@ export const RestBreather = {
   },
 
   async _doRest(characters) {
+    await RelicActivations.onRest(characters);
     const results = [];
     for (const actor of characters) {
       const s = actor.system, hp = s.health, updates = {}, desc = [];
@@ -87,7 +89,7 @@ export const RestBreather = {
         desc.push(`HP ${hp.value} → ${hp.max}`);
       }
 
-      const luckMax = s.stats?.luck?.total ?? 0;
+      const luckMax = s.maxLuck ?? s.stats?.luck?.total ?? 0;
       if ((s.currentLuck ?? 0) < luckMax) {
         updates["system.currentLuck"] = luckMax;
         desc.push(`Luck → ${luckMax}`);
