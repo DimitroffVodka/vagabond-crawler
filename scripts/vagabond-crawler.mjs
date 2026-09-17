@@ -1118,6 +1118,9 @@ Hooks.once("ready", () => {
     if (data.action === "rollbackMove" && game.user.isGM) {
       await MovementTracker.rollback(data.tokenId);
     }
+    if (data.action === "afterImage" && game.user === game.users.activeGM) {
+      await game.scenes.get(data.sceneId)?.createEmbeddedDocuments("Token", [data.data]);
+    }
     // Item Drops and Loot Drops register their own socket handlers in init()
   });
 });

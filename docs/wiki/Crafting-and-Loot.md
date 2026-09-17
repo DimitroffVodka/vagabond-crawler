@@ -67,6 +67,8 @@ Per-NPC table and chance values live on actor flags or in the compendium loot co
 
 ## Relic Forge
 
+> Contributor notes for the relic runtime: [developer reference](https://github.com/DimitroffVodka/vagabond-crawler/blob/main/docs/dev/crafting-loot.md).
+
 Relic Forge adds powers to a weapon, armor, trinket, or other equipment. The left column browses the 11 power categories. The middle holds the base item and any input required by a power, such as a creature type for Bane. The right column lists the selected powers and their displayed costs.
 
 Forging can rename the item, add properties, stamp Crawler metadata, and create transfer Active Effects. Effects marked **when equipped** stay inactive while the relic is in a backpack.

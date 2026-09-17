@@ -262,6 +262,13 @@ export function register() {
       expect(`new dead paths: ${surprises.join(", ")}`).toBe("new dead paths: ");
     });
 
+    // ── The status the Flanking Checker defers to ─────────────────────────
+    case_("vagabond 5.38+ still registers the `flanked` status the checker idles on", async () => {
+      if (foundry.utils.isNewerVersion("5.38", game.system.version)) return;
+      // Renamed → FlankingChecker wakes up and stacks a second Vulnerable on every flanked token.
+      expect(CONFIG.statusEffects.some(s => s.id === "flanked")).toBe(true);
+    });
+
     // ── Declared compatibility hasn't fallen behind reality ───────────────
     case_("module.json verified system version tracks the installed one", async () => {
       const mod = game.modules.get(MODULE_ID);

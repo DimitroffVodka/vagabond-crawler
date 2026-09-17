@@ -275,6 +275,31 @@ export function register() {
       const [back] = await canvas.scene.createEmbeddedDocuments("Token", [snap]);
       expect(await until(() => !back.light.dim)).toBe(true);
       expect(pTok.getFlag(MODULE_ID, "partyLights")).toBe(undefined);
+      expect(await until(() => back.getFlag("vagabond", "litItems") === undefined)).toBe(true);
+    });
+
+    case_("gathering two lit members at once records both lights and hands both back", async (ctx) => {
+      if (!LS()) return;
+      stubHourMode(ctx);
+      const a = await ctx.fx.createTestPC(ctx);
+      const b = await ctx.fx.createTestPC(ctx);
+      const party = await Actor.create({ name: "VCTest Party", type: "party", flags: { vctest: { created: true } }, system: { members: [a.actor.uuid, b.actor.uuid] } });
+      const [pTok] = await canvas.scene.createEmbeddedDocuments("Token", [{ actorId: party.id, actorLink: true, x: a.tokenDoc.x + canvas.grid.size * 3, y: a.tokenDoc.y }]);
+      ctx.cleanup(async () => { for (const t of canvas.scene.tokens.filter(t => [party.id, a.actor.id, b.actor.id].includes(t.actorId))) await t.delete(); await party.delete(); });
+      for (const m of [a, b]) {
+        const [torch] = await m.actor.createEmbeddedDocuments("Item", [sysTorch()]);
+        await LS().use({ actor: m.actor, item: torch, token: m.tokenDoc, light: { bright: 25, dim: 30 } });
+      }
+      const snaps = [a, b].map(m => { const { _id, ...s } = m.tokenDoc.toObject(); return s; });
+
+      await canvas.scene.deleteEmbeddedDocuments("Token", [a.tokenDoc.id, b.tokenDoc.id]);
+      const keys = () => Object.keys(JSON.parse(pTok.getFlag(MODULE_ID, "partyLights") || "{}"));
+      expect(await until(() => keys().length === 2, 3000)).toBe(true);
+      expect(clocksWhere(ls => ls.tokenUuid === pTok.uuid).length).toBe(2);
+
+      const back = await canvas.scene.createEmbeddedDocuments("Token", snaps);
+      expect(await until(() => pTok.getFlag(MODULE_ID, "partyLights") === undefined, 3000)).toBe(true);
+      expect(back.every(t => clocksWhere(ls => ls.tokenUuid === t.uuid).length === 1)).toBe(true);
     });
 
 

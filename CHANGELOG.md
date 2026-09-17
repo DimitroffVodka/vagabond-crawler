@@ -4,7 +4,7 @@
 
 ### Vagabond 5.38.1 compatibility
 
-Verified live against vagabond 5.38.1 on Foundry 14.367: 118/118 smoke cases.
+Tested live against vagabond 5.38.1 on Foundry 14.367 — `await game.vagabondCrawler.test.run()` returned `total: 121, passed: 121, failed: 0`.
 
 - **Wraps forward every argument.** `rollAttack` / `rollDamage` wraps dropped 5.38's new targets, die-override and skill arguments.
 - **Crawl Strip matches the sheet.**

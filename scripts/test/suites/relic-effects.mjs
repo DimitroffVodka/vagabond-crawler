@@ -328,6 +328,16 @@ export function register() {
       await RelicForge.forgeItem(item, ids.map(getRelicPower));
     };
 
+    case_("Loot Generator power text maps Fabled and named Bane/Protection onto forge data", async () => {
+      const { _applyRelicPower } = await import(`/modules/${MODULE_ID}/scripts/loot-generator.mjs`);
+      const forge = (text) => { const d = { name: "Sword", type: "equipment", system: { equipmentType: "weapon" } }; _applyRelicPower(d, text); return d.flags?.[MODULE_ID]?.relicForge; };
+      expect(forge("Fabled, Vicious")?.powers?.[0]).toBe("fabled-vicious");
+      expect(forge("Bane of Goblin (Niche)")?.powers?.[0]).toBe("bane-niche");
+      expect(forge("Bane of Goblin (Niche)")?.userInputs?.["bane-niche"]).toBe("Goblin");
+      expect(forge("Bane of Beast, Wolf")?.powers?.[0]).toBe("bane-specific");
+      expect(forge("Protection vs Undead")?.powers?.[0]).toBe("protection-general");
+    });
+
     case_("Precision forces exactly one hit, then disarms", async (ctx) => {
       const { actor: pc } = await ctx.fx.createTestPC(ctx);
       const weapon = await ctx.fx.addWeapon(pc, { name: "VCTest Precise" });

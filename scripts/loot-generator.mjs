@@ -628,8 +628,17 @@ async function _resolveRawPower(rawPower, powerTable = "weapon", depth = 0) {
  *  Relic Forge does (AEs + applicationMode, relicForge flag, properties,
  *  on-hit statuses). Without the relicForge flag the damage patches skip the
  *  item, so Strike/Bane/Vicious never fired on generated relics. */
-function _applyRelicPower(itemData, powerText, input = "") {
-  const power = _findRelicPower(powerText);
+export function _applyRelicPower(itemData, powerText, input = "") {
+  // Table spellings the alias map doesn't know: "Fabled, Vicious" is Vicious;
+  // "Bane of Goblin (Niche)" / "Protection vs Undead" name the creature, and the
+  // tier follows _powerGoldValue's rule (niche suffix, comma = subtype, else type).
+  const named = powerText.match(/^(Bane of|Protection vs)\s+(.+?)(\s*\(niche\))?$/i);
+  if (named) {
+    const tier = named[3] ? "niche" : named[2].includes(",") ? "specific" : "general";
+    powerText = `${named[1].startsWith("Bane") ? "bane" : "protection"}-${tier}`;
+    input ||= named[2];
+  }
+  const power = _findRelicPower(powerText.replace(/^fabled,\s*/i, ""));
   if (!power) return;
   // For typed resistance, extract the element from the power text
   if (power.id === "resistance-typed" && !input) {

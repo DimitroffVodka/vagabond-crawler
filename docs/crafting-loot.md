@@ -71,6 +71,8 @@ Per-NPC table + chance overrides live as actor flags (`vagabond-crawler.lootTabl
 
 <!-- gif: docs/assets/relic-forge.gif -->
 
+Contributor notes for the relic runtime (flags, system wraps, hooks, use tracking) live in the [dev reference](dev/crafting-loot.md).
+
 ### What it does
 
 A three-column workbench for upgrading any weapon, armor, trinket, or other equipment into a magical relic. The **left column** is the power browser — 11 categories (Ace, Bane, Bonus, Cursed, Fabled, Movement, Protection, Resistance, Senses, Strike, Utility) containing the full Vagabond Relic Naming Procedure catalog. The **middle column** holds the base item plus user-input fields for parameterized powers (creature type for Bane, damage type for Resistance, spell name for utility scrolls). The **right column** is the selection list with per-power costs and a running total.

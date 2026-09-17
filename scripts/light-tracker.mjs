@@ -717,6 +717,10 @@ export const LightTracker = {
     const writeLights = (pdoc, lights) => Object.keys(lights).length
       ? pdoc.setFlag(MODULE_ID, "partyLights", JSON.stringify(lights))
       : pdoc.unsetFlag(MODULE_ID, "partyLights");
+    // Gather and release touch every member at once; serialise the
+    // read-modify-write of partyLights so members don't overwrite each other.
+    let queue = Promise.resolve();
+    const serial = fn => (queue = queue.catch(() => {}).then(fn));
     // The owner comes from the item uuid itself ("Actor.X.Item.Y"): a burned-out
     // item is already deleted by the time our hooks look.
     const ownerUuidOf = ls => ls.itemUuid?.split(".Item.")[0] ?? null;
@@ -732,29 +736,34 @@ export const LightTracker = {
       if (!actor || actor.getFlag(MODULE_ID, VLT_LIGHT_ACTOR_FLAG)) return;
       const light = foundry.utils.deepClone(tokenDoc._source.light);
       const oldUuid = tokenDoc.uuid;
-      setTimeout(async () => {
+      setTimeout(() => serial(async () => {
         const pdoc = _findPartyToken(actor)?.document;
         if (!pdoc) return;
         await rebind(oldUuid, pdoc.uuid);
         await writeLights(pdoc, { ...readLights(pdoc), [actor.uuid]: light });
         await LS._applyLight(pdoc, light);
-      }, 500);
+      }), 500);
     });
 
-    Hooks.on("createToken", async tdoc => {
+    Hooks.on("createToken", tdoc => {
       if (!isGM() || tdoc.actor?.type === "party") return;
       const actor = tdoc.actor;
-      const pdoc = canvas.scene?.tokens.find(t => t.actor?.type === "party" && readLights(t)[actor?.uuid] !== undefined);
-      if (!pdoc) return;
-      const lights = readLights(pdoc);
-      const entry = lights[actor.uuid];
-      delete lights[actor.uuid];
-      await rebind(pdoc.uuid, tdoc.uuid, ls => ownerUuidOf(ls) === actor.uuid);
-      if (entry === "expired") await LS._restoreLight(tdoc);  // burned out while gathered
-      const still = Object.values(lights).filter(l => l !== "expired");
-      if (still.length) await pdoc.update({ light: still[0] });
-      else await LS._restoreLight(pdoc);
-      await writeLights(pdoc, lights);
+      serial(async () => {
+        const pdoc = canvas.scene?.tokens.find(t => t.actor?.type === "party" && readLights(t)[actor?.uuid] !== undefined);
+        if (!pdoc) return;
+        const lights = readLights(pdoc);
+        const entry = lights[actor.uuid];
+        delete lights[actor.uuid];
+        await rebind(pdoc.uuid, tdoc.uuid, ls => ownerUuidOf(ls) === actor.uuid);
+        if (entry === "expired") {  // burned out while gathered: the snapshot still says lit
+          await LS._restoreLight(tdoc);
+          if (tdoc.getFlag("vagabond", "litItems") !== undefined) await tdoc.unsetFlag("vagabond", "litItems");
+        }
+        const still = Object.values(lights).filter(l => l !== "expired");
+        if (still.length) await pdoc.update({ light: still[0] });
+        else await LS._restoreLight(pdoc);
+        await writeLights(pdoc, lights);
+      });
     });
 
     Hooks.on("deleteJournalEntry", (journal, options) => {
@@ -775,12 +784,14 @@ export const LightTracker = {
         }
         if (tdoc.actor?.type !== "party") return;
         const ownerUuid = ownerUuidOf(ls);
-        const lights = readLights(tdoc);
-        if (!ownerUuid || lights[ownerUuid] === undefined) return;
-        lights[ownerUuid] = "expired";
-        await writeLights(tdoc, lights);
-        const still = Object.values(lights).filter(l => l !== "expired");
-        if (still.length) await LS._applyLight(tdoc, still[0]);
+        await serial(async () => {
+          const lights = readLights(tdoc);
+          if (!ownerUuid || lights[ownerUuid] === undefined) return;
+          lights[ownerUuid] = "expired";
+          await writeLights(tdoc, lights);
+          const still = Object.values(lights).filter(l => l !== "expired");
+          if (still.length) await LS._applyLight(tdoc, still[0]);
+        });
       }, 300);
     });
   },

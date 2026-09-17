@@ -49,7 +49,7 @@ In combat the budget is the **effective mode speed** — the fastest of walk, fl
 
 Hover a card during combat and a tab strip slides down. PC cards show **Weapons** and **Spells**, plus situational tabs — Craft (alchemist), Beast (polymorphed druid), Step Up (dancer), Virtuoso (bard), Specialty. NPC cards show **Actions** and **Abilities**.
 
-One-click a weapon or NPC action to roll it through the system's normal attack path, so VCE's favor/hinder chain still resolves. Spells open the shared **Cast Spell Dialog** — pick delivery, adjust damage dice, toggle FX, raise area/range; live mana cost updates as you tweak, including Magic-Ward surcharges against targeted wards. A Focus toggle marks the cast as a focus action. Only card owners see the menu; the **NPC Action Menu** setting can disable it entirely.
+One-click a weapon or NPC action to roll it through the system's normal attack path, so VCE's favor/hinder chain still resolves. Spells open the shared **Cast Spell Dialog** — pick delivery, adjust damage dice, toggle FX, raise area/range; live mana cost updates as you tweak, including Magic-Ward surcharges against targeted wards. A Focus toggle marks the cast as a focus action. Rolls from the strip match the sheet on Vagabond 5.38: weapon attacks carry favor/hinder, the roll-damage setting, targets and Cleave (the damage die steps down per extra target); spell costs come from the system's own calculator, the Trinket gate and the mana-on-failed-cast setting apply, Imbue runs through the system's Imbue, and Place Template creates a Region. Only card owners see the menu; the **NPC Action Menu** setting can disable it entirely.
 
 #### HP + Stats Quick Reference
 

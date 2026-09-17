@@ -589,9 +589,8 @@ export async function applyPackInstincts(attacker) {
   // card's actor UUID, so a world-actor copy only leaked the Hinder onto every
   // other token of the same NPC.
   if (applied) {
-    const worldActor = attacker;
-    if (!worldActor.effects.some(_isPackInstinctsEffect)) {
-      await worldActor.createEmbeddedDocuments("ActiveEffect", [{
+    if (!attacker.effects.some(_isPackInstinctsEffect)) {
+      await attacker.createEmbeddedDocuments("ActiveEffect", [{
         name:     "Pack Instincts (active)",
         img:      "icons/svg/downgrade.svg",
         origin:   PACK_INSTINCTS_ORIGIN,

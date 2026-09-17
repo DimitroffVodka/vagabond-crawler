@@ -149,7 +149,9 @@ export const RelicActivations = {
       expiresAt: game.time.worldTime + rounds * 6,
     });
     // ponytail: I = 1 round, II = 10 rounds (1 minute) — the power text only says short/longer.
-    await canvas.scene.createEmbeddedDocuments("Token", [data]);
+    // Players can't create scene tokens: hand the copy to the active GM.
+    if (game.user.isGM) await canvas.scene.createEmbeddedDocuments("Token", [data]);
+    else game.socket.emit(`module.${MODULE_ID}`, { action: "afterImage", sceneId: canvas.scene.id, data });
   },
 
   _expireAfterImages() {
@@ -228,9 +230,9 @@ export const RelicActivations = {
       .map(([k, l]) => `<option value="${k}">${game.i18n.localize(l)}</option>`).join("");
     const state = await foundry.applications.api.DialogV2.prompt({
       window: { title: `Store ${spell.name}` },
-      content: `<div class="form-group"><label>Damage dice</label><input type="number" name="dice" value="${spell.system.damageType === "-" ? 0 : 1}" min="0"></div>
-        <div class="form-group"><label>Delivery</label><select name="delivery">${deliveries}</select></div>
-        <div class="form-group"><label>Effect</label><input type="checkbox" name="fx" ${spell.system.damageType === "-" ? "checked" : ""}></div>`,
+      content: `<div class="form-group"><label for="vc-store-dice">Damage dice</label><input id="vc-store-dice" type="number" name="dice" value="${spell.system.damageType === "-" ? 0 : 1}" min="0"></div>
+        <div class="form-group"><label for="vc-store-delivery">Delivery</label><select id="vc-store-delivery" name="delivery">${deliveries}</select></div>
+        <div class="form-group"><label for="vc-store-fx">Effect</label><input id="vc-store-fx" type="checkbox" name="fx" ${spell.system.damageType === "-" ? "checked" : ""}></div>`,
       ok: { label: "Store", callback: (_e, button) => {
         const f = button.form.elements;
         return { damageDice: Number(f.dice.value) || 0, deliveryType: f.delivery.value, deliveryIncrease: 0, useFx: f.fx.checked };
@@ -324,13 +326,17 @@ export const RelicActivations = {
             for (const entry of this.menuEntries(item).reverse()) {
               const li = document.createElement("div");
               li.className = "context-menu-item vc-relic-ctx";
-              if (entry.disabled) li.style.opacity = "0.5";
+              li.setAttribute("role", "menuitem");
+              li.tabIndex = 0;
+              if (entry.disabled) { li.style.opacity = "0.5"; li.setAttribute("aria-disabled", "true"); }
               li.innerHTML = `<i class="fas ${entry.icon}"></i><span>${entry.label}</span>`;
-              li.addEventListener("click", async ev => {
+              const activate = async ev => {
                 ev.stopPropagation();
                 menu.remove();
                 if (!entry.disabled) await entry.run();
-              });
+              };
+              li.addEventListener("click", activate);
+              li.addEventListener("keydown", ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); activate(ev); } });
               menu.insertBefore(li, menu.firstChild);
             }
           }, 10);

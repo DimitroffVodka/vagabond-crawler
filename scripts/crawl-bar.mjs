@@ -276,17 +276,16 @@ export const CrawlBar = {
         await MovementTracker.resetAll();
         if (result?.newTurn) {
           // A new crawl turn = 1 Scene: advance progress clock + narrative
-          // elapsed time (always). Torches only burn on turn changes when
-          // realtimeTracking is OFF — when it's ON (Shadowdark rule), torches
-          // burn solely on the real-time tick, but the scene clock + session
-          // timer still march forward per turn.
+          // elapsed time (always). Crawler torches only burn on turn changes when
+          // realtimeTracking is OFF — when it's ON (Shadowdark rule), they burn
+          // solely on the real-time tick, but the scene clock + session timer
+          // still march forward per turn. The system's hour clocks are manual
+          // by their own setting, so they tick per turn either way.
           if (CrawlClock.available) await CrawlClock.advance("scene");
           const mins = game.settings.get(MODULE_ID, "timePassesMinutes");
           await CrawlState.addTime(mins);
-          if (!game.settings.get(MODULE_ID, "realtimeTracking")) {
-            await LightTracker.advanceTime(mins * 60);
-            await LightTracker.tickSystemLightClocks(mins);
-          }
+          if (!game.settings.get(MODULE_ID, "realtimeTracking")) await LightTracker.advanceTime(mins * 60);
+          await LightTracker.tickSystemLightClocks(mins);
         }
         this.render();
         (await import("./crawl-strip.mjs")).CrawlStrip.render();
